@@ -17,14 +17,23 @@ ApplicationWindow {
     property bool showingCompare: false
     property bool showingFullScreen: false
     property bool forceApplicationClose: false
+    property int visibilityBeforeFullScreen: Window.Windowed
 
     function openFullScreen(paths, initialIndex) {
         showingCompare = false
         showingFullScreen = true
-        // Keep the main window's native state untouched. A separate full-screen window avoids
-        // the Maximize <-> FullScreen transition that makes the QML scene and image canvas
-        // resize twice on Windows.
-        fullScreenWindow.showFullScreen()
+        if (Qt.platform.os === "osx") {
+            // On macOS, hiding a separate window while Cocoa is still leaving its native
+            // full-screen Space can strand an all-black Space and keep the application alive.
+            // Use the main window there so Cocoa owns one uninterrupted full-screen transition.
+            visibilityBeforeFullScreen = visibility
+            showFullScreen()
+        } else {
+            // Keep the main window's native state untouched on Windows. A separate full-screen
+            // window avoids the Maximize <-> FullScreen transition that makes the QML scene and
+            // image canvas resize twice.
+            fullScreenWindow.showFullScreen()
+        }
         fullScreenPage.open(paths, initialIndex)
     }
 
@@ -40,10 +49,18 @@ ApplicationWindow {
         if (!showingFullScreen)
             return
 
-        // The main window never changed state, so closing the viewer is just a hide operation.
-        // This keeps the maximized main page at one stable size and eliminates the final resize
-        // frame as well.
-        fullScreenWindow.hide()
+        if (Qt.platform.os === "osx") {
+            if (visibilityBeforeFullScreen === Window.Maximized)
+                showMaximized()
+            else if (visibilityBeforeFullScreen === Window.FullScreen)
+                showFullScreen()
+            else
+                showNormal()
+        } else {
+            // The main window never changed state, so closing the viewer is just a hide
+            // operation. This keeps the maximized main page at one stable size.
+            fullScreenWindow.hide()
+        }
         showingFullScreen = false
         browseController.refreshAll()
         Qt.callLater(function() { browsePage.forceActiveFocus() })
@@ -104,18 +121,19 @@ ApplicationWindow {
         flags: Qt.Window | Qt.FramelessWindowHint
         transientParent: window
 
-        FullScreenPage {
-            id: fullScreenPage
-            controller: fullScreenController
-            propertiesController: imagePropertiesController
-            anchors.fill: parent
-            onCloseRequested: window.closeFullScreen()
-        }
-
         onClosing: function(close) {
             close.accepted = false
             window.closeFullScreen()
         }
+    }
+    FullScreenPage {
+        id: fullScreenPage
+        controller: fullScreenController
+        propertiesController: imagePropertiesController
+        parent: Qt.platform.os === "osx" ? window.contentItem : fullScreenWindow.contentItem
+        anchors.fill: parent
+        visible: window.showingFullScreen
+        onCloseRequested: window.closeFullScreen()
     }
     Connections {
         target: fullScreenController

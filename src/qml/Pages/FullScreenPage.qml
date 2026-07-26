@@ -211,6 +211,9 @@ Item {
         parent: root
         controller: root.propertiesController
         iconPrefix: root.iconPrefix
+        // Popup focus restoration is inconsistent after clicking the close button on macOS.
+        // Return focus explicitly so the page-level Escape/navigation handlers keep working.
+        onClosed: Qt.callLater(function() { root.forceActiveFocus() })
     }
 
     Rectangle {

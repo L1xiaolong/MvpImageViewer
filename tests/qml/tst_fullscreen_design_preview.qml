@@ -57,17 +57,22 @@ TestCase {
         compare(dialog.currentTab, 2)
     }
 
-    function test_escapeClosesFullScreenWithoutFloatingCloseControl() {
+    function test_escapeClosesFullScreenAfterPropertiesDialogCloses() {
         const page = findChild(preview, "fullScreenPage")
         const dialog = findChild(page, "imagePropertiesDialog")
         const closeButton = findChild(page, "closeFullScreenButton")
         compare(closeButton, null)
+
+        page.forceActiveFocus()
+        dialog.openForPath("/Images/ISP calibration/XAG040_0001.JPG")
+        tryCompare(dialog, "opened", true)
         dialog.close()
         tryCompare(dialog, "opened", false)
+        tryCompare(page, "activeFocus", true)
+
         let closeCount = 0
         function countClose() { closeCount += 1 }
         page.closeRequested.connect(countClose)
-        page.forceActiveFocus()
         keyClick(Qt.Key_Escape)
         compare(closeCount, 1)
         page.closeRequested.disconnect(countClose)
