@@ -211,6 +211,7 @@ QVariantMap rawHistogramMap(const RawPlaneHistogram& histogram) {
                 {QStringLiteral("message"), QStringLiteral("Source-plane histogram unavailable")}};
     QVariantList channels;
     for (const RawHistogramChannel& channel : histogram.channels) {
+        if (!channel.isValid()) continue;
         const QString name = rawHistogramChannelName(channel.id);
         channels.append(channelMap(QString::number(static_cast<int>(channel.id)), name,
                                    rawChannelColor(channel.id), channel.bins,

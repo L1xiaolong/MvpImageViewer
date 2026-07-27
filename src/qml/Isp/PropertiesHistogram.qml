@@ -179,32 +179,34 @@ Item {
                                          (left + right) / 2, (top + bottom) / 2)
                         return
                     }
+                    const samples = Math.max(2, Math.min(channel.bins.length,
+                                                         Math.floor(right - left)))
+                    const values = []
                     let maximum = 0
-                    for (let index = 0; index < channel.bins.length; ++index)
-                        maximum = Math.max(maximum, Number(channel.bins[index]))
-                    if (maximum <= 0)
-                        return
-                    const samples = Math.max(2, Math.floor(right - left))
-                    context.beginPath()
-                    context.moveTo(left, bottom)
                     for (let point = 0; point < samples; ++point) {
                         const start = Math.floor(point * channel.bins.length / samples)
                         const end = Math.max(start + 1,
                                              Math.floor((point + 1) * channel.bins.length / samples))
-                        let peak = 0
+                        let count = 0
                         for (let bin = start; bin < end; ++bin)
-                            peak = Math.max(peak, Number(channel.bins[bin]))
+                            count += Number(channel.bins[bin])
+                        values.push(count)
+                        maximum = Math.max(maximum, count)
+                    }
+                    if (maximum <= 0)
+                        return
+                    context.beginPath()
+                    context.moveTo(left, bottom)
+                    for (let point = 0; point < samples; ++point) {
                         const x = left + point * (right - left) / (samples - 1)
-                        const y = bottom - (bottom - top) * Math.log(peak + 1) / Math.log(maximum + 1)
+                        const y = bottom - (bottom - top) * values[point] / maximum
                         context.lineTo(x, y)
                     }
                     context.lineTo(right, bottom)
                     context.closePath()
                     const color = channel.color || "#52616B"
-                    context.globalAlpha = 0.22
                     context.fillStyle = color
                     context.fill()
-                    context.globalAlpha = 1
                     context.strokeStyle = color
                     context.lineWidth = 1.25
                     context.stroke()

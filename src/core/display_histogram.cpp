@@ -13,6 +13,24 @@ struct ChannelAccumulator {
     quint64 squaredSum = 0;
 };
 
+QPair<int, int> gridSampleCounts(int width, int height, qint64 maximumSamples) {
+    if (width <= 0 || height <= 0 || maximumSamples <= 0) {
+        return {0, 0};
+    }
+    const qint64 available = static_cast<qint64>(width) * height;
+    if (available <= maximumSamples) {
+        return {width, height};
+    }
+
+    const int maximumRows = static_cast<int>(std::min<qint64>(height, maximumSamples));
+    const double idealRows =
+        std::sqrt(static_cast<double>(maximumSamples) * height / width);
+    const int rows = std::clamp(static_cast<int>(std::floor(idealRows)), 1, maximumRows);
+    const int columns = static_cast<int>(
+        std::clamp(maximumSamples / rows, qint64{1}, static_cast<qint64>(width)));
+    return {columns, rows};
+}
+
 void addSample(ChannelAccumulator& accumulator, int value) {
     ++accumulator.channel.bins[static_cast<std::size_t>(value)];
     accumulator.sum += static_cast<quint64>(value);
@@ -95,29 +113,18 @@ DisplayHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normal
     ChannelAccumulator green;
     ChannelAccumulator blue;
     ChannelAccumulator luma;
-    int xStep = 1;
-    int yStep = 1;
-    if (result.availablePixelCount > maximumSamples) {
-        const double idealRows = std::sqrt(static_cast<double>(maximumSamples) *
-                                           result.analyzedRegion.height() /
-                                           result.analyzedRegion.width());
-        const int targetRows = std::clamp(static_cast<int>(std::floor(idealRows)), 1,
-                                          result.analyzedRegion.height());
-        const qint64 targetColumns =
-            std::clamp(maximumSamples / targetRows, qint64{1},
-                       static_cast<qint64>(result.analyzedRegion.width()));
-        xStep = static_cast<int>((static_cast<qint64>(result.analyzedRegion.width()) +
-                                  targetColumns - 1) /
-                                 targetColumns);
-        yStep = static_cast<int>((static_cast<qint64>(result.analyzedRegion.height()) +
-                                  targetRows - 1) /
-                                 targetRows);
-    }
-    for (int y = result.analyzedRegion.top(); y < result.analyzedRegion.bottom() + 1;
-         y += yStep) {
+    const auto [sampleColumns, sampleRows] =
+        gridSampleCounts(result.analyzedRegion.width(), result.analyzedRegion.height(),
+                         maximumSamples);
+    for (int rowIndex = 0; rowIndex < sampleRows; ++rowIndex) {
+        const int y = result.analyzedRegion.top() +
+                      static_cast<int>(static_cast<qint64>(rowIndex) *
+                                       result.analyzedRegion.height() / sampleRows);
         const uchar* row = source->constScanLine(y);
-        for (int x = result.analyzedRegion.left(); x < result.analyzedRegion.right() + 1;
-             x += xStep) {
+        for (int columnIndex = 0; columnIndex < sampleColumns; ++columnIndex) {
+            const int x = result.analyzedRegion.left() +
+                          static_cast<int>(static_cast<qint64>(columnIndex) *
+                                           result.analyzedRegion.width() / sampleColumns);
             const uchar* pixel = row + x * 4;
             const int r = pixel[0];
             const int g = pixel[1];

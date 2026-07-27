@@ -353,6 +353,14 @@ void CoreTests::displayHistogramComputesChannelsAndBoundedSampling() {
     QCOMPARE(bounded.availablePixelCount, 4);
     QCOMPARE(bounded.sampledPixelCount, 2);
 
+    QImage tallImage(1, 9, QImage::Format_RGBA8888);
+    tallImage.fill(Qt::black);
+    frame.descriptor.size = tallImage.size();
+    frame.storage = tallImage;
+    const DisplayHistogram tallBounded = DisplayHistogramAnalyzer::analyze(frame, 3);
+    QCOMPARE(tallBounded.availablePixelCount, 9);
+    QCOMPARE(tallBounded.sampledPixelCount, 3);
+
     QCOMPARE(DisplayHistogramAnalyzer::analyze(frame, 0).sampledPixelCount, 0);
 }
 
@@ -424,6 +432,20 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
     QCOMPARE(boundedYuv.channels.at(0).sampledSampleCount, 1);
     QCOMPARE(boundedYuv.channels.at(1).sampledSampleCount, 1);
     QVERIFY(boundedYuv.channels.at(0).isSubsampled());
+
+    RawImageParameters tallYuvParameters = yuvParameters;
+    tallYuvParameters.size = {1, 8};
+    auto tallYuvStorage = std::make_shared<PlaneBufferSet>();
+    tallYuvStorage->storage = QByteArray(16, '\0');
+    tallYuvStorage->planes = {{0, 1, 8}, {8, 2, 8}};
+    ImageFrame tallYuvFrame;
+    tallYuvFrame.descriptor.size = tallYuvParameters.size;
+    tallYuvFrame.rawParameters = tallYuvParameters;
+    tallYuvFrame.storage = std::shared_ptr<const PlaneBufferSet>(tallYuvStorage);
+    const RawPlaneHistogram tallBoundedYuv =
+        RawPlaneHistogramAnalyzer::analyze(tallYuvFrame, 3);
+    QCOMPARE(tallBoundedYuv.channels.at(0).availableSampleCount, 8);
+    QCOMPARE(tallBoundedYuv.channels.at(0).sampledSampleCount, 3);
 
     const RawPlaneHistogram yuvLeft =
         RawPlaneHistogramAnalyzer::analyzeRegion(yuvFrame, QRectF(0.0, 0.0, 0.5, 1.0));

@@ -50,17 +50,21 @@ QRect sourceRegionForDisplayRegion(const QRect& displayRegion,
                                           : QRect{};
 }
 
-QPair<int, int> gridSteps(int width, int height, qint64 maximumSamples) {
-    if (width <= 0 || height <= 0 || maximumSamples <= 0 ||
-        static_cast<qint64>(width) * height <= maximumSamples) {
-        return {1, 1};
+QPair<int, int> gridSampleCounts(int width, int height, qint64 maximumSamples) {
+    if (width <= 0 || height <= 0 || maximumSamples <= 0) {
+        return {0, 0};
     }
+    const qint64 available = static_cast<qint64>(width) * height;
+    if (available <= maximumSamples) {
+        return {width, height};
+    }
+
+    const int maximumRows = static_cast<int>(std::min<qint64>(height, maximumSamples));
     const double idealRows = std::sqrt(static_cast<double>(maximumSamples) * height / width);
-    const int targetRows = std::clamp(static_cast<int>(std::floor(idealRows)), 1, height);
-    const qint64 targetColumns =
-        std::clamp(maximumSamples / targetRows, qint64{1}, static_cast<qint64>(width));
-    return {(width + static_cast<int>(targetColumns) - 1) / static_cast<int>(targetColumns),
-            (height + targetRows - 1) / targetRows};
+    const int rows = std::clamp(static_cast<int>(std::floor(idealRows)), 1, maximumRows);
+    const int columns = static_cast<int>(
+        std::clamp(maximumSamples / rows, qint64{1}, static_cast<qint64>(width)));
+    return {columns, rows};
 }
 
 void addSample(ChannelAccumulator& accumulator, int value) {
@@ -110,9 +114,16 @@ void sampleGrid(const QRect& region, qint64 maximumSamples, Callback&& callback)
     if (region.isEmpty() || maximumSamples <= 0) {
         return;
     }
-    const auto [xStep, yStep] = gridSteps(region.width(), region.height(), maximumSamples);
-    for (int y = region.top(); y <= region.bottom(); y += yStep) {
-        for (int x = region.left(); x <= region.right(); x += xStep) {
+    const auto [sampleColumns, sampleRows] =
+        gridSampleCounts(region.width(), region.height(), maximumSamples);
+    for (int rowIndex = 0; rowIndex < sampleRows; ++rowIndex) {
+        const int y = region.top() +
+                      static_cast<int>(static_cast<qint64>(rowIndex) * region.height() /
+                                       sampleRows);
+        for (int columnIndex = 0; columnIndex < sampleColumns; ++columnIndex) {
+            const int x = region.left() +
+                          static_cast<int>(static_cast<qint64>(columnIndex) * region.width() /
+                                           sampleColumns);
             callback(QPoint(x, y));
         }
     }
