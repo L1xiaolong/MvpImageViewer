@@ -12,6 +12,7 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -26,6 +27,7 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("ISP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.2.3"));
+    app.setWindowIcon(QIcon(QStringLiteral(":/brand/app_icon.png")));
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QSettings settings;
     bool lastMainWindowStateWasMaximized =

@@ -100,6 +100,15 @@ qt_add_resources(ISPImageViewerQml "ispview_fonts"
     FILES ${_ispview_fonts}
 )
 
+set(_ispview_brand_assets
+    ${PROJECT_SOURCE_DIR}/assets/brand/app_icon.png
+)
+qt_add_resources(ISPImageViewerQml "ispview_brand_assets"
+    PREFIX "/brand"
+    BASE "${PROJECT_SOURCE_DIR}/assets/brand"
+    FILES ${_ispview_brand_assets}
+)
+
 target_include_directories(ISPImageViewerQml PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ISPImageViewerQml PRIVATE
     ispview_browser_backend
@@ -152,6 +161,7 @@ if(WIN32 AND EXISTS "${_ispview_qml_windows_icon}")
 endif()
 
 unset(_ispview_qml_icons)
+unset(_ispview_brand_assets)
 unset(_ispview_qml_macos_icon)
 unset(_ispview_qml_windows_icon)
 unset(_ispview_qml_windows_icon_rc)

@@ -1,46 +1,101 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Image Compare Logo">
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1254"
+     height="1254"
+     viewBox="0 0 1254 1254"
+     fill="none"
+     role="img"
+     aria-labelledby="logo-title logo-description">
+  <title id="logo-title">Butterfly Compare Logo</title>
+  <desc id="logo-description">
+    A symmetric abstract butterfly formed by two mirrored folded ribbons in
+    indigo and cyan, presented on a white rounded-square app icon.
+  </desc>
+
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#273241"/>
-      <stop offset="100%" stop-color="#111820"/>
+    <!-- One half is reused and mirrored so the geometry remains exactly symmetric. -->
+    <path id="ribbon-half" d="
+      M 332 288
+      C 310 288, 292 306, 292 329
+      L 292 489
+      C 292 517, 305 537, 326 553
+      L 456 654
+      L 334 767
+      C 314 786, 304 811, 304 839
+      L 304 907
+      C 304 948, 337 982, 378 982
+      C 394 982, 408 976, 421 967
+      L 566 860
+      C 591 842, 605 817, 605 788
+      L 605 516
+      C 605 491, 595 474, 575 459
+      L 376 301
+      C 363 292, 347 288, 332 288
+      Z"/>
+
+    <!-- The darker folded face gives the ribbon its overlapping structure. -->
+    <path id="fold-half" d="
+      M 456 654
+      L 605 777
+      L 605 796
+      C 603 820, 591 842, 566 860
+      L 512 900
+      C 536 860, 526 813, 493 778
+      Z"/>
+
+    <linearGradient id="indigo-ribbon"
+                    x1="292" y1="288" x2="605" y2="982"
+                    gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1D32C3"/>
+      <stop offset="0.48" stop-color="#233CE0"/>
+      <stop offset="1" stop-color="#1B2FBA"/>
     </linearGradient>
-    <linearGradient id="leftPane" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#2EA8FF"/>
-      <stop offset="55%" stop-color="#276BFF"/>
-      <stop offset="100%" stop-color="#4A39F5"/>
+
+    <linearGradient id="indigo-fold"
+                    x1="456" y1="654" x2="580" y2="866"
+                    gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1426A4"/>
+      <stop offset="0.58" stop-color="#102096"/>
+      <stop offset="1" stop-color="#1B2EB5"/>
     </linearGradient>
-    <linearGradient id="rightPane" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="62%" stop-color="#F1F4F8"/>
-      <stop offset="100%" stop-color="#CCD3DD"/>
+
+    <linearGradient id="cyan-ribbon"
+                    x1="292" y1="288" x2="605" y2="982"
+                    gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0096FD"/>
+      <stop offset="0.48" stop-color="#00A8FF"/>
+      <stop offset="1" stop-color="#008DFB"/>
     </linearGradient>
-    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.22"/>
-    </filter>
+
+    <linearGradient id="cyan-fold"
+                    x1="456" y1="654" x2="580" y2="866"
+                    gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#007DE4"/>
+      <stop offset="0.58" stop-color="#0076D8"/>
+      <stop offset="1" stop-color="#0092F2"/>
+    </linearGradient>
   </defs>
 
-  <rect x="80" y="80" width="864" height="864" rx="210" fill="url(#bg)"/>
+  <!-- Scale the complete artwork around the canvas center for balanced macOS Dock sizing. -->
+  <g transform="translate(50.16 50.16) scale(0.92)">
+    <!-- Transparent outer margin keeps the rounded plate crisp on macOS and Windows. -->
+    <rect x="68"
+          y="68"
+          width="1118"
+          height="1118"
+          rx="250"
+          fill="#FFFFFF"
+          stroke="#E3E8EF"
+          stroke-width="10"/>
 
-  <g filter="url(#softShadow)">
-    <path d="M280 300
-             Q280 264 314 278
-             L472 347
-             Q500 359 500 393
-             L500 643
-             Q500 677 472 689
-             L314 758
-             Q280 772 280 736
-             Z"
-          fill="url(#leftPane)"/>
-    <path d="M744 300
-             Q744 264 710 278
-             L552 347
-             Q524 359 524 393
-             L524 643
-             Q524 677 552 689
-             L710 758
-             Q744 772 744 736
-             Z"
-          fill="url(#rightPane)"/>
+    <g shape-rendering="geometricPrecision">
+      <use xlink:href="#ribbon-half" fill="url(#indigo-ribbon)"/>
+      <use xlink:href="#fold-half" fill="url(#indigo-fold)"/>
+
+      <g transform="translate(1254 0) scale(-1 1)">
+        <use xlink:href="#ribbon-half" fill="url(#cyan-ribbon)"/>
+        <use xlink:href="#fold-half" fill="url(#cyan-fold)"/>
+      </g>
+    </g>
   </g>
 </svg>
