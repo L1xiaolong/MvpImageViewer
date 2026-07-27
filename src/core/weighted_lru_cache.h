@@ -48,6 +48,17 @@ template <typename T> class WeightedLruCache final {
         currentCost_ = 0;
     }
 
+    [[nodiscard]] qsizetype evictLeastRecentlyUsed() {
+        if (order_.empty()) {
+            return 0;
+        }
+        const QString key = order_.back();
+        const auto it = entries_.constFind(key);
+        const qsizetype removedCost = it == entries_.cend() ? 0 : it->cost;
+        erase(key);
+        return removedCost;
+    }
+
     [[nodiscard]] qsizetype cost() const { return currentCost_; }
     [[nodiscard]] qsizetype size() const { return entries_.size(); }
     [[nodiscard]] qsizetype maximumCost() const { return maximumCost_; }

@@ -12,12 +12,15 @@
 
 #include <QImage>
 #include <QGuiApplication>
+#include <QHash>
 #include <QDir>
 #include <QFile>
 #include <QUrl>
 #include <QWheelEvent>
 #include <QSettings>
 #include <QSignalSpy>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -47,6 +50,40 @@ class RawParameterColorDecoder final : public IImageDecoder {
     }
 
     mutable std::atomic<int> calls{0};
+};
+
+class PurposeTrackingDecoder final : public IImageDecoder {
+  public:
+    explicit PurposeTrackingDecoder(QSize sourceSize) : sourceSize_(sourceSize) {}
+    [[nodiscard]] bool canDecode(const QString&) const override { return true; }
+
+    [[nodiscard]] DecodeResult decode(const DecodeRequest& request) const override {
+        {
+            const QMutexLocker lock(&mutex_);
+            ++purposeCounts_[static_cast<int>(request.purpose)];
+        }
+        QImage image(request.purpose == DecodePurpose::Full ? QSize(32, 24) : QSize(16, 12),
+                     QImage::Format_RGBA8888);
+        image.fill(request.purpose == DecodePurpose::Full ? Qt::green : Qt::blue);
+        auto frame = std::make_shared<ImageFrame>();
+        frame->descriptor.size = image.size();
+        frame->descriptor.storageBits = 8;
+        frame->metadata.path = request.path;
+        frame->metadata.fileName = QFileInfo(request.path).fileName();
+        frame->metadata.sourceSize = sourceSize_;
+        frame->storage = std::move(image);
+        return {std::move(frame), {}};
+    }
+
+    [[nodiscard]] int count(DecodePurpose purpose) const {
+        const QMutexLocker lock(&mutex_);
+        return purposeCounts_.value(static_cast<int>(purpose));
+    }
+
+  private:
+    QSize sourceSize_;
+    mutable QMutex mutex_;
+    mutable QHash<int, int> purposeCounts_;
 };
 
 BrowseController* paneAt(const BrowseWorkspaceController& workspace, int index) {
@@ -82,13 +119,18 @@ class QmlWorkspaceControllerTests final : public QObject {
     void copiesDropsIntoSubfoldersAndAcrossPanes();
     void emptyPaneOpensDroppedFoldersAndImageLocations();
     void rawParametersRefreshEveryPaneAndQmlProvider();
+    void galleryUsesPreviewUntilPixelProbeRequestsFullResolution();
     void browseFileDialogsAreRequestedByQmlAndActionsStayInBackend();
     void imagePropertiesAreExposedWithoutWidgetUi();
     void fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml();
+    void fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution();
+    void fullScreenAutomaticallyPromotesBudgetedImageAfterNavigationSettles();
     void rawParameterEditorAppliesValuesAndManagesPresetsWithoutWidgets();
     void comparePreferencesPersistAndHorizontalModeIsUnavailable();
     void compareUsesCompactRgbaPixelTextAndLumaOnlyHistogram();
     void compareViewSyncTemporarilyBypassesWithControl();
+    void compareDefersOversizedAutomaticFullLoadsButExactToolsStillPromote();
+    void compareAutomaticallyPromotesBudgetedImages();
 };
 
 void QmlWorkspaceControllerTests::initTestCase() {
@@ -446,6 +488,28 @@ void QmlWorkspaceControllerTests::rawParametersRefreshEveryPaneAndQmlProvider() 
     QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 2);
 }
 
+void QmlWorkspaceControllerTests::galleryUsesPreviewUntilPixelProbeRequestsFullResolution() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("gallery.png"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("fixture"), 7);
+    file.close();
+
+    auto decoder = std::make_shared<PurposeTrackingDecoder>(QSize(12000, 10000));
+    BrowseController controller(decoder, directory.path());
+    controller.setGalleryPath(path);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 1, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(controller.galleryImageReady(), 2000);
+    QCOMPARE(decoder->count(DecodePurpose::Full), 0);
+    QVERIFY(!controller.probeGalleryPixel(0, 0).isEmpty());
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        controller.probeGalleryPixel(0, 0).contains(QStringLiteral("RGBA(0, 255, 0, 255)")),
+        2000);
+}
+
 void QmlWorkspaceControllerTests::browseFileDialogsAreRequestedByQmlAndActionsStayInBackend() {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -555,6 +619,113 @@ void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperati
 
     // Trash integration is exercised by the platform/UI suites; temporary test locations are
     // intentionally not assumed to be trash-capable on every CI host.
+}
+
+void QmlWorkspaceControllerTests::
+    fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("large.png"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("fixture"), 7);
+    file.close();
+
+    auto decoder = std::make_shared<PurposeTrackingDecoder>(QSize(12000, 10000));
+    ImageLoader loader(decoder);
+    FullScreenController controller(&loader);
+    QSignalSpy frameSpy(&controller, &FullScreenController::stateChanged);
+    controller.open({path}, 0);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 1, 2000);
+    QCOMPARE(decoder->count(DecodePurpose::Full), 0);
+
+    controller.actualPixels();
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(frameSpy.size() >= 3, 2000);
+}
+
+void QmlWorkspaceControllerTests::
+    fullScreenAutomaticallyPromotesBudgetedImageAfterNavigationSettles() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QStringList paths;
+    for (const QString& name : {QStringLiteral("first.png"), QStringLiteral("second.png")}) {
+        const QString path = directory.filePath(name);
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("fixture"), 7);
+        file.close();
+        paths.append(path);
+    }
+
+    auto decoder = std::make_shared<PurposeTrackingDecoder>(QSize(4000, 3000));
+    ImageLoader loader(decoder);
+    FullScreenController controller(&loader);
+    controller.open(paths, 0);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 1, 2000);
+    controller.showNext();
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 2, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
+    QCOMPARE(controller.currentPath(), paths.at(1));
+}
+
+void QmlWorkspaceControllerTests::
+    compareDefersOversizedAutomaticFullLoadsButExactToolsStillPromote() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QStringList paths;
+    for (const QString& name : {QStringLiteral("a.png"), QStringLiteral("b.png")}) {
+        const QString path = directory.filePath(name);
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("fixture"), 7);
+        file.close();
+        paths.append(path);
+    }
+
+    auto decoder = std::make_shared<PurposeTrackingDecoder>(QSize(12000, 10000));
+    ImageLoader loader(decoder);
+    CompareController controller(&loader);
+    controller.setPixelValueVisible(false);
+    controller.setHistogramVisible(false);
+    controller.setPaths(paths);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 2, 2000);
+    QTest::qWait(400);
+    QCOMPARE(decoder->count(DecodePurpose::Full), 0);
+
+    controller.setPixelValueVisible(true);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 2, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(controller.frame(0) && controller.frame(1), 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(0)->qImage()->pixelColor(0, 0),
+                              QColor(Qt::green), 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(1)->qImage()->pixelColor(0, 0),
+                              QColor(Qt::green), 2000);
+}
+
+void QmlWorkspaceControllerTests::compareAutomaticallyPromotesBudgetedImages() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QStringList paths;
+    for (const QString& name : {QStringLiteral("a.png"), QStringLiteral("b.png")}) {
+        const QString path = directory.filePath(name);
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("fixture"), 7);
+        file.close();
+        paths.append(path);
+    }
+
+    auto decoder = std::make_shared<PurposeTrackingDecoder>(QSize(4000, 3000));
+    ImageLoader loader(decoder);
+    CompareController controller(&loader);
+    controller.setPixelValueVisible(false);
+    controller.setHistogramVisible(false);
+    controller.setPaths(paths);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 2, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 2, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(controller.frame(0) && controller.frame(1), 2000);
+    QCOMPARE(controller.frame(0)->qImage()->pixelColor(0, 0), QColor(Qt::green));
+    QCOMPARE(controller.frame(1)->qImage()->pixelColor(0, 0), QColor(Qt::green));
 }
 
 void QmlWorkspaceControllerTests::rawParameterEditorAppliesValuesAndManagesPresetsWithoutWidgets() {

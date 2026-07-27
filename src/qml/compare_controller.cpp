@@ -74,6 +74,10 @@ QSize logicalFrameSize(const ImageFramePtr& frame) {
 
 CompareController::CompareController(ImageLoader* loader, QObject* parent)
     : QObject(parent), loader_(loader) {
+    automaticFullLoadTimer_.setSingleShot(true);
+    automaticFullLoadTimer_.setInterval(260);
+    connect(&automaticFullLoadTimer_, &QTimer::timeout, this,
+            &CompareController::requestAutomaticFullFrames);
     const QSettings settings;
     fileInformationVisible_ =
         settings.value(QStringLiteral("compare/fileInformationVisible"), true).toBool();
@@ -112,6 +116,7 @@ QString CompareController::cameraText(int slot) const {
 void CompareController::setPaths(const QStringList& requested) {
     const QStringList bounded = requested.mid(0, 4);
     if (bounded == paths_) return;
+    automaticFullLoadTimer_.stop();
     for (const LoadHandle& handle : previewHandles_) handle.cancel();
     for (const LoadHandle& handle : fullHandles_) handle.cancel();
     paths_ = bounded;
@@ -123,6 +128,8 @@ void CompareController::setPaths(const QStringList& requested) {
     displayHistograms_.fill({}, paths_.size());
     previewHandles_.fill({}, paths_.size());
     fullHandles_.fill({}, paths_.size());
+    fullRequested_.fill(false, paths_.size());
+    fullResolution_.fill(false, paths_.size());
     holdCandidate_ = false;
     emit pathsChanged();
     emit holdCandidateChanged();
@@ -159,7 +166,7 @@ void CompareController::requestFrame(int slot, const QString& path) {
     const QPointer<CompareController> self(this);
     previewHandles_[slot] = loader_->request(
         generation, {path, DecodePurpose::Preview, previewSize, rawParameters},
-        [self, slot, path, generation, rawParameters](quint64 id, const DecodeResult& result) {
+        [self, slot, path, generation](quint64 id, const DecodeResult& result) {
             if (!self || id != generation || slot < 0 || slot >= self->generations_.size() ||
                 self->generations_.at(slot) != generation) return;
             if (!result.frame) {
@@ -171,29 +178,72 @@ void CompareController::requestFrame(int slot, const QString& path) {
             }
             self->errors_[slot].clear();
             self->frames_[slot] = result.frame;
+            self->fullRequested_[slot] = false;
+            self->fullResolution_[slot] = false;
             self->refreshCanvas(slot, true);
             self->clearHistograms(slot);
             if (self->histogramRequested_.value(slot)) self->requestHistogram(slot);
             emit self->frameChanged(slot, false);
             ++self->revision_;
             emit self->revisionChanged();
-            self->fullHandles_[slot] = self->loader_->request(
-                generation, {path, DecodePurpose::Full, {}, rawParameters},
-                [self, slot, generation](quint64 fullId, const DecodeResult& full) {
-                    if (!self || fullId != generation || slot < 0 ||
-                        slot >= self->generations_.size() ||
-                        self->generations_.at(slot) != generation || !full.frame) return;
-                    self->frames_[slot] = full.frame;
-                    self->refreshCanvas(slot, false);
-                    self->clearHistograms(slot);
-                    if (self->histogramRequested_.value(slot)) self->requestHistogram(slot);
-                    emit self->frameChanged(slot, true);
-                    ++self->revision_;
-                    emit self->revisionChanged();
-                }, RequestOptions{LoadCategory::Interactive, 0,
-                                  QStringLiteral("compare-full")});
+            if (self->pixelValueVisible_ || self->histogramVisible_) {
+                self->requestFullFrame(slot, LoadCategory::Interactive);
+            } else {
+                self->automaticFullLoadTimer_.start();
+            }
         }, RequestOptions{LoadCategory::Interactive, 20,
                           QStringLiteral("compare-preview")});
+}
+
+void CompareController::requestFullFrame(int slot, LoadCategory category) {
+    if (!loader_ || slot < 0 || slot >= frames_.size() || !frames_.value(slot) ||
+        fullRequested_.value(slot) || fullResolution_.value(slot)) {
+        return;
+    }
+    fullRequested_[slot] = true;
+    const quint64 generation = generations_.at(slot);
+    const QString path = paths_.at(slot);
+    const QPointer<CompareController> self(this);
+    fullHandles_[slot] = loader_->request(
+        generation, {path, DecodePurpose::Full, {}},
+        [self, slot, generation](quint64 fullId, const DecodeResult& full) {
+            if (!self || fullId != generation || slot < 0 ||
+                slot >= self->generations_.size() ||
+                self->generations_.at(slot) != generation) {
+                return;
+            }
+            self->fullRequested_[slot] = false;
+            if (!full.frame) {
+                return;
+            }
+            self->fullResolution_[slot] = true;
+            self->frames_[slot] = full.frame;
+            self->refreshCanvas(slot, false);
+            self->clearHistograms(slot);
+            if (self->histogramRequested_.value(slot)) {
+                self->requestHistogram(slot);
+            }
+            emit self->frameChanged(slot, true);
+            ++self->revision_;
+            emit self->revisionChanged();
+        },
+        RequestOptions{category, 0, QStringLiteral("compare-full")});
+}
+
+void CompareController::requestAutomaticFullFrames() {
+    if (!loader_ || frames_.isEmpty() || !loader_->canAutomaticallyLoadFull(frames_)) {
+        return;
+    }
+    for (int slot = 0; slot < frames_.size(); ++slot) {
+        requestFullFrame(slot, LoadCategory::NearViewport);
+    }
+}
+
+void CompareController::ensureFullFrames() {
+    automaticFullLoadTimer_.stop();
+    for (int slot = 0; slot < frames_.size(); ++slot) {
+        requestFullFrame(slot, LoadCategory::Interactive);
+    }
 }
 
 void CompareController::setPresentationMode(int mode) {
@@ -241,6 +291,9 @@ void CompareController::setExifVisible(bool visible) {
 void CompareController::setHistogramVisible(bool visible) {
     if (histogramVisible_ == visible) return;
     histogramVisible_ = visible;
+    if (visible) {
+        ensureFullFrames();
+    }
     QSettings().setValue(QStringLiteral("compare/histogramVisible"), visible);
     emit histogramVisibleChanged();
 }
@@ -248,6 +301,9 @@ void CompareController::setHistogramVisible(bool visible) {
 void CompareController::setPixelValueVisible(bool visible) {
     if (pixelValueVisible_ == visible) return;
     pixelValueVisible_ = visible;
+    if (visible) {
+        ensureFullFrames();
+    }
     QSettings().setValue(QStringLiteral("compare/pixelValueVisible"), visible);
     emit pixelValueVisibleChanged();
 }
@@ -261,6 +317,7 @@ void CompareController::fitAll() {
 }
 
 void CompareController::actualPixelsAll() {
+    ensureFullFrames();
     if (canvas_) canvas_->actualPixelsAll();
 }
 
@@ -309,6 +366,7 @@ void CompareController::requestHistogram(int slot) {
     if (slot < 0 || slot >= frames_.size()) return;
     histogramRequested_[slot] = true;
     if (!frames_.value(slot)) return;
+    requestFullFrame(slot, LoadCategory::Interactive);
     const quint64 generation = ++histogramGenerations_[slot];
     const ImageFramePtr frame = frames_.at(slot);
     const QPointer<CompareController> self(this);

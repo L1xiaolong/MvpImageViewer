@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QStringList>
+#include <QTimer>
 
 namespace ispview {
 
@@ -64,6 +65,7 @@ class FullScreenController final : public QObject {
 
   private:
     void showIndex(int index);
+    void scheduleFullFrame(const QString& path, quint64 generation);
     void requestFullFrame(const QString& path, quint64 generation);
     void refreshCanvas(bool resetView);
 
@@ -73,10 +75,13 @@ class FullScreenController final : public QObject {
     int currentIndex_ = -1;
     quint64 generation_ = 0;
     bool loading_ = false;
+    bool fullRequested_ = false;
+    bool exactResolutionRequested_ = false;
     QString errorText_;
     ImageFramePtr frame_;
     LoadHandle previewHandle_;
     LoadHandle fullHandle_;
+    QTimer fullLoadTimer_;
 };
 
 } // namespace ispview

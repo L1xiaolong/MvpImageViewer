@@ -21,6 +21,16 @@ namespace ispview {
 FullScreenController::FullScreenController(ImageLoader* loader, QObject* parent)
     : QObject(parent), loader_(loader) {
     Q_ASSERT(loader_);
+    fullLoadTimer_.setSingleShot(true);
+    fullLoadTimer_.setInterval(220);
+    connect(&fullLoadTimer_, &QTimer::timeout, this, [this] {
+        if (!frame_ || fullRequested_ || currentPath().isEmpty()) {
+            return;
+        }
+        if (loader_->canAutomaticallyLoadFull({frame_})) {
+            requestFullFrame(currentPath(), generation_);
+        }
+    });
 }
 
 QString FullScreenController::currentPath() const {
@@ -61,12 +71,15 @@ void FullScreenController::open(const QStringList& requestedPaths, int initialIn
 }
 
 void FullScreenController::closeSession() {
+    fullLoadTimer_.stop();
     previewHandle_.cancel();
     fullHandle_.cancel();
     ++generation_;
     paths_.clear();
     currentIndex_ = -1;
     loading_ = false;
+    fullRequested_ = false;
+    exactResolutionRequested_ = false;
     errorText_.clear();
     frame_.reset();
     refreshCanvas(true);
@@ -97,6 +110,11 @@ void FullScreenController::fitImage() {
 }
 
 void FullScreenController::actualPixels() {
+    exactResolutionRequested_ = true;
+    fullLoadTimer_.stop();
+    if (frame_ && !fullRequested_) {
+        requestFullFrame(currentPath(), generation_);
+    }
     if (canvas_) canvas_->actualPixelsAll();
 }
 
@@ -148,11 +166,14 @@ QString FullScreenController::revealCurrent() {
 
 void FullScreenController::showIndex(int index) {
     if (index < 0 || index >= paths_.size()) return;
+    fullLoadTimer_.stop();
     previewHandle_.cancel();
     fullHandle_.cancel();
     currentIndex_ = index;
     frame_.reset();
     loading_ = true;
+    fullRequested_ = false;
+    exactResolutionRequested_ = false;
     errorText_.clear();
     const quint64 generation = ++generation_;
     const QString path = currentPath();
@@ -183,17 +204,33 @@ void FullScreenController::showIndex(int index) {
         self->loading_ = false;
         self->refreshCanvas(true);
         emit self->stateChanged();
-        self->requestFullFrame(path, generation);
+        if (self->exactResolutionRequested_) {
+            self->requestFullFrame(path, generation);
+        } else {
+            self->scheduleFullFrame(path, generation);
+        }
     }, RequestOptions{LoadCategory::Interactive, 20, QStringLiteral("fullscreen-preview")});
 }
 
+void FullScreenController::scheduleFullFrame(const QString& path, quint64 generation) {
+    if (path != currentPath() || generation != generation_ || fullRequested_) {
+        return;
+    }
+    fullLoadTimer_.start();
+}
+
 void FullScreenController::requestFullFrame(const QString& path, quint64 generation) {
+    if (fullRequested_ || path != currentPath() || generation != generation_) {
+        return;
+    }
+    fullRequested_ = true;
     const QPointer<FullScreenController> self(this);
     fullHandle_ = loader_->request(generation, {path, DecodePurpose::Full, {}},
                      [self, generation, path](quint64 id, const DecodeResult& result) {
         if (!self || id != generation || self->generation_ != generation ||
             self->currentPath() != path) return;
         if (!result.frame) {
+            self->fullRequested_ = false;
             self->errorText_ = result.error;
             emit self->stateChanged();
             return;

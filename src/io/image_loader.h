@@ -60,6 +60,11 @@ class ImageLoader final : public QObject {
     void setRawParameters(const QString& path, const RawImageParameters& parameters);
     [[nodiscard]] std::optional<RawImageParameters> rawParameters(const QString& path) const;
     [[nodiscard]] bool isCached(DecodeRequest request) const;
+    [[nodiscard]] qsizetype cachedBytes() const;
+    [[nodiscard]] qsizetype memoryBudget() const { return memoryBudget_; }
+    void setMemoryBudget(qsizetype bytes);
+    [[nodiscard]] bool
+    canAutomaticallyLoadFull(const QVector<ImageFramePtr>& previewFrames) const;
     void clearCache();
     // Releases large preview/full-resolution frames while retaining inexpensive thumbnails.
     void clearTransientCaches();
@@ -87,13 +92,19 @@ class ImageLoader final : public QObject {
                                          Callback callback, int priority);
     [[nodiscard]] WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose);
     [[nodiscard]] const WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose) const;
+    void enforceMemoryBudget(DecodePurpose insertedPurpose);
+    [[nodiscard]] static qsizetype estimatedFullFrameCost(const ImageFrame& preview);
 
     std::shared_ptr<const IImageDecoder> decoder_;
     std::shared_ptr<ThumbnailDiskCache> diskCache_;
-    WeightedLruCache<ImageFrame> thumbnailCache_{96LL * 1024 * 1024};
-    WeightedLruCache<ImageFrame> previewCache_{128LL * 1024 * 1024};
-    WeightedLruCache<ImageFrame> fullCache_{288LL * 1024 * 1024};
+    static constexpr qsizetype kDefaultMemoryBudget = 384LL * 1024 * 1024;
+    WeightedLruCache<ImageFrame> thumbnailCache_{kDefaultMemoryBudget};
+    WeightedLruCache<ImageFrame> previewCache_{kDefaultMemoryBudget};
+    WeightedLruCache<ImageFrame> fullCache_{kDefaultMemoryBudget};
+    qsizetype memoryBudget_ = kDefaultMemoryBudget;
+    qsizetype automaticFullLoadBudget_ = 256LL * 1024 * 1024;
     QThreadPool pool_;
+    QThreadPool serializedPool_;
     mutable QReadWriteLock rawParametersLock_;
     QHash<QString, RawImageParameters> rawParameters_;
     QHash<QString, InFlightRequest> inFlight_;

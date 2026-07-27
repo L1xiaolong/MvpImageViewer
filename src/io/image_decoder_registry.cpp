@@ -19,6 +19,15 @@ void ImageDecoderRegistry::add(std::shared_ptr<const IImageDecoder> decoder) {
     }
 }
 
+DecodeExecutionMode ImageDecoderRegistry::executionMode(const QString& path) const {
+    for (const auto& decoder : decoders_) {
+        if (decoder->canDecode(path)) {
+            return decoder->executionMode(path);
+        }
+    }
+    return DecodeExecutionMode::Parallel;
+}
+
 bool ImageDecoderRegistry::canDecode(const QString& path) const {
     for (const auto& decoder : decoders_) {
         if (decoder->canDecode(path)) {

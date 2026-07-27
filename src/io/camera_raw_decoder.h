@@ -12,6 +12,7 @@ class CameraRawDecoder final : public IImageDecoder {
     [[nodiscard]] static QStringList supportedSuffixes();
 
     [[nodiscard]] QString cacheIdentity() const override;
+    [[nodiscard]] DecodeExecutionMode executionMode(const QString& path) const override;
     [[nodiscard]] bool canDecode(const QString& path) const override;
     [[nodiscard]] DecodeResult decode(const DecodeRequest& request) const override;
 };

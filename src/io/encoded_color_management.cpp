@@ -3,10 +3,15 @@
 #include <QByteArray>
 #include <QColorSpace>
 #include <QCryptographicHash>
+#include <QHash>
+#include <QList>
+#include <QMutex>
+#include <QMutexLocker>
 
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <memory>
 
 #if ISPVIEW_HAS_LCMS2
 #include <lcms2.h>
@@ -54,13 +59,17 @@ void lcmsErrorHandler(cmsContext context, cmsUInt32Number, const char* text) {
     }
 }
 
-struct LcmsResources {
+struct LcmsTransform {
+    LcmsErrorState errorState;
     cmsContext context = nullptr;
     cmsHPROFILE sourceProfile = nullptr;
     cmsHPROFILE destinationProfile = nullptr;
     cmsHTRANSFORM transform = nullptr;
+    QString sourceDescription;
+    QString creationError;
+    QMutex useMutex;
 
-    ~LcmsResources() {
+    ~LcmsTransform() {
         if (transform) {
             cmsDeleteTransform(transform);
         }
@@ -74,6 +83,8 @@ struct LcmsResources {
             cmsDeleteContext(context);
         }
     }
+
+    [[nodiscard]] bool isValid() const { return transform != nullptr; }
 };
 
 QString profileDescription(cmsHPROFILE profile, const QString& fallback) {
@@ -88,6 +99,92 @@ QString profileDescription(cmsHPROFILE profile, const QString& fallback) {
         return fallback;
     }
     return boundedProfileText(QString::fromUtf8(buffer.constData()));
+}
+
+std::shared_ptr<LcmsTransform> createTransform(const QByteArray& profile,
+                                              const QString& fallbackDescription) {
+    auto result = std::make_shared<LcmsTransform>();
+    result->context = cmsCreateContext(nullptr, &result->errorState);
+    if (!result->context) {
+        result->creationError = QStringLiteral("LittleCMS could not create a conversion context");
+        return result;
+    }
+    cmsSetLogErrorHandlerTHR(result->context, lcmsErrorHandler);
+    result->sourceProfile = cmsOpenProfileFromMemTHR(
+        result->context, profile.constData(), static_cast<cmsUInt32Number>(profile.size()));
+    if (!result->sourceProfile) {
+        result->creationError =
+            result->errorState.message.isEmpty()
+                ? QStringLiteral("LittleCMS rejected the embedded ICC profile")
+                : result->errorState.message;
+        return result;
+    }
+    result->sourceDescription =
+        profileDescription(result->sourceProfile, fallbackDescription);
+    if (cmsGetColorSpace(result->sourceProfile) != cmsSigRgbData) {
+        result->creationError = QStringLiteral("Only embedded RGB ICC profiles are supported");
+        return result;
+    }
+    result->destinationProfile = cmsCreate_sRGBProfileTHR(result->context);
+    if (!result->destinationProfile) {
+        result->creationError = QStringLiteral("LittleCMS could not create the sRGB profile");
+        return result;
+    }
+    result->transform = cmsCreateTransformTHR(
+        result->context, result->sourceProfile, TYPE_RGBA_8, result->destinationProfile,
+        TYPE_RGBA_8, INTENT_RELATIVE_COLORIMETRIC, cmsFLAGS_COPY_ALPHA);
+    if (!result->transform) {
+        result->creationError =
+            result->errorState.message.isEmpty()
+                ? QStringLiteral("LittleCMS could not create the ICC transform")
+                : result->errorState.message;
+    }
+    return result;
+}
+
+struct TransformCache {
+    QMutex mutex;
+    QHash<QByteArray, std::shared_ptr<LcmsTransform>> entries;
+    QList<QByteArray> leastRecentlyUsed;
+};
+
+TransformCache& transformCache() {
+    static TransformCache cache;
+    return cache;
+}
+
+std::shared_ptr<LcmsTransform> cachedTransform(const QByteArray& profile,
+                                              const QString& fallbackDescription) {
+    constexpr qsizetype kMaximumCachedTransforms = 8;
+    const QByteArray key = QCryptographicHash::hash(profile, QCryptographicHash::Sha256);
+    TransformCache& cache = transformCache();
+    {
+        const QMutexLocker lock(&cache.mutex);
+        if (const auto found = cache.entries.constFind(key); found != cache.entries.cend()) {
+            cache.leastRecentlyUsed.removeAll(key);
+            cache.leastRecentlyUsed.append(key);
+            return *found;
+        }
+    }
+
+    const std::shared_ptr<LcmsTransform> created =
+        createTransform(profile, fallbackDescription);
+    if (!created->isValid()) {
+        return created;
+    }
+
+    const QMutexLocker lock(&cache.mutex);
+    if (const auto found = cache.entries.constFind(key); found != cache.entries.cend()) {
+        cache.leastRecentlyUsed.removeAll(key);
+        cache.leastRecentlyUsed.append(key);
+        return *found;
+    }
+    cache.entries.insert(key, created);
+    cache.leastRecentlyUsed.append(key);
+    while (cache.leastRecentlyUsed.size() > kMaximumCachedTransforms) {
+        cache.entries.remove(cache.leastRecentlyUsed.takeFirst());
+    }
+    return created;
 }
 
 #endif
@@ -136,48 +233,14 @@ void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metad
     colorProfile.sourceFingerprint = profileFingerprint(embeddedProfile);
 
 #if ISPVIEW_HAS_LCMS2
-    LcmsErrorState errorState;
-    LcmsResources resources;
-    resources.context = cmsCreateContext(nullptr, &errorState);
-    if (!resources.context) {
-        metadata.colorWarning = QStringLiteral("LittleCMS could not create a conversion context");
+    const std::shared_ptr<LcmsTransform> transform =
+        cachedTransform(embeddedProfile, colorProfile.sourceDescription);
+    if (!transform->isValid()) {
+        metadata.colorWarning = transform->creationError;
         metadata.colorProfile = std::move(colorProfile);
         return;
     }
-    cmsSetLogErrorHandlerTHR(resources.context, lcmsErrorHandler);
-    resources.sourceProfile = cmsOpenProfileFromMemTHR(
-        resources.context, embeddedProfile.constData(),
-        static_cast<cmsUInt32Number>(embeddedProfile.size()));
-    if (!resources.sourceProfile) {
-        metadata.colorWarning = errorState.message.isEmpty()
-                                    ? QStringLiteral("LittleCMS rejected the embedded ICC profile")
-                                    : errorState.message;
-        metadata.colorProfile = std::move(colorProfile);
-        return;
-    }
-    colorProfile.sourceDescription =
-        profileDescription(resources.sourceProfile, colorProfile.sourceDescription);
-    if (cmsGetColorSpace(resources.sourceProfile) != cmsSigRgbData) {
-        metadata.colorWarning = QStringLiteral("Only embedded RGB ICC profiles are supported");
-        metadata.colorProfile = std::move(colorProfile);
-        return;
-    }
-    resources.destinationProfile = cmsCreate_sRGBProfileTHR(resources.context);
-    if (!resources.destinationProfile) {
-        metadata.colorWarning = QStringLiteral("LittleCMS could not create the sRGB profile");
-        metadata.colorProfile = std::move(colorProfile);
-        return;
-    }
-    resources.transform = cmsCreateTransformTHR(
-        resources.context, resources.sourceProfile, TYPE_RGBA_8, resources.destinationProfile,
-        TYPE_RGBA_8, INTENT_RELATIVE_COLORIMETRIC, cmsFLAGS_COPY_ALPHA);
-    if (!resources.transform) {
-        metadata.colorWarning = errorState.message.isEmpty()
-                                    ? QStringLiteral("LittleCMS could not create the ICC transform")
-                                    : errorState.message;
-        metadata.colorProfile = std::move(colorProfile);
-        return;
-    }
+    colorProfile.sourceDescription = transform->sourceDescription;
     colorProfile.renderingIntent = QStringLiteral("Relative colorimetric");
 
     if (image.format() != QImage::Format_RGBA8888) {
@@ -199,14 +262,19 @@ void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metad
         metadata.colorProfile = std::move(colorProfile);
         return;
     }
-    for (int firstRow = 0; firstRow < image.height(); firstRow += kTransformRowsPerChunk) {
-        const int chunkRows = std::min(kTransformRowsPerChunk, image.height() - firstRow);
-        const qsizetype chunkBytes = rowBytes * chunkRows;
-        const quint64 chunkPixels = quint64(image.width()) * quint64(chunkRows);
-        std::memcpy(sourceChunk.data(), image.constScanLine(firstRow),
-                    static_cast<std::size_t>(chunkBytes));
-        cmsDoTransform(resources.transform, sourceChunk.constData(), image.scanLine(firstRow),
-                       static_cast<cmsUInt32Number>(chunkPixels));
+    {
+        // LittleCMS transforms are reusable. Serialize use of each cached transform so this
+        // remains safe across thumbnail and interactive decoder pools on every supported build.
+        const QMutexLocker transformLock(&transform->useMutex);
+        for (int firstRow = 0; firstRow < image.height(); firstRow += kTransformRowsPerChunk) {
+            const int chunkRows = std::min(kTransformRowsPerChunk, image.height() - firstRow);
+            const qsizetype chunkBytes = rowBytes * chunkRows;
+            const quint64 chunkPixels = quint64(image.width()) * quint64(chunkRows);
+            std::memcpy(sourceChunk.data(), image.constScanLine(firstRow),
+                        static_cast<std::size_t>(chunkBytes));
+            cmsDoTransform(transform->transform, sourceChunk.constData(), image.scanLine(firstRow),
+                           static_cast<cmsUInt32Number>(chunkPixels));
+        }
     }
     image.setColorSpace(QColorSpace(QColorSpace::SRgb));
     colorProfile.destinationColorSpace = QStringLiteral("sRGB");

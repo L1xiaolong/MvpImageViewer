@@ -129,7 +129,7 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void compareSelected();
     Q_INVOKABLE void editSelectedRawParameters();
     Q_INVOKABLE void setGalleryPath(const QString& path);
-    Q_INVOKABLE QString probeGalleryPixel(int x, int y) const;
+    Q_INVOKABLE QString probeGalleryPixel(int x, int y);
 
   public slots:
     void setGridCellWidth(int width);
@@ -159,6 +159,8 @@ class BrowseController final : public QObject {
                                bool pathAlreadyValidated = false);
     void rescanCurrentDirectory();
     void setStatusText(const QString& text);
+    void requestGalleryFull();
+    void applyGalleryFrame(const ImageFramePtr& frame, bool fullResolution);
     void updateSelection(const QStringList& paths);
     void transferPaths(const QStringList& paths, bool move, const QString& targetDirectory = {});
     [[nodiscard]] QStringList allImagePaths() const;
@@ -193,7 +195,10 @@ class BrowseController final : public QObject {
     QString galleryInfoText_;
     QSize galleryImageSize_;
     ImageFramePtr galleryFrame_;
-    LoadHandle galleryLoadHandle_;
+    LoadHandle galleryPreviewHandle_;
+    LoadHandle galleryFullHandle_;
+    bool galleryFullRequested_ = false;
+    bool galleryFullResolution_ = false;
 };
 
 } // namespace ispview

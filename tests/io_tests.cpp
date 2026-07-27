@@ -21,6 +21,8 @@
 #include <QImageWriter>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
@@ -35,6 +37,8 @@
 #include <array>
 #include <atomic>
 #include <limits>
+#include <thread>
+#include <vector>
 
 namespace ispview {
 namespace {
@@ -77,6 +81,53 @@ class DelayedCountingDecoder final : public IImageDecoder {
     }
 
     mutable std::atomic<int> calls{0};
+};
+
+class SerializedRecordingDecoder final : public IImageDecoder {
+  public:
+    [[nodiscard]] DecodeExecutionMode executionMode(const QString& path) const override {
+        return path.endsWith(QStringLiteral(".raw")) ? DecodeExecutionMode::Serialized
+                                                     : DecodeExecutionMode::Parallel;
+    }
+    [[nodiscard]] bool canDecode(const QString&) const override { return true; }
+
+    [[nodiscard]] DecodeResult decode(const DecodeRequest& request) const override {
+        const bool serialized = request.path.endsWith(QStringLiteral(".raw"));
+        if (serialized) {
+            const int active =
+                activeSerializedCalls.fetch_add(1, std::memory_order_relaxed) + 1;
+            int observed = maximumSerializedActive.load(std::memory_order_relaxed);
+            while (observed < active &&
+                   !maximumSerializedActive.compare_exchange_weak(
+                       observed, active, std::memory_order_relaxed)) {
+            }
+            {
+                const QMutexLocker lock(&mutex);
+                order.append(QFileInfo(request.path).fileName());
+            }
+            QThread::msleep(120);
+            activeSerializedCalls.fetch_sub(1, std::memory_order_relaxed);
+        } else {
+            QThread::msleep(10);
+        }
+        QImage image(4, 4, QImage::Format_RGBA8888);
+        image.fill(Qt::black);
+        auto frame = std::make_shared<ImageFrame>();
+        frame->descriptor.size = image.size();
+        frame->metadata.path = request.path;
+        frame->storage = std::move(image);
+        return {std::move(frame), {}};
+    }
+
+    [[nodiscard]] QStringList recordedOrder() const {
+        const QMutexLocker lock(&mutex);
+        return order;
+    }
+
+    mutable QMutex mutex;
+    mutable QStringList order;
+    mutable std::atomic<int> activeSerializedCalls{0};
+    mutable std::atomic<int> maximumSerializedActive{0};
 };
 
 constexpr quint32 prefetchCallBit(int frame, DecodePurpose purpose) {
@@ -154,6 +205,7 @@ class IoTests final : public QObject {
     void colorManagementCapabilityMatchesBuildFeature();
     void decoderConvertsEmbeddedLinearIccToSrgb();
     void colorManagementRejectsNonRgbProfileWithoutChangingPixels();
+    void colorManagementCachedTransformIsThreadSafe();
     void thumbnailDiskCacheRoundTripsImage();
     void imageLoaderDiskCacheKeepsSourceDimensions();
     void nv12LimitedRangeProducesReferencePixels();
@@ -179,6 +231,8 @@ class IoTests final : public QObject {
     void filenameRulesApplyOrderedPresetAndCapturedOverrides();
     void imageLoaderCoalescesIdenticalInFlightRequests();
     void imageLoaderCancellationSuppressesStaleCallbacks();
+    void imageLoaderSerializedQueuePrioritizesAndCancelsWithoutBlockingParallelWork();
+    void imageLoaderEnforcesCombinedMemoryBudget();
 };
 
 void IoTests::decoderScalesPreviewAndKeepsMetadata() {
@@ -533,6 +587,36 @@ void IoTests::colorManagementRejectsNonRgbProfileWithoutChangingPixels() {
 #else
     QVERIFY(metadata.colorWarning.isEmpty());
 #endif
+}
+
+void IoTests::colorManagementCachedTransformIsThreadSafe() {
+    if (!EncodedColorManagement::isAvailable()) {
+        QSKIP("LittleCMS is not available in this build");
+    }
+    const QColorSpace linearSrgb(QColorSpace::SRgbLinear);
+    QVERIFY(linearSrgb.isValid());
+    std::atomic<int> failures{0};
+    std::vector<std::thread> workers;
+    for (int worker = 0; worker < 4; ++worker) {
+        workers.emplace_back([linearSrgb, &failures] {
+            for (int iteration = 0; iteration < 3; ++iteration) {
+                QImage image(512, 384, QImage::Format_RGBA8888);
+                image.fill(QColor(128, 64, 32, 192));
+                image.setColorSpace(linearSrgb);
+                ImageMetadata metadata;
+                EncodedColorManagement::normalizeToSrgb(image, metadata);
+                if (!metadata.colorProfile || !metadata.colorProfile->converted ||
+                    !metadata.colorWarning.isEmpty() ||
+                    image.pixelColor(0, 0).alpha() != 192) {
+                    failures.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    QCOMPARE(failures.load(std::memory_order_relaxed), 0);
 }
 
 void IoTests::scannerFiltersAndNaturallySortsFiles() {
@@ -1395,9 +1479,9 @@ void IoTests::imageLoaderPrefetchesOnlyAdjacentRawFrames() {
 void IoTests::imageLoaderSkipsFullPrefetchWhenFramesExceedBudget() {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
-    const QString path = directory.filePath(QStringLiteral("three_48mp_frames.yuv"));
+    const QString path = directory.filePath(QStringLiteral("three_12mp_frames.yuv"));
     RawImageParameters parameters;
-    parameters.size = {8000, 6000};
+    parameters.size = {4000, 3000};
     parameters.format = RawPixelFormat::P010;
     parameters.frameIndex = 1;
     QFile file(path);
@@ -1407,6 +1491,7 @@ void IoTests::imageLoaderSkipsFullPrefetchWhenFramesExceedBudget() {
 
     auto decoder = std::make_shared<PrefetchRecordingDecoder>();
     ImageLoader loader(decoder);
+    loader.setMemoryBudget(64LL * 1024LL * 1024LL);
     loader.prefetchAdjacentRawFrames(path, parameters, {960, 720});
     const quint32 expected =
         prefetchCallBit(0, DecodePurpose::Preview) | prefetchCallBit(2, DecodePurpose::Preview);
@@ -1622,6 +1707,102 @@ void IoTests::imageLoaderCancellationSuppressesStaleCallbacks() {
     QTRY_COMPARE_WITH_TIMEOUT(liveCallbacks, 1, 2000);
     QCOMPARE(cancelledCallbacks, 0);
     QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 1);
+}
+
+void IoTests::imageLoaderSerializedQueuePrioritizesAndCancelsWithoutBlockingParallelWork() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const auto createFixture = [&directory](const QString& name) {
+        const QString path = directory.filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly) || file.write("fixture") != 7) {
+            return QString{};
+        }
+        return path;
+    };
+    const QString first = createFixture(QStringLiteral("first.raw"));
+    const QString cancelledPath = createFixture(QStringLiteral("cancelled.raw"));
+    const QString interactive = createFixture(QStringLiteral("interactive.raw"));
+    const QString parallel = createFixture(QStringLiteral("parallel.png"));
+    QVERIFY(!first.isEmpty() && !cancelledPath.isEmpty() && !interactive.isEmpty() &&
+            !parallel.isEmpty());
+
+    auto decoder = std::make_shared<SerializedRecordingDecoder>();
+    ImageLoader loader(decoder);
+    int completed = 0;
+    loader.request(1, {first, DecodePurpose::Full, {}},
+                   [&completed](quint64, const DecodeResult& result) {
+                       QVERIFY(result.succeeded());
+                       ++completed;
+                   },
+                   RequestOptions{LoadCategory::Background, 0,
+                                  QStringLiteral("serialized-first")});
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->recordedOrder().size(), 1, 1000);
+    LoadHandle cancelled = loader.request(
+        2, {cancelledPath, DecodePurpose::Full, {}},
+        [](quint64, const DecodeResult&) { QFAIL("Cancelled queued decode completed"); },
+        RequestOptions{LoadCategory::Background, 0, QStringLiteral("serialized-cancelled")});
+    loader.request(3, {interactive, DecodePurpose::Full, {}},
+                   [&completed](quint64, const DecodeResult& result) {
+                       QVERIFY(result.succeeded());
+                       ++completed;
+                   },
+                   RequestOptions{LoadCategory::Interactive, 0,
+                                  QStringLiteral("serialized-interactive")});
+    bool parallelCompleted = false;
+    loader.request(4, {parallel, DecodePurpose::Full, {}},
+                   [&parallelCompleted](quint64, const DecodeResult& result) {
+                       QVERIFY(result.succeeded());
+                       parallelCompleted = true;
+                   },
+                   RequestOptions{LoadCategory::Interactive, 0,
+                                  QStringLiteral("parallel-during-serialized")});
+    cancelled.cancel();
+
+    QTRY_VERIFY_WITH_TIMEOUT(parallelCompleted, 1000);
+    QTRY_COMPARE_WITH_TIMEOUT(completed, 2, 3000);
+    QCOMPARE(decoder->recordedOrder(),
+             QStringList({QStringLiteral("first.raw"), QStringLiteral("interactive.raw")}));
+    QCOMPARE(decoder->maximumSerializedActive.load(std::memory_order_relaxed), 1);
+}
+
+void IoTests::imageLoaderEnforcesCombinedMemoryBudget() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    auto decoder = std::make_shared<DelayedCountingDecoder>();
+    ImageLoader loader(decoder);
+    loader.setMemoryBudget(100);
+
+    int completed = 0;
+    for (int index = 0; index < 3; ++index) {
+        const QString path = directory.filePath(QStringLiteral("%1.png").arg(index));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("fixture"), 7);
+        file.close();
+        loader.request(static_cast<quint64>(index),
+                       {path, static_cast<DecodePurpose>(index), {}},
+                       [&completed](quint64, const DecodeResult& result) {
+                           QVERIFY(result.succeeded());
+                           ++completed;
+                       });
+    }
+    QTRY_COMPARE_WITH_TIMEOUT(completed, 3, 3000);
+    QVERIFY(loader.cachedBytes() <= loader.memoryBudget());
+
+    auto small = std::make_shared<ImageFrame>();
+    small->metadata.sourceSize = QSize(2000, 1500);
+    small->descriptor.storageBits = 8;
+    auto large = std::make_shared<ImageFrame>();
+    large->metadata.sourceSize = QSize(12000, 10000);
+    large->descriptor.storageBits = 8;
+    ImageLoader defaultBudgetLoader(decoder);
+    QVERIFY(defaultBudgetLoader.canAutomaticallyLoadFull({small, small, small, small}));
+    QVERIFY(!defaultBudgetLoader.canAutomaticallyLoadFull({large}));
+    defaultBudgetLoader.setMemoryBudget(8LL * 1024LL * 1024LL);
+    QVERIFY(!defaultBudgetLoader.canAutomaticallyLoadFull({small}));
+    defaultBudgetLoader.setMemoryBudget(384LL * 1024LL * 1024LL);
+    QVERIFY(defaultBudgetLoader.canAutomaticallyLoadFull({small}));
 }
 
 } // namespace ispview

@@ -10,6 +10,8 @@
 #include <QThread>
 #include <QThreadPool>
 
+#include <limits>
+
 namespace ispview {
 namespace {
 
@@ -46,6 +48,8 @@ ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* 
     Q_ASSERT(decoder_);
     pool_.setMaxThreadCount(qBound(2, QThread::idealThreadCount() - 1, 6));
     pool_.setExpiryTimeout(10'000);
+    serializedPool_.setMaxThreadCount(1);
+    serializedPool_.setExpiryTimeout(10'000);
 }
 
 LoadHandle ImageLoader::request(quint64 requestId, DecodeRequest request, Callback callback,
@@ -91,7 +95,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const QPointer<ImageLoader> self(this);
     const auto decoder = decoder_;
     const auto diskCache = diskCache_;
-    pool_.start(
+    QThreadPool& executionPool =
+        decoder_->executionMode(request.path) == DecodeExecutionMode::Serialized
+            ? serializedPool_
+            : pool_;
+    executionPool.start(
         [self, decoder, diskCache, request = std::move(request), key, activeConsumers] {
             DecodeResult result;
             if (activeConsumers->load(std::memory_order_relaxed) > 0 &&
@@ -161,6 +169,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     }
                     if (result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
                         self->cacheFor(purpose).put(key, result.frame, result.frame->byteSize());
+                        self->enforceMemoryBudget(purpose);
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                          ? result.frame->metadata.sourceSize
@@ -191,7 +200,7 @@ void ImageLoader::prefetchAdjacentRawFrames(const QString& path, const RawImageP
     const qsizetype estimatedFrameCost = estimatedFullFrameBytes(current);
     // Full frames have their own budget. Prefetch only when current and adjacent frames can
     // coexist without displacing the active frame immediately.
-    const qsizetype fullPrefetchBudget = fullCache_.maximumCost();
+    const qsizetype fullPrefetchBudget = std::min(fullCache_.maximumCost(), memoryBudget_);
     const bool prefetchFull = adjacentCount > 0 && estimatedFrameCost > 0 &&
                               estimatedFrameCost <= fullPrefetchBudget / (adjacentCount + 1);
     for (const int delta : {-1, 1}) {
@@ -251,6 +260,87 @@ bool ImageLoader::isCached(DecodeRequest request) const {
         request.rawParameters = rawParameters(request.path);
     }
     return cacheFor(request.purpose).contains(cacheKey(request, decoder_->cacheIdentity()));
+}
+
+qsizetype ImageLoader::cachedBytes() const {
+    Q_ASSERT(thread() == QThread::currentThread());
+    return thumbnailCache_.cost() + previewCache_.cost() + fullCache_.cost();
+}
+
+void ImageLoader::setMemoryBudget(qsizetype bytes) {
+    Q_ASSERT(thread() == QThread::currentThread());
+    memoryBudget_ = std::max<qsizetype>(bytes, 1);
+    automaticFullLoadBudget_ =
+        std::min<qsizetype>(256LL * 1024LL * 1024LL, memoryBudget_);
+    enforceMemoryBudget(DecodePurpose::Full);
+}
+
+qsizetype ImageLoader::estimatedFullFrameCost(const ImageFrame& preview) {
+    if (preview.rawParameters) {
+        return estimatedFullFrameBytes(*preview.rawParameters);
+    }
+    const QSize sourceSize = preview.metadata.sourceSize.isValid()
+                                 ? preview.metadata.sourceSize
+                                 : preview.descriptor.size;
+    if (sourceSize.isEmpty()) {
+        return 0;
+    }
+    const qsizetype bytesPerPixel = preview.descriptor.storageBits > 8 ? 8 : 4;
+    const qint64 pixels = static_cast<qint64>(sourceSize.width()) * sourceSize.height();
+    if (pixels <= 0 || pixels > std::numeric_limits<qsizetype>::max() / bytesPerPixel) {
+        return std::numeric_limits<qsizetype>::max();
+    }
+    return static_cast<qsizetype>(pixels) * bytesPerPixel;
+}
+
+bool ImageLoader::canAutomaticallyLoadFull(
+    const QVector<ImageFramePtr>& previewFrames) const {
+    qsizetype total = 0;
+    for (const ImageFramePtr& frame : previewFrames) {
+        if (!frame) {
+            return false;
+        }
+        const qsizetype cost = estimatedFullFrameCost(*frame);
+        if (cost <= 0 || cost > automaticFullLoadBudget_ - total) {
+            return false;
+        }
+        total += cost;
+    }
+    return total <= automaticFullLoadBudget_;
+}
+
+void ImageLoader::enforceMemoryBudget(DecodePurpose insertedPurpose) {
+    constexpr qsizetype thumbnailReserve = 64LL * 1024 * 1024;
+    constexpr qsizetype previewReserve = 64LL * 1024 * 1024;
+    auto evictOne = [](WeightedLruCache<ImageFrame>& cache) {
+        return cache.evictLeastRecentlyUsed() > 0;
+    };
+    while (cachedBytes() > memoryBudget_) {
+        bool evicted = false;
+        if (fullCache_.cost() > 0 &&
+            (insertedPurpose != DecodePurpose::Full ||
+             fullCache_.cost() > memoryBudget_ / 2)) {
+            evicted = evictOne(fullCache_);
+        }
+        if (!evicted && previewCache_.cost() > previewReserve) {
+            evicted = evictOne(previewCache_);
+        }
+        if (!evicted && thumbnailCache_.cost() > thumbnailReserve) {
+            evicted = evictOne(thumbnailCache_);
+        }
+        if (!evicted && fullCache_.cost() > 0) {
+            evicted = evictOne(fullCache_);
+        }
+        if (!evicted && previewCache_.cost() > 0) {
+            evicted = evictOne(previewCache_);
+        }
+        if (!evicted && thumbnailCache_.cost() > 0) {
+            evicted = evictOne(thumbnailCache_);
+        }
+        if (!evicted) {
+            break;
+        }
+    }
 }
 
 WeightedLruCache<ImageFrame>& ImageLoader::cacheFor(DecodePurpose purpose) {

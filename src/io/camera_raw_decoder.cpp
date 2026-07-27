@@ -350,6 +350,10 @@ QString CameraRawDecoder::cacheIdentity() const {
 #endif
 }
 
+DecodeExecutionMode CameraRawDecoder::executionMode(const QString& path) const {
+    return canDecode(path) ? DecodeExecutionMode::Serialized : DecodeExecutionMode::Parallel;
+}
+
 bool CameraRawDecoder::canDecode(const QString& path) const {
     return isAvailable() && cameraRawSuffixes().contains(QFileInfo(path).suffix().toLower());
 }

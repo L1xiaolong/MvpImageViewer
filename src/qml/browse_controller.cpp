@@ -724,7 +724,10 @@ void BrowseController::setGalleryPath(const QString& path) {
         return;
     }
     galleryPath_ = normalized;
-    galleryLoadHandle_.cancel();
+    galleryPreviewHandle_.cancel();
+    galleryFullHandle_.cancel();
+    galleryFullRequested_ = false;
+    galleryFullResolution_ = false;
     galleryFrame_.reset();
     galleryImageSize_ = {};
     galleryInfoText_.clear();
@@ -735,45 +738,85 @@ void BrowseController::setGalleryPath(const QString& path) {
     }
     const quint64 requestId = ++galleryRequestId_;
     const QPointer<BrowseController> self(this);
-    galleryLoadHandle_ = loader_->request(
-        requestId, {normalized, DecodePurpose::Full, {}},
+    galleryPreviewHandle_ = loader_->request(
+        requestId, {normalized, DecodePurpose::Preview, QSize(2048, 2048)},
         [self, normalized](quint64 completedId, const DecodeResult& result) {
             if (!self || completedId != self->galleryRequestId_ ||
                 normalized != self->galleryPath_) {
                 return;
             }
-            self->galleryFrame_ = result.frame;
-            if (result.frame) {
-                const RawPlaneAccessor raw(*result.frame);
-                if (raw.isValid()) {
-                    self->galleryImageSize_ = raw.displaySize();
-                } else if (const QImage* image = result.frame->qImage()) {
-                    // Full decoded pixels already include EXIF orientation. Their logical size
-                    // must drive both 1:1 display and pixel coordinates; metadata.sourceSize is
-                    // the pre-orientation sensor/header size for rotated JPEGs.
-                    self->galleryImageSize_ = image->size();
-                } else if (result.frame->metadata.sourceSize.isValid()) {
-                    self->galleryImageSize_ = result.frame->metadata.sourceSize;
-                } else {
-                    self->galleryImageSize_ = result.frame->descriptor.size;
-                }
-                const int bits = std::max(1, result.frame->descriptor.validBits);
-                self->galleryInfoText_ =
-                    QStringLiteral("%1 × %2  %3-bit  %4  %5")
-                        .arg(result.frame->descriptor.size.width())
-                        .arg(result.frame->descriptor.size.height())
-                        .arg(bits)
-                        .arg(result.frame->metadata.format.toUpper())
-                        .arg(QLocale().formattedDataSize(result.frame->metadata.fileSize));
-            }
-            emit self->galleryImageChanged();
+            self->applyGalleryFrame(result.frame, false);
         }, RequestOptions{LoadCategory::Interactive, 0, QStringLiteral("gallery")});
 }
 
-QString BrowseController::probeGalleryPixel(int x, int y) const {
+void BrowseController::requestGalleryFull() {
+    if (galleryFullRequested_ || galleryFullResolution_ || galleryPath_.isEmpty()) {
+        return;
+    }
+    galleryFullRequested_ = true;
+    const QString requestedPath = galleryPath_;
+    const quint64 requestId = galleryRequestId_;
+    const QPointer<BrowseController> self(this);
+    galleryFullHandle_ = loader_->request(
+        requestId, {requestedPath, DecodePurpose::Full, {}},
+        [self, requestedPath](quint64 completedId, const DecodeResult& result) {
+            if (!self || completedId != self->galleryRequestId_ ||
+                requestedPath != self->galleryPath_) {
+                return;
+            }
+            self->galleryFullRequested_ = false;
+            if (result.frame) {
+                self->applyGalleryFrame(result.frame, true);
+            }
+        },
+        RequestOptions{LoadCategory::Interactive, 10, QStringLiteral("gallery-pixel-probe")});
+}
+
+void BrowseController::applyGalleryFrame(const ImageFramePtr& frame, bool fullResolution) {
+    galleryFrame_ = frame;
+    galleryFullResolution_ = fullResolution && frame;
+    if (frame) {
+        const RawPlaneAccessor raw(*frame);
+        if (raw.isValid()) {
+            galleryImageSize_ = raw.displaySize();
+        } else if (fullResolution) {
+            if (const QImage* image = frame->qImage()) {
+                // Full decoded pixels already include EXIF orientation.
+                galleryImageSize_ = image->size();
+            }
+        } else {
+            galleryImageSize_ = frame->metadata.sourceSize.isValid()
+                                    ? frame->metadata.sourceSize
+                                    : frame->descriptor.size;
+            if (const QImage* image = frame->qImage();
+                image && galleryImageSize_.isValid() &&
+                (image->width() > image->height()) !=
+                    (galleryImageSize_.width() > galleryImageSize_.height())) {
+                galleryImageSize_.transpose();
+            }
+        }
+        if (!galleryImageSize_.isValid()) {
+            galleryImageSize_ = frame->descriptor.size;
+        }
+        const int bits = std::max(1, frame->descriptor.validBits);
+        galleryInfoText_ =
+            QStringLiteral("%1 × %2  %3-bit  %4  %5")
+                .arg(galleryImageSize_.width())
+                .arg(galleryImageSize_.height())
+                .arg(bits)
+                .arg(frame->metadata.format.toUpper())
+                .arg(QLocale().formattedDataSize(frame->metadata.fileSize));
+    }
+    emit galleryImageChanged();
+}
+
+QString BrowseController::probeGalleryPixel(int x, int y) {
     if (!galleryFrame_ || !galleryImageSize_.isValid() || x < 0 || y < 0 ||
         x >= galleryImageSize_.width() || y >= galleryImageSize_.height()) {
         return {};
+    }
+    if (!galleryFullResolution_) {
+        requestGalleryFull();
     }
 
     QString value;

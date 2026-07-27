@@ -6,6 +6,7 @@
 #include <QStringList>
 #include <QVector>
 #include <QPointer>
+#include <QTimer>
 #include <QVariantMap>
 
 namespace ispview {
@@ -83,6 +84,9 @@ class CompareController final : public QObject {
 
   private:
     void requestFrame(int slot, const QString& path);
+    void requestFullFrame(int slot, LoadCategory category);
+    void requestAutomaticFullFrames();
+    void ensureFullFrames();
     void applyHoldFrame();
     void refreshCanvas(int changedSlot = -1, bool resetChangedView = false);
     void clearHistograms(int slot);
@@ -108,6 +112,9 @@ class CompareController final : public QObject {
     QVector<QVariantMap> displayHistograms_;
     QVector<LoadHandle> previewHandles_;
     QVector<LoadHandle> fullHandles_;
+    QVector<bool> fullRequested_;
+    QVector<bool> fullResolution_;
+    QTimer automaticFullLoadTimer_;
 };
 
 } // namespace ispview
