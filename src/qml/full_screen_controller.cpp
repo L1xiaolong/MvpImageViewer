@@ -12,6 +12,7 @@
 #include <QLocale>
 #include <QPointer>
 #include <QQuickWindow>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -57,6 +58,21 @@ void FullScreenController::open(const QStringList& requestedPaths, int initialIn
         return;
     }
     showIndex(std::clamp(initialIndex, 0, static_cast<int>(paths_.size()) - 1));
+}
+
+void FullScreenController::closeSession() {
+    previewHandle_.cancel();
+    fullHandle_.cancel();
+    ++generation_;
+    paths_.clear();
+    currentIndex_ = -1;
+    loading_ = false;
+    errorText_.clear();
+    frame_.reset();
+    refreshCanvas(true);
+    if (loader_) loader_->clearTransientCaches();
+    QTimer::singleShot(500, this, [] { PlatformServices::releaseUnusedMemory(); });
+    emit stateChanged();
 }
 
 void FullScreenController::attachCanvas(QObject* object) {

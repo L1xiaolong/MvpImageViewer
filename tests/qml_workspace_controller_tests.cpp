@@ -11,6 +11,7 @@
 #include "browser/thumbnail_model.h"
 
 #include <QImage>
+#include <QGuiApplication>
 #include <QDir>
 #include <QFile>
 #include <QUrl>
@@ -187,7 +188,27 @@ void QmlWorkspaceControllerTests::exposesNativeFolderNavigationStructure() {
         QVERIFY(!path.isEmpty());
         QVERIFY(!paths.contains(path));
         paths.insert(path);
+#ifdef Q_OS_WIN
+        QVERIFY(place.value(QStringLiteral("icon")).toString().startsWith(
+            QStringLiteral("image://system-folder/")));
+#else
+        QVERIFY(!place.contains(QStringLiteral("icon")));
+#endif
     }
+
+#ifdef Q_OS_WIN
+    const QVariantMap firstPlace = places.constFirst().toMap();
+    const QString encodedPath = QString::fromLatin1(
+        QUrl::toPercentEncoding(firstPlace.value(QStringLiteral("path")).toString()));
+    SystemFolderIconProvider provider;
+    QSize iconSize;
+    const QImage nativeIcon = provider.requestImage(encodedPath, &iconSize, QSize(32, 32));
+    // The offscreen QPA used by CTest intentionally has no native Windows pixmap backend.
+    // URL wiring remains testable there; pixel conversion is validated only on a native QPA.
+    if (QGuiApplication::platformName() != QStringLiteral("offscreen"))
+        QVERIFY(!nativeIcon.isNull());
+    if (!nativeIcon.isNull()) QCOMPARE(iconSize, nativeIcon.size());
+#endif
 
     auto* folderModel = qobject_cast<QFileSystemModel*>(controller.folderTree());
     QVERIFY(folderModel);
@@ -526,6 +547,12 @@ void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperati
     QVERIFY(QFileInfo::exists(renamed));
     QCOMPARE(filesystemSpy.size(), 1);
 
+    controller.closeSession();
+    QVERIFY(controller.paths().isEmpty());
+    QCOMPARE(controller.currentIndex(), -1);
+    QVERIFY(controller.currentPath().isEmpty());
+    QVERIFY(!controller.loading());
+
     // Trash integration is exercised by the platform/UI suites; temporary test locations are
     // intentionally not assumed to be trash-capable on every CI host.
 }
@@ -623,6 +650,11 @@ void QmlWorkspaceControllerTests::compareUsesCompactRgbaPixelTextAndLumaOnlyHist
     QCOMPARE(channels.constFirst().toMap().value(QStringLiteral("name")).toString(),
              QStringLiteral("Luma"));
     QVERIFY(!histogram.contains(QStringLiteral("summary")));
+
+    compare.closeSession();
+    QVERIFY(compare.paths().isEmpty());
+    QVERIFY(!compare.frame(0));
+    QVERIFY(compare.histogram(0).isEmpty());
 }
 
 void QmlWorkspaceControllerTests::compareViewSyncTemporarilyBypassesWithControl() {

@@ -104,6 +104,10 @@ int main(int argc, char* argv[]) {
     engine.addImageProvider(QStringLiteral("thumbnail"),
                             new ispview::ThumbnailImageProvider(decoder,
                                                                 browseController.loader()));
+#ifdef Q_OS_WIN
+    engine.addImageProvider(QStringLiteral("system-folder"),
+                            new ispview::SystemFolderIconProvider());
+#endif
     engine.load(QUrl(QStringLiteral("qrc:/ISPViewQml/Main.qml")));
     if (engine.rootObjects().isEmpty()) {
         return 1;
@@ -112,16 +116,31 @@ int main(int argc, char* argv[]) {
     if (!mainWindow) {
         return 1;
     }
+    // The hidden full-screen helper Window means quitOnLastWindowClosed cannot be the owner of
+    // application shutdown. QML emits this signal only for a real application close; closing a
+    // compare/full-screen session is deliberately kept inside QML.
+    QObject::connect(mainWindow, SIGNAL(quitApplicationRequested()), &app, SLOT(quit()));
     if (lastMainWindowStateWasMaximized) {
         mainWindow->showMaximized();
     } else {
         mainWindow->showNormal();
     }
-    // Minimized and hidden are transient states. Remember the most recent stable state so closing
-    // from the taskbar still restores to normal/maximized instead of starting minimized.
+    // Remember the most recent stable state so closing from the taskbar still restores to
+    // normal/maximized instead of starting minimized.
+    // The QML scene owns an additional hidden full-screen Window on Windows, so Qt's
+    // quitOnLastWindowClosed mechanism cannot reliably terminate the event loop when the main
+    // window is closed. The Hidden fallback is gated by applicationExitPending so rejecting a
+    // compare/full-screen close can never terminate the process.
     QObject::connect(
         mainWindow, &QWindow::visibilityChanged, &app,
-        [&lastMainWindowStateWasMaximized](QWindow::Visibility visibility) {
+        [mainWindow, &lastMainWindowStateWasMaximized](QWindow::Visibility visibility) {
+#ifdef Q_OS_WIN
+            if (visibility == QWindow::Hidden
+                && mainWindow->property("applicationExitPending").toBool()) {
+                QCoreApplication::quit();
+                return;
+            }
+#endif
             if (visibility == QWindow::Maximized) {
                 lastMainWindowStateWasMaximized = true;
             } else if (visibility == QWindow::Windowed) {

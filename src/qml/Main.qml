@@ -17,7 +17,9 @@ ApplicationWindow {
     property bool showingCompare: false
     property bool showingFullScreen: false
     property bool forceApplicationClose: false
+    property bool applicationExitPending: false
     property int visibilityBeforeFullScreen: Window.Windowed
+    signal quitApplicationRequested()
 
     function openFullScreen(paths, initialIndex) {
         showingCompare = false
@@ -41,6 +43,7 @@ ApplicationWindow {
         if (!showingCompare)
             return
         compareController.setHoldCandidate(false)
+        compareController.closeSession()
         showingCompare = false
         Qt.callLater(function() { browsePage.forceActiveFocus() })
     }
@@ -49,6 +52,8 @@ ApplicationWindow {
         if (!showingFullScreen)
             return
 
+        fullScreenController.closeSession()
+        showingFullScreen = false
         if (Qt.platform.os === "osx") {
             if (visibilityBeforeFullScreen === Window.Maximized)
                 showMaximized()
@@ -61,21 +66,30 @@ ApplicationWindow {
             // operation. This keeps the maximized main page at one stable size.
             fullScreenWindow.hide()
         }
-        showingFullScreen = false
         browseController.refreshAll()
         Qt.callLater(function() { browsePage.forceActiveFocus() })
     }
 
     onClosing: function(close) {
-        if (forceApplicationClose) {
-            close.accepted = true
-        } else if (showingFullScreen) {
+        if (!forceApplicationClose && !applicationExitPending && showingFullScreen) {
             close.accepted = false
-            closeFullScreen()
-        } else if (showingCompare) {
-            close.accepted = false
-            closeCompare()
+            Qt.callLater(function() { window.closeFullScreen() })
+            return
         }
+        if (!forceApplicationClose && !applicationExitPending && showingCompare) {
+            close.accepted = false
+            // Leave the native close callback before replacing the compare page. On Windows,
+            // changing the window contents synchronously from this callback can hide the native
+            // window even though the close event was rejected.
+            Qt.callLater(function() { window.closeCompare() })
+            return
+        }
+
+        close.accepted = true
+        applicationExitPending = true
+        compareController.closeSession()
+        fullScreenController.closeSession()
+        quitApplicationRequested()
     }
 
     Component.onCompleted: {

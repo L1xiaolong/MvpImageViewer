@@ -338,6 +338,7 @@ Item {
         Loader {
             id: comparisonCanvasLoader
             anchors.fill: parent
+            active: root.visible || root.designMode
             source: root.designMode
                     ? Qt.resolvedUrl("../Isp/DesignCompareCanvas.qml")
                     : Qt.resolvedUrl("../Isp/ProductionCompareCanvas.qml")

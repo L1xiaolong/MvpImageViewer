@@ -155,11 +155,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             QMetaObject::invokeMethod(
                 self,
                 [self, result = std::move(result), key, purpose = request.purpose,
-                 sourcePath = request.path]() {
+                 sourcePath = request.path, activeConsumers]() {
                     if (!self) {
                         return;
                     }
-                    if (result.frame) {
+                    if (result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
                         self->cacheFor(purpose).put(key, result.frame, result.frame->byteSize());
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
@@ -215,6 +215,11 @@ void ImageLoader::prefetchAdjacentRawFrames(const QString& path, const RawImageP
 
 void ImageLoader::clearCache() {
     thumbnailCache_.clear();
+    clearTransientCaches();
+}
+
+void ImageLoader::clearTransientCaches() {
+    Q_ASSERT(thread() == QThread::currentThread());
     previewCache_.clear();
     fullCache_.clear();
 }

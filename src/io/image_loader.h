@@ -61,6 +61,8 @@ class ImageLoader final : public QObject {
     [[nodiscard]] std::optional<RawImageParameters> rawParameters(const QString& path) const;
     [[nodiscard]] bool isCached(DecodeRequest request) const;
     void clearCache();
+    // Releases large preview/full-resolution frames while retaining inexpensive thumbnails.
+    void clearTransientCaches();
 
     [[nodiscard]] static QString cacheKey(const DecodeRequest& request,
                                           const QString& decoderIdentity = {});

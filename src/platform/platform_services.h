@@ -10,6 +10,8 @@ class PlatformServices final {
   public:
     [[nodiscard]] static bool revealInFileManager(const QString& path);
     [[nodiscard]] static bool openDirectoryInFileManager(const QString& path);
+    // Returns unused heap pages after closing memory-heavy transient views.
+    static void releaseUnusedMemory();
 };
 
 } // namespace ispview

@@ -120,7 +120,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: root.iconSize_
             height: root.iconSize_
-            source: root.folderIcon(parent.selected)
+            source: parent.entry.icon ? parent.entry.icon : root.folderIcon(parent.selected)
             sourceSize: Qt.size(32, 32)
             opacity: root.macStyle ? 0.86 : 1
         }

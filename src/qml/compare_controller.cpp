@@ -6,12 +6,14 @@
 #include "core/raw_plane_access.h"
 #include "io/image_loader.h"
 #include "io/raw_preset_store.h"
+#include "platform/platform_services.h"
 
 #include <QFileInfo>
 #include <QPointer>
 #include <QQuickWindow>
 #include <QSettings>
 #include <QThreadPool>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -128,6 +130,13 @@ void CompareController::setPaths(const QStringList& requested) {
     for (int slot = 0; slot < paths_.size(); ++slot) requestFrame(slot, paths_.at(slot));
 }
 
+void CompareController::closeSession() {
+    setPaths({});
+    if (canvas_) canvas_->setFrames({}, -1, true);
+    if (loader_) loader_->clearTransientCaches();
+    QTimer::singleShot(500, this, [] { PlatformServices::releaseUnusedMemory(); });
+}
+
 void CompareController::requestFrame(int slot, const QString& path) {
     if (!loader_) return;
     std::optional<RawImageParameters> rawParameters = loader_->rawParameters(path);
@@ -151,7 +160,8 @@ void CompareController::requestFrame(int slot, const QString& path) {
     previewHandles_[slot] = loader_->request(
         generation, {path, DecodePurpose::Preview, previewSize, rawParameters},
         [self, slot, path, generation, rawParameters](quint64 id, const DecodeResult& result) {
-            if (!self || id != generation || self->generations_.at(slot) != generation) return;
+            if (!self || id != generation || slot < 0 || slot >= self->generations_.size() ||
+                self->generations_.at(slot) != generation) return;
             if (!result.frame) {
                 self->errors_[slot] = result.error;
                 emit self->loadFailed(slot, result.error);
@@ -170,7 +180,9 @@ void CompareController::requestFrame(int slot, const QString& path) {
             self->fullHandles_[slot] = self->loader_->request(
                 generation, {path, DecodePurpose::Full, {}, rawParameters},
                 [self, slot, generation](quint64 fullId, const DecodeResult& full) {
-                    if (!self || fullId != generation || self->generations_.at(slot) != generation || !full.frame) return;
+                    if (!self || fullId != generation || slot < 0 ||
+                        slot >= self->generations_.size() ||
+                        self->generations_.at(slot) != generation || !full.frame) return;
                     self->frames_[slot] = full.frame;
                     self->refreshCanvas(slot, false);
                     self->clearHistograms(slot);

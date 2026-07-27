@@ -56,6 +56,7 @@ Item {
     Loader {
         id: canvasLoader
         anchors.fill: parent
+        active: root.visible || root.designMode
         source: root.designMode
                 ? Qt.resolvedUrl("../Isp/DesignFullScreenCanvas.qml")
                 : Qt.resolvedUrl("../Isp/ProductionFullScreenCanvas.qml")

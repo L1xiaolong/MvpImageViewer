@@ -307,9 +307,15 @@ QVariantList BrowseController::nativeSidebarPlaces() const {
 #endif
         if (seenPaths.contains(key)) return;
         seenPaths.insert(key);
-        places.append(QVariantMap{{QStringLiteral("label"), label},
-                                  {QStringLiteral("path"), cleanPath},
-                                  {QStringLiteral("kind"), kind}});
+        QVariantMap place{{QStringLiteral("label"), label},
+                          {QStringLiteral("path"), cleanPath},
+                          {QStringLiteral("kind"), kind}};
+#ifdef Q_OS_WIN
+        place.insert(QStringLiteral("icon"),
+                     QStringLiteral("image://system-folder/%1")
+                         .arg(QString::fromLatin1(QUrl::toPercentEncoding(cleanPath))));
+#endif
+        places.append(std::move(place));
     };
 
 #ifdef Q_OS_MACOS

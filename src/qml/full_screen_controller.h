@@ -46,6 +46,7 @@ class FullScreenController final : public QObject {
     [[nodiscard]] QString errorText() const { return errorText_; }
 
     Q_INVOKABLE void open(const QStringList& paths, int initialIndex);
+    Q_INVOKABLE void closeSession();
     Q_INVOKABLE void attachCanvas(QObject* canvas);
     Q_INVOKABLE void showPrevious();
     Q_INVOKABLE void showNext();

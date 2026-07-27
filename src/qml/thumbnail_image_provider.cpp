@@ -5,8 +5,10 @@
 #include "io/image_loader.h"
 #include "io/raw_preset_store.h"
 
+#include <QAbstractFileIconProvider>
 #include <QEventLoop>
 #include <QFileInfo>
+#include <QFileSystemModel>
 #include <QMutexLocker>
 #include <QPainter>
 #include <QPointer>
@@ -14,6 +16,25 @@
 #include <QUrl>
 
 namespace ispview {
+
+SystemFolderIconProvider::SystemFolderIconProvider()
+    : QQuickImageProvider(QQuickImageProvider::Image),
+      fileSystemModel_(std::make_unique<QFileSystemModel>()) {}
+
+SystemFolderIconProvider::~SystemFolderIconProvider() = default;
+
+QImage SystemFolderIconProvider::requestImage(const QString& id, QSize* size,
+                                               const QSize& requestedSize) {
+    const QString path = QUrl::fromPercentEncoding(id.toUtf8());
+    const QSize target = requestedSize.isValid() ? requestedSize : QSize(32, 32);
+    QAbstractFileIconProvider* iconProvider = fileSystemModel_->iconProvider();
+    QIcon icon = iconProvider->icon(QFileInfo(path));
+    if (icon.isNull()) icon = iconProvider->icon(QAbstractFileIconProvider::Folder);
+    const QImage image = icon.pixmap(target).toImage();
+    if (size) *size = image.size();
+    return image;
+}
+
 namespace {
 
 QImage placeholder(const QString& text, const QSize& size) {
