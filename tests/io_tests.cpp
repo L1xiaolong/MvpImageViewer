@@ -5,6 +5,7 @@
 #include "io/encoded_color_management.h"
 #include "io/image_decoder_registry.h"
 #include "io/image_loader.h"
+#include "io/image_transformer.h"
 #include "io/metadata_reader.h"
 #include "io/qt_image_decoder.h"
 #include "io/raw_image_decoder.h"
@@ -233,6 +234,8 @@ class IoTests final : public QObject {
     void imageLoaderCancellationSuppressesStaleCallbacks();
     void imageLoaderSerializedQueuePrioritizesAndCancelsWithoutBlockingParallelWork();
     void imageLoaderEnforcesCombinedMemoryBudget();
+    void imageTransformerRotatesResizesAndRestoresEncodedImage();
+    void imageTransformerRotatesAndRestoresNv12Data();
 };
 
 void IoTests::decoderScalesPreviewAndKeepsMetadata() {
@@ -279,12 +282,22 @@ void IoTests::singleFileRenameMovesSidecarAndRejectsConflicts() {
     QVERIFY(sidecar.open(QIODevice::WriteOnly));
     QCOMPARE(sidecar.write(QByteArrayLiteral("{}")), 2);
     sidecar.close();
+    QFile backup(ImageTransformer::backupPath(source));
+    QVERIFY(backup.open(QIODevice::WriteOnly));
+    QCOMPARE(backup.write(QByteArrayLiteral("original")), 8);
+    backup.close();
+    QFile manifest(ImageTransformer::backupManifestPath(source));
+    QVERIFY(manifest.open(QIODevice::WriteOnly));
+    QCOMPARE(manifest.write(QByteArrayLiteral("{}")), 2);
+    manifest.close();
 
     QString error;
     QVERIFY2(SingleFileRename::execute(source, destination, &error), qPrintable(error));
     QVERIFY(!QFileInfo::exists(source));
     QVERIFY(QFileInfo::exists(destination));
     QVERIFY(QFileInfo::exists(RawPresetStore::sidecarPath(destination)));
+    QVERIFY(QFileInfo::exists(ImageTransformer::backupPath(destination)));
+    QVERIFY(QFileInfo::exists(ImageTransformer::backupManifestPath(destination)));
 
     const QString occupied = directory.filePath(QStringLiteral("occupied.raw"));
     QFile occupiedFile(occupied);
@@ -1803,6 +1816,67 @@ void IoTests::imageLoaderEnforcesCombinedMemoryBudget() {
     QVERIFY(!defaultBudgetLoader.canAutomaticallyLoadFull({small}));
     defaultBudgetLoader.setMemoryBudget(384LL * 1024LL * 1024LL);
     QVERIFY(defaultBudgetLoader.canAutomaticallyLoadFull({small}));
+}
+
+void IoTests::imageTransformerRotatesResizesAndRestoresEncodedImage() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("editable.png"));
+    QImage original(3, 2, QImage::Format_RGBA8888);
+    original.fill(Qt::transparent);
+    original.setPixelColor(0, 0, Qt::red);
+    original.setPixelColor(2, 1, Qt::blue);
+    QVERIFY(original.save(path));
+    QFile originalFile(path);
+    QVERIFY(originalFile.open(QIODevice::ReadOnly));
+    const QByteArray originalBytes = originalFile.readAll();
+    originalFile.close();
+
+    QCOMPARE(ImageTransformer::rotate(path, QuarterTurn::Clockwise), QString{});
+    QVERIFY(ImageTransformer::canRestore(path));
+    QCOMPARE(QImageReader(path).size(), QSize(2, 3));
+    QCOMPARE(ImageTransformer::resize(path, QSize(8, 6)), QString{});
+    QCOMPARE(QImageReader(path).size(), QSize(8, 6));
+
+    QCOMPARE(ImageTransformer::restore(path), QString{});
+    QVERIFY(!ImageTransformer::canRestore(path));
+    QFile restored(path);
+    QVERIFY(restored.open(QIODevice::ReadOnly));
+    QCOMPARE(restored.readAll(), originalBytes);
+}
+
+void IoTests::imageTransformerRotatesAndRestoresNv12Data() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("frame_4x2_nv12.yuv"));
+    const QByteArray original = QByteArray::fromRawData(
+        "\x01\x02\x03\x04\x05\x06\x07\x08\x0a\x1e\x14\x28", 12);
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write(original), original.size());
+    file.close();
+    RawImageParameters parameters;
+    parameters.size = {4, 2};
+    parameters.format = RawPixelFormat::NV12;
+
+    QCOMPARE(ImageTransformer::rotate(path, QuarterTurn::Clockwise, parameters), QString{});
+    const auto rotatedParameters = RawPresetStore::loadForFile(path);
+    QVERIFY(rotatedParameters.has_value());
+    QCOMPARE(rotatedParameters->size, QSize(2, 4));
+    QFile rotated(path);
+    QVERIFY(rotated.open(QIODevice::ReadOnly));
+    const QByteArray expected = QByteArray::fromRawData(
+        "\x05\x01\x06\x02\x07\x03\x08\x04\x0a\x1e\x14\x28", 12);
+    QCOMPARE(rotated.readAll(), expected);
+    rotated.close();
+
+    QCOMPARE(ImageTransformer::restore(path), QString{});
+    QFile restored(path);
+    QVERIFY(restored.open(QIODevice::ReadOnly));
+    QCOMPARE(restored.readAll(), original);
+    const auto restoredParameters = RawPresetStore::loadForFile(path);
+    QVERIFY(restoredParameters.has_value());
+    QCOMPARE(restoredParameters->size, QSize(4, 2));
 }
 
 } // namespace ispview

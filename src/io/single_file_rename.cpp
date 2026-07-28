@@ -1,6 +1,7 @@
 #include "io/single_file_rename.h"
 
 #include "io/raw_preset_store.h"
+#include "io/image_transformer.h"
 
 #include <QDir>
 #include <QFile>
@@ -63,13 +64,22 @@ bool SingleFileRename::execute(const QString& sourcePath, const QString& destina
         return false;
     }
 
-    const QString sourceSidecar =
-        source.isFile() ? RawPresetStore::sidecarPath(sourcePath) : QString{};
-    const QString destinationSidecar =
-        source.isFile() ? RawPresetStore::sidecarPath(destinationPath) : QString{};
-    if (QFileInfo::exists(sourceSidecar) && QFileInfo::exists(destinationSidecar)) {
-        setError(error, QStringLiteral("The destination RAW/YUV sidecar already exists"));
-        return false;
+    QVector<QPair<QString, QString>> auxiliaryFiles;
+    if (source.isFile()) {
+        auxiliaryFiles = {
+            {RawPresetStore::sidecarPath(sourcePath), RawPresetStore::sidecarPath(destinationPath)},
+            {ImageTransformer::backupPath(sourcePath),
+             ImageTransformer::backupPath(destinationPath)},
+            {ImageTransformer::backupManifestPath(sourcePath),
+             ImageTransformer::backupManifestPath(destinationPath)},
+            {RawPresetStore::sidecarPath(ImageTransformer::backupPath(sourcePath)),
+             RawPresetStore::sidecarPath(ImageTransformer::backupPath(destinationPath))}};
+    }
+    for (const auto& [sourceAuxiliary, destinationAuxiliary] : auxiliaryFiles) {
+        if (QFileInfo::exists(sourceAuxiliary) && QFileInfo::exists(destinationAuxiliary)) {
+            setError(error, QStringLiteral("A destination sidecar or restore backup already exists"));
+            return false;
+        }
     }
     const bool renamed = source.isDir() ? QDir().rename(sourcePath, destinationPath)
                                         : QFile::rename(sourcePath, destinationPath);
@@ -77,16 +87,23 @@ bool SingleFileRename::execute(const QString& sourcePath, const QString& destina
         setError(error, QStringLiteral("The operating system could not rename the item"));
         return false;
     }
-    if (QFileInfo::exists(sourceSidecar) && !QFile::rename(sourceSidecar, destinationSidecar)) {
-        if (!QFile::rename(destinationPath, sourcePath)) {
-            setError(error, QStringLiteral(
-                                "The sidecar rename failed and the image filename could not be "
-                                "restored"));
-        } else {
-            setError(error,
-                     QStringLiteral("The sidecar rename failed; the image filename was restored"));
+    QVector<QPair<QString, QString>> moved;
+    for (const auto& [sourceAuxiliary, destinationAuxiliary] : auxiliaryFiles) {
+        if (!QFileInfo::exists(sourceAuxiliary)) continue;
+        if (!QFile::rename(sourceAuxiliary, destinationAuxiliary)) {
+            for (auto iterator = moved.crbegin(); iterator != moved.crend(); ++iterator)
+                QFile::rename(iterator->second, iterator->first);
+            if (!QFile::rename(destinationPath, sourcePath)) {
+                setError(error, QStringLiteral(
+                                    "The sidecar rename failed and the image filename could not be "
+                                    "restored"));
+            } else {
+                setError(error, QStringLiteral(
+                                    "The sidecar rename failed; the image filename was restored"));
+            }
+            return false;
         }
-        return false;
+        moved.append({sourceAuxiliary, destinationAuxiliary});
     }
     if (error) {
         error->clear();

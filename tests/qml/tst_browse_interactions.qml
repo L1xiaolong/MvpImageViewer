@@ -19,6 +19,12 @@ TestCase {
 
     readonly property var mockController: mockWorkspace.pane0
 
+    AppMenuItem {
+        id: conditionalMenuItem
+        visible: false
+        text: "Conditional action"
+    }
+
     BrowsePage {
         id: browsePage
         anchors.fill: parent
@@ -55,6 +61,14 @@ TestCase {
         tryCompare(imageMenu, "opened", true);
         compare(mockController.selectedPaths[0], mockController.thumbnails.get(2).path);
         imageMenu.close();
+    }
+
+    function test_hiddenMenuItemDoesNotReserveSpace() {
+        conditionalMenuItem.visible = false
+        compare(conditionalMenuItem.implicitHeight, 0)
+        conditionalMenuItem.visible = true
+        compare(conditionalMenuItem.implicitHeight, 32)
+        conditionalMenuItem.visible = false
     }
 
     function test_gallerySplitterChangesThumbnailWidth() {

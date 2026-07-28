@@ -55,6 +55,9 @@ class BrowseController final : public QObject {
     Q_PROPERTY(bool galleryImageReady READ galleryImageReady NOTIFY galleryImageChanged)
     Q_PROPERTY(QString galleryInfoText READ galleryInfoText NOTIFY galleryImageChanged)
     Q_PROPERTY(bool canEditRaw READ canEditRaw NOTIFY selectionChanged)
+    Q_PROPERTY(bool canTransform READ canTransform NOTIFY selectionChanged)
+    Q_PROPERTY(bool canRestoreSelected READ canRestoreSelected NOTIFY selectionChanged)
+    Q_PROPERTY(QSize selectedImageSize READ selectedImageSize NOTIFY selectionChanged)
 
   public:
     BrowseController(std::shared_ptr<const IImageDecoder> decoder,
@@ -89,6 +92,9 @@ class BrowseController final : public QObject {
     [[nodiscard]] bool galleryImageReady() const { return galleryFrame_ != nullptr; }
     [[nodiscard]] QString galleryInfoText() const { return galleryInfoText_; }
     [[nodiscard]] bool canEditRaw() const;
+    [[nodiscard]] bool canTransform() const;
+    [[nodiscard]] bool canRestoreSelected() const;
+    [[nodiscard]] QSize selectedImageSize() const;
     [[nodiscard]] ImageLoader* loader() const { return loader_; }
     [[nodiscard]] QStringList selectedImagePaths() const;
     void setWorkspaceSelectionOrder(const QStringList& paths);
@@ -128,6 +134,10 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void openSelected();
     Q_INVOKABLE void compareSelected();
     Q_INVOKABLE void editSelectedRawParameters();
+    Q_INVOKABLE QString rotateSelectedClockwise();
+    Q_INVOKABLE QString rotateSelectedCounterClockwise();
+    Q_INVOKABLE QString resizeSelected(int width, int height);
+    Q_INVOKABLE QString restoreSelected();
     Q_INVOKABLE void setGalleryPath(const QString& path);
     Q_INVOKABLE QString probeGalleryPixel(int x, int y);
 
@@ -153,6 +163,7 @@ class BrowseController final : public QObject {
     void directorySelectionRequested(const QUrl& initialFolder);
     void renameRequested(const QString& currentName);
     void trashConfirmationRequested(int itemCount);
+    void imageTransformed(const QString& path);
 
   private:
     void openDirectoryInternal(const QString& path, bool addToHistory,
@@ -165,6 +176,8 @@ class BrowseController final : public QObject {
     void transferPaths(const QStringList& paths, bool move, const QString& targetDirectory = {});
     [[nodiscard]] QStringList allImagePaths() const;
     void initialize(const QString& initialDirectory, bool startEmpty);
+    [[nodiscard]] QString transformSelected(bool clockwise);
+    void refreshTransformedPath(const QString& path);
 
     ImageLoader* loader_ = nullptr;
     DirectoryScanner* scanner_ = nullptr;

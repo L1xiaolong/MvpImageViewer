@@ -62,6 +62,8 @@ class CompareController final : public QObject {
     Q_INVOKABLE void attachCanvas(QObject* canvas);
     Q_INVOKABLE void fitAll();
     Q_INVOKABLE void actualPixelsAll();
+    Q_INVOKABLE QString rotateClockwise(int slot);
+    Q_INVOKABLE QString rotateCounterClockwise(int slot);
     Q_INVOKABLE QVariantList pixelTexts(int sourceSlot, int x, int y) const;
     Q_INVOKABLE void requestHistogram(int slot);
     Q_INVOKABLE QVariantMap histogram(int slot) const;
@@ -81,6 +83,7 @@ class CompareController final : public QObject {
     void revisionChanged();
     void histogramRevisionChanged();
     void histogramChanged(int slot);
+    void imageTransformed(const QString& path);
 
   private:
     void requestFrame(int slot, const QString& path);
@@ -91,6 +94,7 @@ class CompareController final : public QObject {
     void refreshCanvas(int changedSlot = -1, bool resetChangedView = false);
     void clearHistograms(int slot);
     void completeHistogram(int slot, quint64 generation, QVariantMap value);
+    QString rotateSlot(int slot, bool clockwise);
     ImageLoader* loader_;
     QStringList paths_;
     QVector<ImageFramePtr> frames_;

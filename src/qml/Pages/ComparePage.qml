@@ -17,6 +17,7 @@ Item {
     property var pixelValues: []
     property string transientMessage: ""
     property bool transientError: false
+    property int selectedSlot: 0
     readonly property var comparisonCanvas: comparisonCanvasLoader.item
 
     signal closeRequested()
@@ -27,6 +28,7 @@ Item {
         pixelValues = []
         transientMessage = ""
         transientError = false
+        selectedSlot = 0
         root.controller.setHoldCandidate(false)
         root.controller.setPresentationMode(0)
         root.controller.setSplitAmount(0.5)
@@ -262,6 +264,32 @@ Item {
                 toolTipText: "Actual pixels (1:1)"
                 onClicked: root.controller.actualPixelsAll()
             }
+            AppIconButton {
+                objectName: "compareRotateCounterClockwiseButton"
+                controlSize: 28
+                renderedIconSize: 16
+                enabled: root.paths.length > 0
+                iconSource: "qrc:/icons/ui/rotate-ccw-square.svg"
+                toolTipText: "Rotate selected image 90° counterclockwise"
+                onClicked: {
+                    const error = root.controller.rotateCounterClockwise(root.selectedSlot)
+                    if (error.length > 0) root.showTransientMessage(error, true)
+                    else root.showTransientMessage("Image rotated and saved", false)
+                }
+            }
+            AppIconButton {
+                objectName: "compareRotateClockwiseButton"
+                controlSize: 28
+                renderedIconSize: 16
+                enabled: root.paths.length > 0
+                iconSource: "qrc:/icons/ui/rotate-cw-square.svg"
+                toolTipText: "Rotate selected image 90° clockwise"
+                onClicked: {
+                    const error = root.controller.rotateClockwise(root.selectedSlot)
+                    if (error.length > 0) root.showTransientMessage(error, true)
+                    else root.showTransientMessage("Image rotated and saved", false)
+                }
+            }
 
             Rectangle {
                 Layout.leftMargin: 4
@@ -355,6 +383,7 @@ Item {
                 if (valid)
                     root.pixelValues = root.controller.pixelTexts(sourceSlot, pixel.x, pixel.y)
             }
+            function onSlotActivated(slot) { root.selectedSlot = slot }
         }
 
         Rectangle {
@@ -414,6 +443,14 @@ Item {
                          || (root.controller.presentationMode === 1
                              && comparisonCell.index < 2)
                 clip: true
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.width: root.selectedSlot === comparisonCell.index ? 2 : 0
+                    border.color: "#7893A6"
+                    z: 20
+                }
 
                 Rectangle {
                     visible: comparisonCell.navigationData.visible === true

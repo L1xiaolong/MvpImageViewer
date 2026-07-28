@@ -7,7 +7,9 @@ MenuItem {
     property string shortcutText: ""
     property bool destructive: false
 
-    implicitHeight: 32
+    // QQuickMenu still accounts for an invisible item's implicit size when calculating its
+    // content height. Conditional actions must collapse completely instead of leaving a blank row.
+    implicitHeight: visible ? 32 : 0
     leftPadding: 10
     rightPadding: 10
     topPadding: 0

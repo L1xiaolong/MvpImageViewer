@@ -17,6 +17,7 @@ Rectangle {
     property bool canAddPane: true
     property bool gridEnabled: true
     property bool galleryEnabled: true
+    property bool transformEnabled: false
     property real navigationWidth: Theme.sidebarWidth
 
     property alias openFolderControl: openFolderButton
@@ -27,6 +28,9 @@ Rectangle {
     property alias galleryControl: galleryModeButton
     property alias sortControl: sortButton
     property alias compareControl: compareButton
+    property alias rotateClockwiseControl: rotateClockwiseButton
+    property alias rotateCounterClockwiseControl: rotateCounterClockwiseButton
+    property alias resizeImageControl: resizeImageButton
     property alias searchControl: fileSearch
     property alias clearSearchControl: clearMouse
 
@@ -179,9 +183,45 @@ Rectangle {
     }
 
     AppIconButton {
+        id: rotateCounterClockwiseButton
+        objectName: "rotateCounterClockwiseButton"
+        x: brandDivider.x + 328
+        y: 8
+        width: 36
+        height: 36
+        enabled: root.transformEnabled
+        iconSource: root.iconPrefix + "rotate-ccw-square.svg"
+        toolTipText: enabled ? "Rotate 90° counterclockwise" : "Select one image to rotate"
+    }
+
+    AppIconButton {
+        id: rotateClockwiseButton
+        objectName: "rotateClockwiseButton"
+        x: brandDivider.x + 366
+        y: 8
+        width: 36
+        height: 36
+        enabled: root.transformEnabled
+        iconSource: root.iconPrefix + "rotate-cw-square.svg"
+        toolTipText: enabled ? "Rotate 90° clockwise" : "Select one image to rotate"
+    }
+
+    AppIconButton {
+        id: resizeImageButton
+        objectName: "resizeImageButton"
+        x: brandDivider.x + 404
+        y: 8
+        width: 36
+        height: 36
+        enabled: root.transformEnabled
+        iconSource: root.iconPrefix + "image-resize.svg"
+        toolTipText: enabled ? "Resize image…" : "Select one image to resize"
+    }
+
+    AppIconButton {
         id: compareButton
         objectName: "compareButton"
-        x: brandDivider.x + 328
+        x: brandDivider.x + 442
         y: 8
         width: 36
         height: 36

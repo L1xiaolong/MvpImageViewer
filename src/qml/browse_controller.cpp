@@ -4,6 +4,7 @@
 #include "io/directory_scanner.h"
 #include "io/drop_copy_operation.h"
 #include "io/image_loader.h"
+#include "io/image_transformer.h"
 #include "io/raw_preset_store.h"
 #include "io/single_file_rename.h"
 #include "io/supported_image_formats.h"
@@ -17,6 +18,7 @@
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QGuiApplication>
+#include <QImageReader>
 #include <QLocale>
 #include <QPointer>
 #include <QSettings>
@@ -285,6 +287,31 @@ bool BrowseController::canEditRaw() const {
     }
     const QString suffix = QFileInfo(selectedPaths_.first()).suffix().toLower();
     return suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv");
+}
+
+bool BrowseController::canTransform() const {
+    return selectedImagePaths().size() == 1;
+}
+
+bool BrowseController::canRestoreSelected() const {
+    return canTransform() && ImageTransformer::canRestore(selectedImagePaths().first());
+}
+
+QSize BrowseController::selectedImageSize() const {
+    if (!canTransform()) return {};
+    const QString path = selectedImagePaths().first();
+    if (galleryPath_ == path && galleryImageSize_.isValid()) return galleryImageSize_;
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    if (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")) {
+        auto raw = loader_->rawParameters(path);
+        if (!raw) raw = RawPresetStore::loadForFile(path);
+        if (!raw) {
+            const RawImageParameters inferred = RawPresetStore::inferFromFileName(path);
+            if (inferred.size.isValid()) raw = inferred;
+        }
+        return raw ? raw->size : QSize{};
+    }
+    return QImageReader(path).size();
 }
 
 void BrowseController::openDirectory(const QString& path) { openDirectoryInternal(path, true); }
@@ -668,7 +695,14 @@ QString BrowseController::moveSelectedToTrashConfirmed() {
     for (const QString& path : std::as_const(selectedPaths_)) {
         if (!QFile::moveToTrash(path)) {
             failures.append(QFileInfo(path).fileName());
+            continue;
         }
+        const QStringList companions{
+            RawPresetStore::sidecarPath(path), ImageTransformer::backupPath(path),
+            ImageTransformer::backupManifestPath(path),
+            RawPresetStore::sidecarPath(ImageTransformer::backupPath(path))};
+        for (const QString& companion : companions)
+            if (QFileInfo::exists(companion)) QFile::moveToTrash(companion);
     }
     clearSelection();
     rescanCurrentDirectory();
@@ -716,6 +750,81 @@ void BrowseController::compareSelected() {
 
 void BrowseController::editSelectedRawParameters() {
     if (canEditRaw()) emit rawParametersRequested(selectedPaths_.first());
+}
+
+QString BrowseController::transformSelected(bool clockwise) {
+    if (!canTransform()) return QStringLiteral("Select one image first.");
+    const QString path = selectedImagePaths().first();
+    std::optional<RawImageParameters> raw = loader_->rawParameters(path);
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    if (!raw && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")))
+        raw = RawPresetStore::loadForFile(path);
+    if (!raw && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
+        const RawImageParameters inferred = RawPresetStore::inferFromFileName(path);
+        if (inferred.size.isValid()) raw = inferred;
+    }
+    if ((suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")) && !raw) {
+        const QString error =
+            QStringLiteral("Configure the RAW/YUV dimensions and pixel format first.");
+        setStatusText(error);
+        return error;
+    }
+    const QString error = ImageTransformer::rotate(
+        path, clockwise ? QuarterTurn::Clockwise : QuarterTurn::CounterClockwise, raw);
+    if (error.isEmpty()) refreshTransformedPath(path);
+    else setStatusText(error);
+    return error;
+}
+
+QString BrowseController::rotateSelectedClockwise() { return transformSelected(true); }
+
+QString BrowseController::rotateSelectedCounterClockwise() { return transformSelected(false); }
+
+QString BrowseController::resizeSelected(int width, int height) {
+    if (!canTransform()) return QStringLiteral("Select one image first.");
+    if (width <= 0 || height <= 0 || width > 100000 || height > 100000)
+        return QStringLiteral("Enter dimensions between 1 and 100,000 pixels.");
+    const QString path = selectedImagePaths().first();
+    std::optional<RawImageParameters> raw = loader_->rawParameters(path);
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    if (!raw && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")))
+        raw = RawPresetStore::loadForFile(path);
+    if (!raw && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
+        const RawImageParameters inferred = RawPresetStore::inferFromFileName(path);
+        if (inferred.size.isValid()) raw = inferred;
+    }
+    if ((suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")) && !raw)
+        return QStringLiteral("Configure the RAW/YUV dimensions and pixel format first.");
+    if (raw && raw->isYuv() && ((width & 1) != 0 || (height & 1) != 0))
+        return QStringLiteral("YUV 4:2:0 output dimensions must be even.");
+    const QString error = ImageTransformer::resize(path, {width, height}, raw);
+    if (error.isEmpty()) refreshTransformedPath(path);
+    else setStatusText(error);
+    return error;
+}
+
+QString BrowseController::restoreSelected() {
+    if (!canRestoreSelected()) return QStringLiteral("No original image backup is available.");
+    const QString path = selectedImagePaths().first();
+    const QString error = ImageTransformer::restore(path);
+    if (error.isEmpty()) refreshTransformedPath(path);
+    else setStatusText(error);
+    return error;
+}
+
+void BrowseController::refreshTransformedPath(const QString& path) {
+    loader_->clearCache();
+    if (const auto raw = RawPresetStore::loadForFile(path)) loader_->setRawParameters(path, *raw);
+    thumbnailModel_->invalidateThumbnail(path);
+    if (galleryPath_ == path) {
+        galleryPath_.clear();
+        galleryFrame_.reset();
+        setGalleryPath(path);
+    }
+    emit selectionChanged();
+    emit imageTransformed(path);
+    rescanCurrentDirectory();
+    setStatusText(QStringLiteral("Saved changes to %1").arg(QFileInfo(path).fileName()));
 }
 
 void BrowseController::setGalleryPath(const QString& path) {

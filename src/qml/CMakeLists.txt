@@ -39,6 +39,7 @@ qt_add_qml_module(ISPImageViewerQml
         Isp/DesignFullScreenCanvas.qml
         Isp/FolderNavigator.qml
         Isp/ImagePropertiesDialog.qml
+        Isp/ImageResizeDialog.qml
         Isp/PropertiesHistogram.qml
         Isp/PropertyFieldList.qml
         Isp/RawNumberField.qml
@@ -82,6 +83,9 @@ set(_ispview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/histogram.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/pixel-probe.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/screenshot.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/rotate-cw-square.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/rotate-ccw-square.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/image-resize.svg
 )
 qt_add_resources(ISPImageViewerQml "ispview_qml_icons"
     PREFIX "/icons/ui"

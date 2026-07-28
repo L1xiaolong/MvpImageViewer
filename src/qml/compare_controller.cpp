@@ -6,6 +6,7 @@
 #include "core/raw_plane_access.h"
 #include "io/image_loader.h"
 #include "io/raw_preset_store.h"
+#include "io/image_transformer.h"
 #include "platform/platform_services.h"
 
 #include <QFileInfo>
@@ -238,6 +239,35 @@ void CompareController::requestAutomaticFullFrames() {
         requestFullFrame(slot, LoadCategory::NearViewport);
     }
 }
+
+QString CompareController::rotateSlot(int slot, bool clockwise) {
+    if (!loader_ || slot < 0 || slot >= paths_.size())
+        return QStringLiteral("Select an image to rotate.");
+    const QString path = paths_.at(slot);
+    std::optional<RawImageParameters> raw = loader_->rawParameters(path);
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    if (!raw && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")))
+        raw = RawPresetStore::loadForFile(path);
+    if (!raw && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
+        const RawImageParameters inferred = RawPresetStore::inferFromFileName(path);
+        if (inferred.size.isValid()) raw = inferred;
+    }
+    if ((suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")) && !raw)
+        return QStringLiteral("Configure the RAW/YUV dimensions and pixel format first.");
+    const QString error = ImageTransformer::rotate(
+        path, clockwise ? QuarterTurn::Clockwise : QuarterTurn::CounterClockwise, raw);
+    if (!error.isEmpty()) return error;
+    loader_->clearCache();
+    if (const auto updatedRaw = RawPresetStore::loadForFile(path))
+        loader_->setRawParameters(path, *updatedRaw);
+    requestFrame(slot, path);
+    emit imageTransformed(path);
+    return {};
+}
+
+QString CompareController::rotateClockwise(int slot) { return rotateSlot(slot, true); }
+
+QString CompareController::rotateCounterClockwise(int slot) { return rotateSlot(slot, false); }
 
 void CompareController::ensureFullFrames() {
     automaticFullLoadTimer_.stop();

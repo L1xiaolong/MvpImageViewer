@@ -24,7 +24,8 @@ Rectangle {
     readonly property var sortLabels: ["Name", "Modified", "Size", "Type"]
     signal fullScreenRequested(var paths, int initialIndex)
     readonly property bool contentInteractionEnabled: !propertiesDialog.opened &&
-                                                       !rawParametersDialog.opened
+                                                       !rawParametersDialog.opened &&
+                                                       !imageResizeDialog.opened
     readonly property bool fileShortcutsEnabled: (workspaceController.hasActivePane === undefined ||
                                                   workspaceController.hasActivePane) &&
                                                   !toolbar.searchControl.activeFocus &&
@@ -33,6 +34,7 @@ Rectangle {
                                                   !trashDialog.opened &&
                                                   !propertiesDialog.opened &&
                                                   !rawParametersDialog.opened &&
+                                                  !imageResizeDialog.opened &&
                                                   !folderPicker.visible
     function pathIsRaw(path) {
         const lowered = path.toLowerCase();
@@ -71,6 +73,7 @@ Rectangle {
                      root.workspaceController.paneCount <= 2
         galleryEnabled: root.workspaceController.paneCount === undefined ||
                         root.workspaceController.paneCount === 1
+        transformEnabled: root.controller.canTransform
         navigationWidth: root.navigatorWidth
     }
 
@@ -123,6 +126,18 @@ Rectangle {
         function onClicked() { root.workspaceController.compareSelected(); }
     }
     Connections {
+        target: toolbar.rotateClockwiseControl
+        function onClicked() { root.controller.rotateSelectedClockwise(); }
+    }
+    Connections {
+        target: toolbar.rotateCounterClockwiseControl
+        function onClicked() { root.controller.rotateSelectedCounterClockwise(); }
+    }
+    Connections {
+        target: toolbar.resizeImageControl
+        function onClicked() { imageResizeDialog.openForSelection(); }
+    }
+    Connections {
         target: root.controller
         function onGalleryImageChanged() {
             if (root.controller.galleryImageReady &&
@@ -158,6 +173,12 @@ Rectangle {
             text: (root.controller.sortMode === 3 ? "✓  " : "    ") + "File type"
             onTriggered: root.controller.setSortMode(3)
         }
+    }
+
+    ImageResizeDialog {
+        id: imageResizeDialog
+        parent: Overlay.overlay
+        controller: root.controller
     }
 
     Menu {
@@ -1237,6 +1258,11 @@ Rectangle {
             enabled: root.workspaceController.canCompare
             onTriggered: root.workspaceController.compareSelected()
         }
+        AppMenuItem {
+            visible: root.controller.canRestoreSelected
+            text: "Restore original"
+            onTriggered: root.controller.restoreSelected()
+        }
         AppMenuSeparator {}
         AppMenuItem {
             text: "Cut"
@@ -1277,6 +1303,7 @@ Rectangle {
         AppMenuItem { text: "Open full screen"; onTriggered: root.controller.activatePath(galleryWorkspace.contextPath) }
         AppMenuItem { text: "Compare selected"; enabled: root.workspaceController.canCompare; onTriggered: root.workspaceController.compareSelected() }
         AppMenuItem { text: "RAW/YUV parameters…"; enabled: root.controller.canEditRaw; onTriggered: root.controller.editSelectedRawParameters() }
+        AppMenuItem { visible: root.controller.canRestoreSelected; text: "Restore original"; onTriggered: root.controller.restoreSelected() }
         AppMenuSeparator {}
         AppMenuItem { text: "Cut"; shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
         AppMenuItem { text: "Copy"; shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }

@@ -897,6 +897,7 @@ void QmlImageCanvas::mousePressEvent(QMouseEvent* event) {
         return;
     }
     activeSlot_ = slotAt(event->position());
+    if (activeSlot_ >= 0) emit slotActivated(activeSlot_);
     if (event->button() != Qt::LeftButton || activeSlot_ < 0 ||
         logicalImageSize(activeSlot_).isEmpty()) {
         event->ignore();

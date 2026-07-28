@@ -309,6 +309,11 @@ Item {
             enabled: root.workspaceController.canCompare
             onTriggered: root.workspaceController.compareSelected()
         }
+        AppMenuItem {
+            visible: root.controller.canRestoreSelected
+            text: "Restore original"
+            onTriggered: root.controller.restoreSelected()
+        }
         AppMenuSeparator {}
         AppMenuItem {
             text: "Cut"
@@ -355,6 +360,11 @@ Item {
             text: "RAW/YUV parameters…"
             enabled: root.controller.canEditRaw
             onTriggered: root.controller.editSelectedRawParameters()
+        }
+        AppMenuItem {
+            visible: root.controller.canRestoreSelected
+            text: "Restore original"
+            onTriggered: root.controller.restoreSelected()
         }
         AppMenuSeparator {}
         AppMenuItem { text: "Cut"; shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }

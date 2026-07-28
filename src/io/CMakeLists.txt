@@ -61,6 +61,8 @@ qt_add_library(ispview_io STATIC
     directory_scanner.cpp
     image_loader.h
     image_loader.cpp
+    image_transformer.h
+    image_transformer.cpp
     single_file_rename.h
     single_file_rename.cpp
     drop_copy_operation.h

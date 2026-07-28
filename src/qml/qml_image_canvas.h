@@ -64,6 +64,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     void navigationRevisionChanged();
     void viewStateChanged(int slot, const ispview::ViewState& state);
     void pixelHovered(int sourceSlot, const QPoint& pixel, const QColor& color, bool valid);
+    void slotActivated(int slot);
     void contextMenuRequested(const QPointF& position);
 
   protected:
