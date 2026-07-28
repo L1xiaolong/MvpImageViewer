@@ -44,6 +44,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-libraw
             mingw-w64-ucrt-x86_64-exiv2
             mingw-w64-ucrt-x86_64-lcms2

@@ -3,6 +3,8 @@ qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(ISPImageViewerQml
     main.cpp
+    app_settings.h
+    app_settings.cpp
     browse_controller.h
     browse_controller.cpp
     browse_workspace_controller.h
@@ -27,6 +29,7 @@ qt_add_qml_module(ISPImageViewerQml
     QML_FILES
         Main.qml
         Isp/Theme.qml
+        Isp/SettingsCard.qml
         Isp/AppIconButton.qml
         Isp/AppTextInputDialog.qml
         Isp/AppConfirmDialog.qml
@@ -52,6 +55,14 @@ qt_add_qml_module(ISPImageViewerQml
         Pages/BrowsePage.qml
         Pages/ComparePage.qml
         Pages/FullScreenPage.qml
+)
+
+qt_add_translations(ISPImageViewerQml
+    IMMEDIATE_CALL
+    SOURCE_TARGETS ISPImageViewerQml
+    TS_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/i18n/ispimageviewer_zh_CN.ts"
+    RESOURCE_PREFIX "/i18n"
 )
 
 set(_ispview_qml_icons
@@ -86,11 +97,24 @@ set(_ispview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/rotate-cw-square.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/rotate-ccw-square.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/image-resize.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/settings.svg
 )
 qt_add_resources(ISPImageViewerQml "ispview_qml_icons"
     PREFIX "/icons/ui"
     BASE "${PROJECT_SOURCE_DIR}/assets/icons/ui"
     FILES ${_ispview_qml_icons}
+)
+
+set(_ispview_qml_dark_icons)
+foreach(_icon IN LISTS _ispview_qml_icons)
+    get_filename_component(_icon_name "${_icon}" NAME)
+    list(APPEND _ispview_qml_dark_icons
+        "${PROJECT_SOURCE_DIR}/assets/icons/ui-dark/${_icon_name}")
+endforeach()
+qt_add_resources(ISPImageViewerQml "ispview_qml_dark_icons"
+    PREFIX "/icons/ui-dark"
+    BASE "${PROJECT_SOURCE_DIR}/assets/icons/ui-dark"
+    FILES ${_ispview_qml_dark_icons}
 )
 
 set(_ispview_fonts
@@ -114,6 +138,9 @@ qt_add_resources(ISPImageViewerQml "ispview_brand_assets"
 )
 
 target_include_directories(ISPImageViewerQml PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_compile_definitions(ISPImageViewerQml PRIVATE
+    ISPVIEW_PROJECT_VERSION="${PROJECT_VERSION}"
+)
 target_link_libraries(ISPImageViewerQml PRIVATE
     ispview_browser_backend
     ispview_render_backend
@@ -123,6 +150,7 @@ target_link_libraries(ISPImageViewerQml PRIVATE
     # versioned private QtGui include directory: framework builds on macOS may
     # do that incidentally, while MSYS2/MinGW correctly keeps it private.
     Qt6::GuiPrivate
+    Qt6::Network
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::QuickLayouts

@@ -9,6 +9,7 @@
 #include <QMutexLocker>
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -22,6 +23,7 @@ namespace {
 
 constexpr qsizetype kMaximumIccProfileBytes = 64LL * 1024 * 1024;
 constexpr qsizetype kMaximumProfileTextLength = 512;
+std::atomic_bool colorManagementEnabled{true};
 
 QString boundedProfileText(QString text) {
     text.replace(QChar::Null, QChar::ReplacementCharacter);
@@ -199,6 +201,14 @@ bool EncodedColorManagement::isAvailable() {
 #endif
 }
 
+bool EncodedColorManagement::isEnabled() {
+    return colorManagementEnabled.load(std::memory_order_relaxed);
+}
+
+void EncodedColorManagement::setEnabled(bool enabled) {
+    colorManagementEnabled.store(enabled, std::memory_order_relaxed);
+}
+
 QString EncodedColorManagement::version() {
 #if ISPVIEW_HAS_LCMS2
     return QStringLiteral("%1.%2")
@@ -231,6 +241,11 @@ void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metad
         return;
     }
     colorProfile.sourceFingerprint = profileFingerprint(embeddedProfile);
+    if (!isEnabled()) {
+        colorProfile.transformEngine = QStringLiteral("Disabled in settings");
+        metadata.colorProfile = std::move(colorProfile);
+        return;
+    }
 
 #if ISPVIEW_HAS_LCMS2
     const std::shared_ptr<LcmsTransform> transform =

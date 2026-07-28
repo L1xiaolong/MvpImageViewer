@@ -13,9 +13,9 @@ Rectangle {
     implicitWidth: 156
     implicitHeight: 64
     radius: 3
-    color: "#A61E2227"
+    color: Theme.inspectionOverlayMuted
     border.width: 1
-    border.color: "#42FFFFFF"
+    border.color: Theme.inspectionOverlayBorder
     clip: true
 
     function request() {

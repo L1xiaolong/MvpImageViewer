@@ -6,9 +6,9 @@ Rectangle {
     id: root
     width: 1440
     height: 52
-    color: "#FFFFFF"
+    color: Theme.raisedSurface
 
-    property string iconPrefix: "qrc:/icons/ui/"
+    property string iconPrefix: Theme.iconPrefix
     property int displayMode: 0
     property int sortMode: 0
     property bool compareEnabled: false
@@ -33,15 +33,16 @@ Rectangle {
     property alias resizeImageControl: resizeImageButton
     property alias searchControl: fileSearch
     property alias clearSearchControl: clearMouse
+    property alias settingsControl: settingsButton
 
     Text {
         id: productName
         anchors.left: parent.left
         anchors.right: brandDivider.left
         anchors.verticalCenter: parent.verticalCenter
-        text: "ISP Image Viewer"
+        text: qsTr("ISP Image Viewer")
         horizontalAlignment: Text.AlignHCenter
-        color: "#2E3A43"
+        color: Theme.graphiteInk
         font.family: Theme.uiFont
         font.pixelSize: 17
         font.weight: Font.DemiBold
@@ -53,7 +54,7 @@ Rectangle {
         y: 14
         width: 1
         height: 24
-        color: "#DDE3E7"
+        color: Theme.opticalGray
     }
 
     AppIconButton {
@@ -65,7 +66,7 @@ Rectangle {
         height: 36
         enabled: root.activePaneAvailable
         iconSource: root.iconPrefix + "folder-open.svg"
-        toolTipText: "Open folder"
+        toolTipText: qsTr("Open folder")
     }
 
     AppIconButton {
@@ -77,7 +78,7 @@ Rectangle {
         height: 36
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         iconSource: root.iconPrefix + "folder-plus.svg"
-        toolTipText: "New folder"
+        toolTipText: qsTr("New folder")
     }
 
     AppIconButton {
@@ -89,7 +90,7 @@ Rectangle {
         height: 36
         enabled: root.canAddPane
         iconSource: root.iconPrefix + "folder-pane-plus.svg"
-        toolTipText: enabled ? "Add file manager" : "Maximum 4 file managers"
+        toolTipText: enabled ? qsTr("Add file manager") : qsTr("Maximum 4 file managers")
     }
 
     Rectangle {
@@ -98,7 +99,7 @@ Rectangle {
         y: 14
         width: 1
         height: 24
-        color: "#DDE3E7"
+        color: Theme.opticalGray
     }
 
     AppIconButton {
@@ -126,7 +127,7 @@ Rectangle {
         checked: root.displayMode === 1
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         iconSource: root.iconPrefix + "list.svg"
-        toolTipText: "List view"
+        toolTipText: qsTr("List view")
     }
 
     AppIconButton {
@@ -151,7 +152,7 @@ Rectangle {
         width: 16
         height: 2
         radius: 1
-        color: "#58778E"
+        color: Theme.primaryButton
         Behavior on x {
             NumberAnimation {
                 duration: 120
@@ -166,7 +167,7 @@ Rectangle {
         y: 14
         width: 1
         height: 24
-        color: "#DDE3E7"
+        color: Theme.opticalGray
     }
 
     AppIconButton {
@@ -178,8 +179,8 @@ Rectangle {
         height: 36
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         iconSource: root.iconPrefix + "sort.svg"
-        toolTipText: ["Sort by name", "Sort by modified time", "Sort by file size",
-                      "Sort by file type"][root.sortMode]
+        toolTipText: [qsTr("Sort by name"), qsTr("Sort by modified time"),
+                      qsTr("Sort by file size"), qsTr("Sort by file type")][root.sortMode]
     }
 
     AppIconButton {
@@ -191,7 +192,8 @@ Rectangle {
         height: 36
         enabled: root.transformEnabled
         iconSource: root.iconPrefix + "rotate-ccw-square.svg"
-        toolTipText: enabled ? "Rotate 90° counterclockwise" : "Select one image to rotate"
+        toolTipText: enabled ? qsTr("Rotate 90° counterclockwise")
+                             : qsTr("Select one image to rotate")
     }
 
     AppIconButton {
@@ -203,7 +205,8 @@ Rectangle {
         height: 36
         enabled: root.transformEnabled
         iconSource: root.iconPrefix + "rotate-cw-square.svg"
-        toolTipText: enabled ? "Rotate 90° clockwise" : "Select one image to rotate"
+        toolTipText: enabled ? qsTr("Rotate 90° clockwise")
+                             : qsTr("Select one image to rotate")
     }
 
     AppIconButton {
@@ -215,7 +218,7 @@ Rectangle {
         height: 36
         enabled: root.transformEnabled
         iconSource: root.iconPrefix + "image-resize.svg"
-        toolTipText: enabled ? "Resize image…" : "Select one image to resize"
+        toolTipText: enabled ? qsTr("Resize image…") : qsTr("Select one image to resize")
     }
 
     AppIconButton {
@@ -237,20 +240,24 @@ Rectangle {
         y: 9
         width: 236
         height: 34
-        placeholderText: "Search files"
+        placeholderText: qsTr("Search files")
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         selectByMouse: true
         leftPadding: 34
         rightPadding: 40
-        color: "#33414B"
+        color: Theme.graphiteInk
+        placeholderTextColor: Theme.faintInk
         font.family: Theme.uiFont
         font.pixelSize: 13
 
         background: Rectangle {
-            color: fileSearch.activeFocus ? "#FFFFFF" : "#FAFBFC"
+            color: Theme.searchFieldSurface
             radius: 6
-            border.color: fileSearch.activeFocus ? "#7893A6" : "#D7DEE3"
-            border.width: 1
+            border.color: !fileSearch.enabled ? Theme.opticalGray
+                          : fileSearch.activeFocus ? Theme.searchFieldFocusBorder
+                          : fileSearch.hovered ? Theme.searchFieldHoverBorder
+                          : Theme.searchFieldBorder
+            border.width: fileSearch.activeFocus ? 2 : 1
             Image {
                 x: 9
                 anchors.verticalCenter: parent.verticalCenter
@@ -266,8 +273,8 @@ Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            text: "⌘F"
-            color: "#9AA5AD"
+            text: qsTr("⌘F")
+            color: Theme.faintInk
             font.family: Theme.uiFont
             font.pixelSize: 11
         }
@@ -278,8 +285,8 @@ Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            text: "×"
-            color: clearMouse.containsMouse ? "#33414B" : "#7B8891"
+            text: qsTr("×")
+            color: clearMouse.containsMouse ? Theme.graphiteInk : Theme.mutedInk
             font.pixelSize: 16
             MouseArea {
                 id: clearMouse
@@ -290,11 +297,22 @@ Rectangle {
         }
     }
 
+    AppIconButton {
+        id: settingsButton
+        objectName: "settingsButton"
+        x: fileSearch.x - 42
+        y: 9
+        width: 34
+        height: 34
+        iconSource: root.iconPrefix + "settings.svg"
+        toolTipText: qsTr("Settings")
+    }
+
     Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         height: 1
-        color: "#DDE3E7"
+        color: Theme.opticalGray
     }
 }

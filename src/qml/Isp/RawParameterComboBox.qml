@@ -16,7 +16,7 @@ ComboBox {
         leftPadding: 0
         rightPadding: 0
         text: root.displayText
-        color: root.enabled ? Theme.graphiteInk : "#A5AEB4"
+        color: root.enabled ? Theme.graphiteInk : Theme.faintInk
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
         font: root.font
@@ -24,14 +24,14 @@ ComboBox {
     indicator: Text {
         x: root.width - width - 8
         anchors.verticalCenter: parent.verticalCenter
-        text: "⌄"
+        text: qsTr("⌄")
         color: Theme.mutedInk
         font.family: Theme.uiFont
         font.pixelSize: 13
     }
     background: Rectangle {
         radius: 5
-        color: root.enabled ? Theme.paperWhite : "#F0F2F2"
+        color: root.enabled ? Theme.paperWhite : Theme.softHover
         border.width: root.activeFocus ? 2 : 1
         border.color: root.activeFocus ? Theme.probeBlue : Theme.opticalGray
     }

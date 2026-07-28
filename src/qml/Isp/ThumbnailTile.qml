@@ -124,7 +124,7 @@ Item {
                 elide: Text.ElideRight
                 color: Theme.mutedInk
                 font.family: Theme.monoFont
-                font.pixelSize: 10
+                font.pixelSize: Theme.metadataFontSize
                 font.letterSpacing: -0.15
             }
         }
@@ -203,7 +203,7 @@ Item {
                 elide: Text.ElideRight
                 color: Theme.mutedInk
                 font.family: Theme.monoFont
-                font.pixelSize: 10
+                font.pixelSize: Theme.metadataFontSize
                 font.letterSpacing: -0.15
             }
         }
@@ -256,7 +256,7 @@ Item {
             visible: folderDropArea.containsDrag
             radius: Theme.radius
             color: "#197893A6"
-            border.color: "#7893A6"
+            border.color: Theme.primaryButton
             border.width: 2
         }
     }
@@ -301,48 +301,48 @@ Item {
     AppMenu {
         id: imageContextMenu
         AppMenuItem {
-            text: "Open full screen"
+            text: qsTr("Open full screen")
             onTriggered: root.activated()
         }
         AppMenuItem {
-            text: "Compare selected"
+            text: qsTr("Compare selected")
             enabled: root.workspaceController.canCompare
             onTriggered: root.workspaceController.compareSelected()
         }
         AppMenuItem {
             visible: root.controller.canRestoreSelected
-            text: "Restore original"
+            text: qsTr("Restore original")
             onTriggered: root.controller.restoreSelected()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Cut"
+            text: qsTr("Cut")
             shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"
             onTriggered: root.controller.copySelected(true)
         }
         AppMenuItem {
-            text: "Copy"
+            text: qsTr("Copy")
             shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"
             onTriggered: root.controller.copySelected(false)
         }
         AppMenuItem {
-            text: "Rename…"
+            text: qsTr("Rename…")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.renameSelected()
         }
         AppMenuItem {
-            text: "Move to Trash"
+            text: qsTr("Move to Trash")
             destructive: true
             onTriggered: root.controller.moveSelectedToTrash()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Reveal in Finder / Explorer"
+            text: qsTr("Reveal in Finder / Explorer")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.revealSelected()
         }
         AppMenuItem {
-            text: "Properties"
+            text: qsTr("Properties")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.showSelectedProperties()
         }
@@ -350,43 +350,43 @@ Item {
 
     AppMenu {
         id: rawContextMenu
-        AppMenuItem { text: "Open full screen"; onTriggered: root.activated() }
+        AppMenuItem { text: qsTr("Open full screen"); onTriggered: root.activated() }
         AppMenuItem {
-            text: "Compare selected"
+            text: qsTr("Compare selected")
             enabled: root.workspaceController.canCompare
             onTriggered: root.workspaceController.compareSelected()
         }
         AppMenuItem {
-            text: "RAW/YUV parameters…"
+            text: qsTr("RAW/YUV parameters…")
             enabled: root.controller.canEditRaw
             onTriggered: root.controller.editSelectedRawParameters()
         }
         AppMenuItem {
             visible: root.controller.canRestoreSelected
-            text: "Restore original"
+            text: qsTr("Restore original")
             onTriggered: root.controller.restoreSelected()
         }
         AppMenuSeparator {}
-        AppMenuItem { text: "Cut"; shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
-        AppMenuItem { text: "Copy"; shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }
-        AppMenuItem { text: "Rename…"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.renameSelected() }
-        AppMenuItem { text: "Move to Trash"; destructive: true; onTriggered: root.controller.moveSelectedToTrash() }
+        AppMenuItem { text: qsTr("Cut"); shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
+        AppMenuItem { text: qsTr("Copy"); shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }
+        AppMenuItem { text: qsTr("Rename…"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.renameSelected() }
+        AppMenuItem { text: qsTr("Move to Trash"); destructive: true; onTriggered: root.controller.moveSelectedToTrash() }
         AppMenuSeparator {}
-        AppMenuItem { text: "Reveal in Finder / Explorer"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
-        AppMenuItem { text: "Properties"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
+        AppMenuItem { text: qsTr("Reveal in Finder / Explorer"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
+        AppMenuItem { text: qsTr("Properties"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
     }
 
     AppMenu {
         id: folderContextMenu
-        AppMenuItem { text: "Open folder"; onTriggered: root.activated() }
-        AppMenuItem { text: "Paste into folder"; enabled: root.controller.canPaste; onTriggered: root.controller.pasteItemsInto(root.path) }
+        AppMenuItem { text: qsTr("Open folder"); onTriggered: root.activated() }
+        AppMenuItem { text: qsTr("Paste into folder"); enabled: root.controller.canPaste; onTriggered: root.controller.pasteItemsInto(root.path) }
         AppMenuSeparator {}
-        AppMenuItem { text: "Cut"; shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
-        AppMenuItem { text: "Copy"; shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }
-        AppMenuItem { text: "Rename…"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.renameSelected() }
-        AppMenuItem { text: "Move to Trash"; destructive: true; onTriggered: root.controller.moveSelectedToTrash() }
+        AppMenuItem { text: qsTr("Cut"); shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
+        AppMenuItem { text: qsTr("Copy"); shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }
+        AppMenuItem { text: qsTr("Rename…"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.renameSelected() }
+        AppMenuItem { text: qsTr("Move to Trash"); destructive: true; onTriggered: root.controller.moveSelectedToTrash() }
         AppMenuSeparator {}
-        AppMenuItem { text: "Reveal in Finder / Explorer"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
-        AppMenuItem { text: "Properties"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
+        AppMenuItem { text: qsTr("Reveal in Finder / Explorer"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
+        AppMenuItem { text: qsTr("Properties"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
     }
 }

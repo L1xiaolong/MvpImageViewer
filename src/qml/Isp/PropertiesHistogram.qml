@@ -58,8 +58,8 @@ Item {
                     onClicked: root.source = index
                     contentItem: Text {
                         text: sourceButton.text
-                        color: !sourceButton.enabled ? "#A8B0B5"
-                              : root.source === sourceButton.index ? "#244F86" : Theme.mutedInk
+                        color: !sourceButton.enabled ? Theme.faintInk
+                              : root.source === sourceButton.index ? Theme.probeBlue : Theme.mutedInk
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         font.family: Theme.uiFont
@@ -68,10 +68,10 @@ Item {
                     }
                     background: Rectangle {
                         radius: 5
-                        color: root.source === sourceButton.index ? "#E8F0FC"
+                        color: root.source === sourceButton.index ? Theme.explorerSelectionBg
                               : sourceButton.hovered ? Theme.softHover : "transparent"
                         border.width: root.source === sourceButton.index ? 1 : 0
-                        border.color: "#BDD0EC"
+                        border.color: Theme.accentBorder
                     }
                 }
             }
@@ -113,8 +113,8 @@ Item {
                     }
                     background: Rectangle {
                         radius: 5
-                        color: root.selectedChannel === channelButton.index ? "#F0F2F2"
-                              : channelButton.hovered ? "#F6F7F7" : "transparent"
+                        color: root.selectedChannel === channelButton.index ? Theme.softHover
+                              : channelButton.hovered ? Theme.softHover : "transparent"
                     }
                 }
             }
@@ -124,7 +124,7 @@ Item {
             width: parent.width
             height: 180
             radius: 6
-            color: "#FBFCFB"
+            color: Theme.raisedSurface
             border.width: 1
             border.color: Theme.opticalGray
             clip: true
@@ -146,7 +146,7 @@ Item {
                     const right = width - 4
                     const bottom = height - 22
 
-                    context.strokeStyle = "#E3E7E8"
+                    context.strokeStyle = Theme.opticalGray
                     context.lineWidth = 1
                     for (let division = 0; division <= 4; ++division) {
                         const y = top + (bottom - top) * division / 4
@@ -155,7 +155,7 @@ Item {
                         context.lineTo(right, Math.round(y) + 0.5)
                         context.stroke()
                     }
-                    context.fillStyle = "#7B858C"
+                    context.fillStyle = Theme.mutedInk
                     context.font = "9px " + Theme.monoFont
                     context.textAlign = "center"
                     const domain = Number(root.histogramData.maximumValue || 255)
@@ -165,7 +165,7 @@ Item {
                     }
 
                     if (root.histogramData.loading === true) {
-                        context.fillStyle = "#69747D"
+                        context.fillStyle = Theme.mutedInk
                         context.font = "11px " + Theme.uiFont
                         context.fillText("Analyzing…", (left + right) / 2, (top + bottom) / 2)
                         return
@@ -173,7 +173,7 @@ Item {
                     const channel = root.channels.length > root.selectedChannel
                                   ? root.channels[root.selectedChannel] : null
                     if (!channel || !channel.bins || channel.bins.length < 2) {
-                        context.fillStyle = "#8C969C"
+                        context.fillStyle = Theme.faintInk
                         context.font = "11px " + Theme.uiFont
                         context.fillText(root.histogramData.message || "No histogram",
                                          (left + right) / 2, (top + bottom) / 2)
@@ -204,7 +204,7 @@ Item {
                     }
                     context.lineTo(right, bottom)
                     context.closePath()
-                    const color = channel.color || "#52616B"
+                    const color = channel.color || Theme.mutedInk
                     context.fillStyle = color
                     context.fill()
                     context.strokeStyle = color
@@ -228,7 +228,7 @@ Item {
             width: parent.width
             height: 22 + Math.max(1, root.channels.length) * 24
             radius: 6
-            color: "#FBFCFB"
+            color: Theme.raisedSurface
             border.width: 1
             border.color: Theme.opticalGray
             clip: true
@@ -238,7 +238,7 @@ Item {
                 Rectangle {
                     width: parent.width
                     height: 22
-                    color: "#F0F3F3"
+                    color: Theme.softHover
                     Row {
                         anchors.fill: parent
                         Repeater {
@@ -266,7 +266,7 @@ Item {
                         required property var modelData
                         width: parent.width
                         height: 24
-                        color: index % 2 === 0 ? "#FBFCFB" : "#F5F7F7"
+                        color: index % 2 === 0 ? Theme.raisedSurface : Theme.softHover
                         Row {
                             anchors.fill: parent
                             Repeater {

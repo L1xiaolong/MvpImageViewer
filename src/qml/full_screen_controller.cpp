@@ -118,6 +118,11 @@ void FullScreenController::actualPixels() {
     if (canvas_) canvas_->actualPixelsAll();
 }
 
+void FullScreenController::reload() {
+    if (currentIndex_ >= 0)
+        showIndex(currentIndex_);
+}
+
 void FullScreenController::copyCurrent(bool cut) {
     if (!currentPath().isEmpty()) FileClipboard::setPaths({currentPath()}, cut);
 }

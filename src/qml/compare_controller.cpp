@@ -145,6 +145,14 @@ void CompareController::closeSession() {
     QTimer::singleShot(500, this, [] { PlatformServices::releaseUnusedMemory(); });
 }
 
+void CompareController::reload() {
+    if (paths_.isEmpty())
+        return;
+    const QStringList currentPaths = paths_;
+    paths_.clear();
+    setPaths(currentPaths);
+}
+
 void CompareController::requestFrame(int slot, const QString& path) {
     if (!loader_) return;
     std::optional<RawImageParameters> rawParameters = loader_->rawParameters(path);

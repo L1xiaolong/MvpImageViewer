@@ -8,6 +8,7 @@ ImageCanvas {
     presentationMode: controller ? controller.presentationMode : 0
     compareAmount: controller ? controller.splitAmount : 0.5
     viewSynchronized: true
+    backgroundColor: Theme.canvasBackground
 
     onControllerChanged: {
         if (controller)

@@ -53,6 +53,7 @@ class FullScreenController final : public QObject {
     Q_INVOKABLE void showNext();
     Q_INVOKABLE void fitImage();
     Q_INVOKABLE void actualPixels();
+    Q_INVOKABLE void reload();
     Q_INVOKABLE void copyCurrent(bool cut = false);
     Q_INVOKABLE QString renameCurrentTo(const QString& requestedName);
     Q_INVOKABLE QString moveCurrentToTrash();

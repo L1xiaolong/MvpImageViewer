@@ -12,9 +12,9 @@ Menu {
     delegate: AppMenuItem {}
 
     background: Rectangle {
-        color: "#FCFDFC"
+        color: Theme.raisedSurface
         radius: 8
-        border.color: "#D7DEE3"
+        border.color: Theme.opticalGray
         border.width: 1
     }
 }

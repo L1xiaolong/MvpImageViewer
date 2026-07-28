@@ -10,9 +10,10 @@ Item {
 
     required property var controller
     property var propertiesController: null
+    property var settingsController: null
     property bool designMode: false
-    property string iconPrefix: "qrc:/icons/ui/"
-    property string pixelText: "Move over the image"
+    property string iconPrefix: Theme.iconPrefix
+    property string pixelText: qsTr("Move over the image")
     property string inspectedPath: ""
     readonly property var imageCanvas: canvasLoader.item
     readonly property var navigationData: {
@@ -24,9 +25,21 @@ Item {
 
     signal closeRequested()
 
+    function requestMoveCurrentToTrash() {
+        if (!root.settingsController || root.settingsController.confirmTrash) {
+            trashDialog.showConfirmation()
+            return
+        }
+        const error = root.controller.moveCurrentToTrash()
+        if (error.length > 0) {
+            trashDialog.showConfirmation()
+            trashDialog.complete(error)
+        }
+    }
+
     function open(paths, initialIndex) {
         propertiesDialog.close()
-        pixelText = "Move over the image"
+        pixelText = qsTr("Move over the image")
         inspectedPath = ""
         controller.open(paths, initialIndex)
         forceActiveFocus()
@@ -51,7 +64,7 @@ Item {
         }
     }
 
-    Rectangle { anchors.fill: parent; color: "#A0A0A0" }
+    Rectangle { anchors.fill: parent; color: Theme.canvasBackground }
 
     Loader {
         id: canvasLoader
@@ -240,22 +253,22 @@ Item {
     AppMenu {
         id: fullScreenContextMenu
         objectName: "fullScreenContextMenu"
-        AppMenuItem { text: "Cut"; shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copyCurrent(true) }
-        AppMenuItem { text: "Copy"; shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copyCurrent(false) }
-        AppMenuItem { text: "Rename…"; onTriggered: renameDialog.openWith(root.controller.fileName) }
-        AppMenuItem { text: "Move to Trash"; destructive: true; onTriggered: trashDialog.showConfirmation() }
+        AppMenuItem { text: qsTr("Cut"); shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copyCurrent(true) }
+        AppMenuItem { text: qsTr("Copy"); shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copyCurrent(false) }
+        AppMenuItem { text: qsTr("Rename…"); onTriggered: renameDialog.openWith(root.controller.fileName) }
+        AppMenuItem { text: qsTr("Move to Trash"); destructive: true; onTriggered: root.requestMoveCurrentToTrash() }
         AppMenuSeparator {}
         AppMenuItem { text: Qt.platform.os === "osx" ? "Reveal in Finder" : "Show in File Explorer"; onTriggered: root.controller.revealCurrent() }
         AppMenuSeparator {}
         AppMenu {
-            title: "Display"
-            AppMenuItem { text: "1:1"; onTriggered: root.controller.actualPixels() }
-            AppMenuItem { text: "Fit"; onTriggered: root.controller.fitImage() }
+            title: qsTr("Display")
+            AppMenuItem { text: qsTr("1:1"); onTriggered: root.controller.actualPixels() }
+            AppMenuItem { text: qsTr("Fit"); onTriggered: root.controller.fitImage() }
         }
         AppMenuSeparator {}
         AppMenuItem {
             objectName: "fullScreenPropertiesAction"
-            text: "Properties"
+            text: qsTr("Properties")
             onTriggered: root.showPropertiesDialog()
         }
     }
@@ -263,18 +276,18 @@ Item {
     AppTextInputDialog {
         id: renameDialog
         parent: root
-        dialogTitle: "Rename image"
-        description: "Enter a new name for the current image"
-        acceptText: "Rename"
+        dialogTitle: qsTr("Rename image")
+        description: qsTr("Enter a new name for the current image")
+        acceptText: qsTr("Rename")
         onSubmitted: function(text) { complete(root.controller.renameCurrentTo(text)) }
     }
 
     AppConfirmDialog {
         id: trashDialog
         parent: root
-        dialogTitle: "Move to Trash?"
-        message: "The current image will be moved to the system Trash."
-        confirmText: "Move"
+        dialogTitle: qsTr("Move to Trash?")
+        message: qsTr("The current image will be moved to the system Trash.")
+        confirmText: qsTr("Move")
         destructive: true
         onConfirmed: complete(root.controller.moveCurrentToTrash())
     }

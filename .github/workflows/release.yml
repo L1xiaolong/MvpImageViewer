@@ -67,10 +67,11 @@ jobs:
         if: runner.os == 'macOS'
         with:
           version: '6.9.0'
-          # Qt Quick Controls belongs to the qtdeclarative archive; qtsvg is
-          # likewise an archive, rather than an install-qt add-on module.
+          # Qt Quick Controls belongs to qtdeclarative; LinguistTools and
+          # lrelease belong to qttools. These are archives rather than
+          # install-qt add-on modules.
           modules: 'qtshadertools'
-          archives: 'qtbase qtdeclarative qtsvg'
+          archives: 'qtbase qtdeclarative qtsvg qttools'
           cache: true
 
       - name: Set up MSYS2/UCRT64
@@ -88,6 +89,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qt6-tools
             zip
 
       - name: Configure and build (macOS)

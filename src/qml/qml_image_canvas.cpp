@@ -214,6 +214,7 @@ class Renderer final : public QQuickRhiItemRenderer {
     QSize itemSize_;
     int presentationMode_ = 0;
     qreal compareAmount_ = 0.5;
+    QColor backgroundColor_{160, 160, 160};
     bool resourcesDirty_ = true;
     std::unique_ptr<QRhiBuffer> vertices_;
     std::unique_ptr<QRhiBuffer> compareUniform_;
@@ -549,6 +550,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         }
         presentationMode_ = incomingMode;
         compareAmount_ = canvas->compareAmount();
+        backgroundColor_ = canvas->backgroundColor();
         viewStates_.clear();
         viewStates_.reserve(frames_.size());
         for (int slot = 0; slot < frames_.size(); ++slot)
@@ -594,7 +596,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         updates->updateDynamicBuffer(compareUniform_.get(), 0, 32, compareValues.data());
 
         const QSize outputSize = renderTarget()->pixelSize();
-        commandBuffer->beginPass(renderTarget(), QColor(160, 160, 160, 255), {1.F, 0}, updates);
+        commandBuffer->beginPass(renderTarget(), backgroundColor_, {1.F, 0}, updates);
         commandBuffer->setViewport(
             QRhiViewport(0, 0, static_cast<float>(outputSize.width()),
                          static_cast<float>(outputSize.height())));
@@ -684,6 +686,14 @@ void QmlImageCanvas::setSynchronized(bool enabled) {
     if (synchronized_ == enabled) return;
     synchronized_ = enabled;
     emit synchronizedChanged();
+}
+
+void QmlImageCanvas::setBackgroundColor(const QColor& color) {
+    if (backgroundColor_ == color)
+        return;
+    backgroundColor_ = color;
+    emit backgroundColorChanged();
+    update();
 }
 
 void QmlImageCanvas::setFrames(const QVector<ImageFramePtr>& frames, int changedSlot,

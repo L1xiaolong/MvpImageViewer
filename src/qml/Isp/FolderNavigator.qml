@@ -10,7 +10,7 @@ Rectangle {
     required property var controller
     property bool designMode: false
     property bool browsingEnabled: true
-    property string iconPrefix: "qrc:/icons/ui/"
+    property string iconPrefix: Theme.iconPrefix
     // Injectable so both native variants can be covered by QML tests on one host.
     property string platformName: Qt.platform.os
 
@@ -18,13 +18,13 @@ Rectangle {
     readonly property int indentWidth: macStyle ? 16 : 20
     readonly property int itemHeight: macStyle ? 28 : 26
     readonly property int iconSize_: macStyle ? 16 : 18
-    readonly property color selectionBg: macStyle ? "#0A64D8" : "#DCEBFA"
-    readonly property color hoverBg: macStyle ? "#12000000" : "#E8F2FC"
-    readonly property color sidebarText: macStyle ? "#252525" : "#202020"
+    readonly property color selectionBg: macStyle ? Theme.probeBlue : Theme.explorerSelectionBg
+    readonly property color hoverBg: macStyle ? "#12000000" : Theme.explorerSelectionBg
+    readonly property color sidebarText: macStyle ? Theme.graphiteInk : Theme.graphiteInk
     readonly property string nativeFont: macStyle ? ".AppleSystemUIFont" : "Segoe UI"
 
     objectName: "folderNavigatorSurface"
-    color: macStyle ? "#F2F2F2" : "#FAFAFA"
+    color: macStyle ? Theme.softHover : Theme.raisedSurface
     enabled: browsingEnabled
     opacity: browsingEnabled ? 1 : 0.45
     clip: true
@@ -165,8 +165,8 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.leftMargin: root.macStyle ? 12 : 14
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Recent"
-                color: root.macStyle ? "#777777" : "#3B3B3B"
+                text: qsTr("Recent")
+                color: root.macStyle ? Theme.mutedInk : Theme.graphiteInk
                 font.family: root.nativeFont
                 font.pixelSize: root.macStyle ? 11 : 12
                 font.weight: Font.DemiBold
@@ -197,8 +197,8 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.leftMargin: root.macStyle ? 12 : 14
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Quick Access"
-                color: root.macStyle ? "#777777" : "#3B3B3B"
+                text: qsTr("Quick Access")
+                color: root.macStyle ? Theme.mutedInk : Theme.graphiteInk
                 font.family: root.nativeFont
                 font.pixelSize: root.macStyle ? 11 : 12
                 font.weight: Font.DemiBold
@@ -229,8 +229,8 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.leftMargin: root.macStyle ? 12 : 14
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Locations"
-                color: root.macStyle ? "#777777" : "#3B3B3B"
+                text: qsTr("Locations")
+                color: root.macStyle ? Theme.mutedInk : Theme.graphiteInk
                 font.family: root.nativeFont
                 font.pixelSize: root.macStyle ? 11 : 12
                 font.weight: Font.DemiBold
@@ -295,7 +295,7 @@ Rectangle {
                     height: root.itemHeight
                     text: treeDelegate.isDirectory
                           ? (treeDelegate.expanded ? "▾" : "▸") : ""
-                    color: treeDelegate.isCurrentFolder && root.macStyle ? "white" : "#666666"
+                    color: treeDelegate.isCurrentFolder && root.macStyle ? "white" : Theme.mutedInk
                     font.family: root.nativeFont
                     font.pixelSize: root.macStyle ? 11 : 12
                     horizontalAlignment: Text.AlignHCenter

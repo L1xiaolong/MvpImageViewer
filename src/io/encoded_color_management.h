@@ -12,7 +12,9 @@ namespace ispview {
 class EncodedColorManagement final {
   public:
     [[nodiscard]] static bool isAvailable();
+    [[nodiscard]] static bool isEnabled();
     [[nodiscard]] static QString version();
+    static void setEnabled(bool enabled);
     static void normalizeToSrgb(QImage& image, ImageMetadata& metadata);
 };
 

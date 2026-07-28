@@ -157,18 +157,16 @@ remove_plugins("imageformats"
     qwebp
 )
 
-# The application has no network client. These are optional backends rather than QtNetwork
-# itself, which remains in the dependency closure where Qt QML requires it.
+# Online update checks use QtNetwork over HTTPS. Keep the platform TLS backend while continuing
+# to remove optional network-information and input-method plugins.
 remove_paths(
     "PlugIns/networkinformation"
     "PlugIns/platforminputcontexts"
-    "PlugIns/tls"
 )
 if(PACKAGE_PLATFORM STREQUAL "windows")
     remove_paths(
         "networkinformation"
         "platforminputcontexts"
-        "tls"
     )
 endif()
 
@@ -288,12 +286,14 @@ if(PACKAGE_PLATFORM STREQUAL "macos")
         "${plugin_root}/platforms/libqcocoa.dylib"
         "${plugin_root}/imageformats/libqjpeg.dylib"
         "${plugin_root}/imageformats/libqsvg.dylib"
+        "${plugin_root}/tls/libqsecuretransportbackend.dylib"
     )
 else()
     list(APPEND required_paths
         "${plugin_root}/platforms/qwindows.dll"
         "${plugin_root}/imageformats/qjpeg.dll"
         "${plugin_root}/imageformats/qsvg.dll"
+        "${plugin_root}/tls/qschannelbackend.dll"
     )
 endif()
 foreach(required_path IN LISTS required_paths)

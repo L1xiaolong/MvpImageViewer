@@ -13,10 +13,10 @@ Button {
     implicitWidth: compact ? controlSize : contentRow.implicitWidth + 20
     implicitHeight: controlSize
     padding: 0
-    opacity: enabled ? 1 : 0.38
+    opacity: enabled ? 1 : Theme.disabledOpacity
 
     background: Rectangle {
-        color: control.checked ? "#E7EFF5" : control.down ? "#E2E9ED" : control.hovered ? "#F1F5F7" : "transparent"
+        color: control.checked ? Theme.explorerSelectionBg : control.down ? Theme.pressedSurface : control.hovered ? Theme.softHover : "transparent"
         radius: 6
         border.width: control.activeFocus ? 1 : 0
         border.color: Theme.probeBlue
@@ -34,6 +34,8 @@ Button {
                 sourceSize: Qt.size(control.renderedIconSize * 2,
                                     control.renderedIconSize * 2)
                 fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
             }
             Text {
                 visible: !control.compact

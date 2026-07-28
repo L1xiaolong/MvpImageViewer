@@ -517,7 +517,7 @@ void IoTests::colorManagementCapabilityMatchesBuildFeature() {
     QVERIFY(EncodedColorManagement::version().isEmpty());
 #endif
     const QString identity = QtImageDecoder().cacheIdentity();
-    QVERIFY(identity.contains(QStringLiteral("qt-image-v3")));
+    QVERIFY(identity.contains(QStringLiteral("qt-image-v4")));
     QVERIFY(ImageLoader::cacheKey({QStringLiteral("/tmp/a.png"), DecodePurpose::Thumbnail, {}}) !=
             ImageLoader::cacheKey({QStringLiteral("/tmp/a.png"), DecodePurpose::Thumbnail, {}},
                                   identity));
@@ -973,7 +973,7 @@ void IoTests::decoderRegistryRoutesByFormat() {
     QVERIFY(!registry.canDecode(QStringLiteral("frame.tiff")));
     QVERIFY(!registry.canDecode(QStringLiteral("frame.webp")));
     QVERIFY(!registry.canDecode(QStringLiteral("notes.txt")));
-    QVERIFY(registry.cacheIdentity().contains(QStringLiteral("qt-image-v3")));
+    QVERIFY(registry.cacheIdentity().contains(QStringLiteral("qt-image-v4")));
 }
 
 void IoTests::defaultDecoderAndFormatCatalogStayConsistent() {

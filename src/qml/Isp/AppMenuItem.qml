@@ -20,7 +20,8 @@ MenuItem {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: control.text
-            color: !control.enabled ? "#A9B2B8" : control.destructive ? "#B84A4A" : "#33414B"
+            color: !control.enabled ? Theme.faintInk
+                  : control.destructive ? Theme.danger : Theme.graphiteInk
             font.family: Theme.uiFont
             font.pixelSize: 13
         }
@@ -29,7 +30,7 @@ MenuItem {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: control.shortcutText
-            color: "#8A969E"
+            color: Theme.faintInk
             font.family: Theme.uiFont
             font.pixelSize: 11
         }
@@ -37,6 +38,6 @@ MenuItem {
 
     background: Rectangle {
         radius: 5
-        color: control.highlighted && control.enabled ? "#EAF0F4" : "transparent"
+        color: control.highlighted && control.enabled ? Theme.explorerSelectionBg : "transparent"
     }
 }

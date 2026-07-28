@@ -26,6 +26,8 @@ class QmlImageCanvas : public QQuickRhiItem {
                    NOTIFY synchronizedChanged)
     Q_PROPERTY(int imageCount READ imageCount NOTIFY imageCountChanged)
     Q_PROPERTY(int navigationRevision READ navigationRevision NOTIFY navigationRevisionChanged)
+    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor
+                   NOTIFY backgroundColorChanged)
 
   public:
     explicit QmlImageCanvas(QQuickItem* parent = nullptr);
@@ -36,11 +38,13 @@ class QmlImageCanvas : public QQuickRhiItem {
     bool synchronized() const { return synchronized_; }
     int imageCount() const { return static_cast<int>(frames_.size()); }
     int navigationRevision() const { return navigationRevision_; }
+    QColor backgroundColor() const { return backgroundColor_; }
     const QVector<ImageFramePtr>& frames() const { return frames_; }
 
     void setPresentationMode(int mode);
     void setCompareAmount(qreal amount);
     void setSynchronized(bool enabled);
+    void setBackgroundColor(const QColor& color);
     void setFrames(const QVector<ImageFramePtr>& frames, int changedSlot = -1,
                    bool resetChangedView = false);
 
@@ -62,6 +66,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     void synchronizedChanged();
     void imageCountChanged();
     void navigationRevisionChanged();
+    void backgroundColorChanged();
     void viewStateChanged(int slot, const ispview::ViewState& state);
     void pixelHovered(int sourceSlot, const QPoint& pixel, const QColor& color, bool valid);
     void slotActivated(int slot);
@@ -88,6 +93,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     int activeSlot_ = -1;
     QPointF lastMousePosition_;
     int navigationRevision_ = 0;
+    QColor backgroundColor_{160, 160, 160};
 
     QRectF cellRect(int slot) const;
     int slotAt(const QPointF& position) const;

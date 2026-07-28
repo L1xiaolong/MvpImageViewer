@@ -10,7 +10,7 @@ Dialog {
     objectName: "rawParametersDialog"
 
     property var controller: null
-    property string iconPrefix: "qrc:/icons/ui/"
+    property string iconPrefix: Theme.iconPrefix
     property bool saveAndApply: false
     property string noticeText: ""
     property bool noticeError: false
@@ -101,7 +101,7 @@ Dialog {
                 anchors.leftMargin: 16
                 anchors.top: parent.top
                 anchors.topMargin: 10
-                text: "RAW / YUV DECODER"
+                text: qsTr("RAW / YUV DECODER")
                 color: Theme.probeBlue
                 font.family: Theme.uiFont
                 font.pixelSize: 8
@@ -158,7 +158,7 @@ Dialog {
 
                 Text {
                     width: parent.width - 24
-                    text: "CONFIGURATION"
+                    text: qsTr("CONFIGURATION")
                     color: Theme.mutedInk
                     font.family: Theme.uiFont
                     font.pixelSize: 8
@@ -182,7 +182,7 @@ Dialog {
                         id: deletePresetButton
                         width: 98
                         height: 28
-                        text: "Delete preset"
+                        text: qsTr("Delete preset")
                         enabled: root.controller && root.controller.selectedPreset.length > 0
                         onClicked: {
                             const error = root.controller.deleteSelectedPreset()
@@ -190,7 +190,7 @@ Dialog {
                         }
                         contentItem: Text {
                             text: deletePresetButton.text
-                            color: deletePresetButton.enabled ? Theme.danger : "#A8B0B5"
+                            color: deletePresetButton.enabled ? Theme.danger : Theme.faintInk
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             font.family: Theme.uiFont
@@ -199,16 +199,18 @@ Dialog {
                         }
                         background: Rectangle {
                             radius: 5
-                            color: deletePresetButton.hovered && deletePresetButton.enabled ? "#FAEEEE" : Theme.paperWhite
+                            color: deletePresetButton.hovered && deletePresetButton.enabled
+                                   ? Theme.dangerSurface : Theme.paperWhite
                             border.width: 1
-                            border.color: deletePresetButton.enabled ? "#E4BEBE" : Theme.opticalGray
+                            border.color: deletePresetButton.enabled
+                                          ? Theme.dangerBorder : Theme.opticalGray
                         }
                     }
                 }
 
                 Text {
                     width: parent.width - 24
-                    text: "FRAME LAYOUT"
+                    text: qsTr("FRAME LAYOUT")
                     color: Theme.mutedInk
                     font.family: Theme.uiFont
                     font.pixelSize: 8
@@ -222,26 +224,26 @@ Dialog {
                     columnSpacing: 16
                     rowSpacing: 6
 
-                    Text { text: "Format"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { text: qsTr("Format"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawParameterComboBox {
                         Layout.fillWidth: true
                         model: root.formatNames
                         currentIndex: Number(root.value("format", 0))
                         onActivated: root.controller.setValue("format", index)
                     }
-                    Text { text: "Width"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { text: qsTr("Width"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "width"; parameterValue: root.value("width", 0); minimumValue: 1 }
-                    Text { text: "Height"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { text: qsTr("Height"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "height"; parameterValue: root.value("height", 0); minimumValue: 1 }
-                    Text { text: "Row stride (0 = auto)"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { text: qsTr("Row stride (0 = auto)"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "rowStride"; parameterValue: root.value("rowStride", 0) }
-                    Text { visible: root.controller && root.controller.yuvFormat; text: "Chroma stride (0 = auto)"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { visible: root.controller && root.controller.yuvFormat; text: qsTr("Chroma stride (0 = auto)"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawNumberField { visible: root.controller && root.controller.yuvFormat; Layout.fillWidth: true; controller: root.controller; parameterKey: "chromaStride"; parameterValue: root.value("chromaStride", 0) }
-                    Text { text: "Header offset"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { text: qsTr("Header offset"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "headerOffset"; parameterValue: root.value("headerOffset", 0) }
-                    Text { visible: root.controller && root.controller.raw16Format; text: "Valid bits (0 = default)"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { visible: root.controller && root.controller.raw16Format; text: qsTr("Valid bits (0 = default)"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawNumberField { visible: root.controller && root.controller.raw16Format; Layout.fillWidth: true; controller: root.controller; parameterKey: "validBits"; parameterValue: root.value("validBits", 0); maximumValue: 16 }
-                    Text { text: "Orientation"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                    Text { text: qsTr("Orientation"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                     RawParameterComboBox {
                         Layout.fillWidth: true
                         model: root.orientationNames
@@ -254,15 +256,15 @@ Dialog {
                     visible: root.controller && root.controller.yuvFormat
                     width: parent.width - 24
                     spacing: 7
-                    Text { text: "YUV INTERPRETATION"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 9; font.weight: Font.DemiBold; font.letterSpacing: 1.0 }
+                    Text { text: qsTr("YUV INTERPRETATION"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 9; font.weight: Font.DemiBold; font.letterSpacing: 1.0 }
                     GridLayout {
                         width: parent.width
                         columns: 2
                         columnSpacing: 16
                         rowSpacing: 6
-                        Text { text: "Color matrix"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        Text { text: qsTr("Color matrix"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawParameterComboBox { Layout.fillWidth: true; model: root.matrixNames; currentIndex: Number(root.value("yuvMatrix", 1)); onActivated: root.controller.setValue("yuvMatrix", index) }
-                        Text { text: "Quantization range"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        Text { text: qsTr("Quantization range"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawParameterComboBox { Layout.fillWidth: true; model: root.rangeNames; currentIndex: Number(root.value("range", 1)); onActivated: root.controller.setValue("range", index) }
                     }
                 }
@@ -272,12 +274,12 @@ Dialog {
                     width: parent.width - 24
                     spacing: 6
                     CheckBox {
-                        text: "Little endian"
+                        text: qsTr("Little endian")
                         checked: Boolean(root.value("littleEndian", true))
                         onToggled: root.controller.setValue("littleEndian", checked)
                     }
                     CheckBox {
-                        text: "Valid bits are MSB aligned"
+                        text: qsTr("Valid bits are MSB aligned")
                         checked: Boolean(root.value("msbAligned", false))
                         onToggled: root.controller.setValue("msbAligned", checked)
                     }
@@ -287,27 +289,27 @@ Dialog {
                     visible: root.controller && !root.controller.yuvFormat
                     width: parent.width - 24
                     spacing: 7
-                    Text { text: "BAYER DEVELOPMENT"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 9; font.weight: Font.DemiBold; font.letterSpacing: 1.0 }
+                    Text { text: qsTr("BAYER DEVELOPMENT"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 9; font.weight: Font.DemiBold; font.letterSpacing: 1.0 }
                     GridLayout {
                         width: parent.width
                         columns: 2
                         columnSpacing: 16
                         rowSpacing: 6
-                        Text { text: "Bayer pattern"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        Text { text: qsTr("Bayer pattern"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawParameterComboBox { Layout.fillWidth: true; model: root.bayerNames; currentIndex: Number(root.value("bayerPattern", 0)); onActivated: root.controller.setValue("bayerPattern", index) }
-                        Text { text: "Black level"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        Text { text: qsTr("Black level"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "blackLevel"; parameterValue: root.value("blackLevel", 0) }
-                        Text { text: "White level (0 = maximum)"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        Text { text: qsTr("White level (0 = maximum)"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "whiteLevel"; parameterValue: root.value("whiteLevel", 0) }
-                        Text { text: "Display gamma"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        Text { text: qsTr("Display gamma"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "displayGamma"; parameterValue: root.value("displayGamma", 2.2); decimals: 4; minimumValue: 0.1; maximumValue: 10 }
                     }
                     CheckBox {
-                        text: "Demosaic"
+                        text: qsTr("Demosaic")
                         checked: Boolean(root.value("demosaic", false))
                         onToggled: root.controller.setValue("demosaic", checked)
                     }
-                    Text { text: "White balance gains"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 10; font.weight: Font.Medium }
+                    Text { text: qsTr("White balance gains"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 10; font.weight: Font.Medium }
                     Row {
                         width: parent.width
                         spacing: 8
@@ -323,7 +325,7 @@ Dialog {
                             }
                         }
                     }
-                    Text { text: "Color correction matrix"; color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 10; font.weight: Font.Medium }
+                    Text { text: qsTr("Color correction matrix"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 10; font.weight: Font.Medium }
                     Grid {
                         width: parent.width
                         columns: 3
@@ -351,9 +353,9 @@ Dialog {
                     width: parent.width - 24
                     height: visible ? Math.max(34, noticeLabel.implicitHeight + 16) : 0
                     radius: 5
-                    color: root.noticeError ? "#FBEDED" : "#EAF5EE"
+                    color: root.noticeError ? Theme.dangerSurface : Theme.successSurface
                     border.width: 1
-                    border.color: root.noticeError ? "#E5BABA" : "#BCD9C6"
+                    border.color: root.noticeError ? Theme.dangerBorder : Theme.successBorder
                     Text {
                         id: noticeLabel
                         anchors.left: parent.left
@@ -361,7 +363,7 @@ Dialog {
                         anchors.margins: 10
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.noticeText
-                        color: root.noticeError ? Theme.danger : "#3E7452"
+                        color: root.noticeError ? Theme.danger : Theme.success
                         wrapMode: Text.Wrap
                         font.family: Theme.uiFont
                         font.pixelSize: 10
@@ -376,7 +378,7 @@ Dialog {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: 50
-            color: "#F8F9F8"
+            color: Theme.raisedSurface
             Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: Theme.opticalGray }
             Row {
                 anchors.left: parent.left
@@ -384,15 +386,15 @@ Dialog {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
                 Button {
-                    width: 104; height: 28; text: "Save preset…"
+                    width: 104; height: 28; text: qsTr("Save preset…")
                     onClicked: { root.saveAndApply = false; presetNameDialog.openWith(root.controller.suggestedPresetName) }
                 }
                 Button {
-                    width: 114; height: 28; text: "Save + folder…"
+                    width: 114; height: 28; text: qsTr("Save + folder…")
                     onClicked: { root.saveAndApply = true; presetNameDialog.openWith(root.controller.suggestedPresetName) }
                 }
                 Button {
-                    width: 104; height: 28; text: "Apply to folder"
+                    width: 104; height: 28; text: qsTr("Apply to folder")
                     onClicked: {
                         const error = root.controller.applyToFolder()
                         if (error.length > 0) root.showNotice(error, true)
@@ -405,11 +407,11 @@ Dialog {
     AppTextInputDialog {
         id: presetNameDialog
         parent: root.parent
-        dialogTitle: "Save configuration"
+        dialogTitle: qsTr("Save configuration")
         description: root.saveAndApply
                      ? "Save this configuration, then apply it to matching files in the folder"
                      : "Choose a reusable configuration name"
-        acceptText: "Save"
+        acceptText: qsTr("Save")
         onSubmitted: function(text) {
             complete(root.controller.savePreset(text, root.saveAndApply))
         }

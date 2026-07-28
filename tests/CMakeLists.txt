@@ -22,6 +22,8 @@ add_test(NAME ispview_io_tests COMMAND ispview_io_tests)
 
 qt_add_executable(ispview_qml_workspace_tests
     qml_workspace_controller_tests.cpp
+    ../src/qml/app_settings.h
+    ../src/qml/app_settings.cpp
     ../src/qml/browse_controller.h
     ../src/qml/browse_controller.cpp
     ../src/qml/browse_workspace_controller.h
@@ -41,7 +43,7 @@ qt_add_executable(ispview_qml_workspace_tests
 )
 target_link_libraries(ispview_qml_workspace_tests PRIVATE
     ispview_browser_backend ispview_render_backend ispview_io
-    Qt6::Quick Qt6::GuiPrivate Qt6::Test
+    Qt6::Quick Qt6::GuiPrivate Qt6::Network Qt6::Test
 )
 target_compile_definitions(ispview_qml_workspace_tests PRIVATE
     ISPVIEW_HAS_LIBRAW=$<BOOL:${ISPVIEW_HAS_LIBRAW}>

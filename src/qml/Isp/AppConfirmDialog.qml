@@ -5,9 +5,9 @@ import "."
 Dialog {
     id: root
 
-    property string dialogTitle: ""
-    property string message: ""
-    property string confirmText: "Confirm"
+    property string dialogTitle: qsTr("")
+    property string message: qsTr("")
+    property string confirmText: qsTr("Confirm")
     property bool destructive: false
     property bool completedWithError: false
 
@@ -92,7 +92,7 @@ Dialog {
             y: parent.height - 50
             width: 82
             height: 34
-            text: "Cancel"
+            text: qsTr("Cancel")
             onClicked: root.close()
             contentItem: Text {
                 text: cancelButton.text
@@ -104,7 +104,7 @@ Dialog {
             }
             background: Rectangle {
                 radius: 6
-                color: cancelButton.down ? "#E2E9ED" : cancelButton.hovered ? "#F1F5F7" : Theme.paperWhite
+                color: cancelButton.down ? Theme.pressedSurface : cancelButton.hovered ? Theme.softHover : Theme.paperWhite
                 border.color: Theme.opticalGray
                 border.width: 1
             }
@@ -120,7 +120,7 @@ Dialog {
             onClicked: root.confirmAction()
             contentItem: Text {
                 text: confirmButton.text
-                color: Theme.paperWhite
+                color: Theme.primaryButtonText
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 font.family: Theme.uiFont
@@ -131,7 +131,7 @@ Dialog {
                 radius: 6
                 color: root.destructive && !root.completedWithError
                       ? (confirmButton.down ? "#9F3B3B" : confirmButton.hovered ? "#C44E4E" : Theme.danger)
-                      : (confirmButton.down ? "#49677A" : confirmButton.hovered ? "#607E92" : "#526F82")
+                      : (confirmButton.down ? Theme.primaryButton : confirmButton.hovered ? Theme.primaryButtonHover : Theme.primaryButton)
             }
         }
     }

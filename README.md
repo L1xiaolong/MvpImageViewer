@@ -21,6 +21,7 @@ ISP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片查看与
 - 每个对比窗格可独立显示文件信息、EXIF、亮度直方图和像素值
 - 1～4 面板多文件夹工作区，可跨目录选择图片进入对比
 - 文件复制、剪切、粘贴、重命名、拖放、系统定位和回收站集成
+- 设置中心支持语言、亮暗主题、自定义快捷键、每日更新检查和内置使用指南
 - 可选的 RAW/YUV 参数解释、源平面像素检查、直方图和 ROI 统计
 - 可选的相机 RAW、EXIF/IPTC/XMP 元数据和 ICC 到 sRGB 转换
 
@@ -42,7 +43,7 @@ TIFF、WebP、OpenEXR、HEIC/HEIF、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当
 
 - CMake 3.25+
 - 支持 C++20 的编译器
-- Qt 6.7+：Core、Gui、Quick、Quick Controls 2、Quick Layouts、Svg、ShaderTools 及 Gui 私有头文件
+- Qt 6.7+：Core、Gui、Quick、Quick Controls 2、Quick Layouts、Svg、ShaderTools、LinguistTools 及 Gui 私有头文件
 - macOS：Apple Silicon；Qt 6.9.x 为当前验证版本
 - Windows：x64；推荐 MSYS2/UCRT64 + GCC + Ninja
 

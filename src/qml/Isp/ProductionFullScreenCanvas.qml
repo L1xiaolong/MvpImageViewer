@@ -5,6 +5,7 @@ ImageCanvas {
     property var controller: null
     presentationMode: 0
     viewSynchronized: false
+    backgroundColor: Theme.canvasBackground
 
     onControllerChanged: {
         if (controller)

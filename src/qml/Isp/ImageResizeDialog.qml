@@ -93,7 +93,7 @@ Dialog {
         Text {
             x: 22
             y: 18
-            text: "Resize image"
+            text: qsTr("Resize image")
             color: Theme.graphiteInk
             font.family: Theme.uiFont
             font.pixelSize: 17
@@ -102,7 +102,8 @@ Dialog {
         Text {
             x: 22
             y: 47
-            text: sourceWidth > 0 ? "Original: " + sourceWidth + " × " + sourceHeight + " px"
+            text: sourceWidth > 0
+                  ? qsTr("Original: %1 × %2 px").arg(sourceWidth).arg(sourceHeight)
                                   : "Image dimensions unavailable"
             color: Theme.mutedInk
             font.family: Theme.monoFont
@@ -117,7 +118,7 @@ Dialog {
                 id: pixelsButton
                 width: 88
                 height: 30
-                text: "Pixels"
+                text: qsTr("Pixels")
                 checkable: true
                 checked: !root.percentageMode
                 onClicked: {
@@ -131,7 +132,7 @@ Dialog {
             Button {
                 width: 88
                 height: 30
-                text: "Percent"
+                text: qsTr("Percent")
                 checkable: true
                 checked: root.percentageMode
                 onClicked: {
@@ -187,7 +188,7 @@ Dialog {
         CheckBox {
             x: 18
             y: 234
-            text: "Keep aspect ratio"
+            text: qsTr("Keep aspect ratio")
             checked: root.keepAspectRatio
             onToggled: root.keepAspectRatio = checked
             font.family: Theme.uiFont
@@ -209,7 +210,7 @@ Dialog {
             y: parent.height - 50
             width: 82
             height: 34
-            text: "Cancel"
+            text: qsTr("Cancel")
             onClicked: root.close()
         }
         Button {
@@ -217,7 +218,7 @@ Dialog {
             y: parent.height - 50
             width: 92
             height: 34
-            text: "Resize"
+            text: qsTr("Resize")
             enabled: root.sourceWidth > 0 && root.sourceHeight > 0
             onClicked: root.applyResize()
         }

@@ -1,6 +1,8 @@
 #include "io/qt_image_decoder.h"
+#include "io/encoded_color_management.h"
 #include "io/image_loader.h"
 #include "qml/browse_controller.h"
+#include "qml/app_settings.h"
 #include "qml/browse_workspace_controller.h"
 #include "qml/compare_controller.h"
 #include "qml/image_properties_controller.h"
@@ -131,6 +133,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void compareViewSyncTemporarilyBypassesWithControl();
     void compareDefersOversizedAutomaticFullLoadsButExactToolsStillPromote();
     void compareAutomaticallyPromotesBudgetedImages();
+    void applicationSettingsPersistAndRestoreDefaults();
 };
 
 void QmlWorkspaceControllerTests::initTestCase() {
@@ -194,6 +197,83 @@ void QmlWorkspaceControllerTests::addsActivatesAndClosesOneToFourPanes() {
     QCOMPARE(workspace.activePaneIndex(), 0);
     QVERIFY(workspace.hasActivePane());
     QVERIFY(paneAt(workspace, 0)->currentDirectory().isEmpty());
+}
+
+void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults() {
+    QSettings().clear();
+    auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
+    QVERIFY(application);
+    AppSettings settings(application);
+
+    QCOMPARE(settings.language(), QStringLiteral("system"));
+    QCOMPARE(settings.theme(), QStringLiteral("system"));
+    QVERIFY(settings.restoreLastDirectory());
+    QVERIFY(settings.confirmTrash());
+    QVERIFY(settings.automaticUpdateChecks());
+    QVERIFY(settings.applyEmbeddedColorProfiles());
+    QVERIFY(settings.preserveHighBitDepth());
+    QVERIFY(settings.honorExifOrientation());
+    QCOMPARE(settings.canvasBackground(), QStringLiteral("neutral"));
+    QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("C"));
+    QCOMPARE(settings.shortcutEntries().size(), 7);
+
+    QSignalSpy languageSpy(&settings, &AppSettings::languageChanged);
+    QSignalSpy themeSpy(&settings, &AppSettings::themeChanged);
+    QSignalSpy shortcutsSpy(&settings, &AppSettings::shortcutsChanged);
+    QSignalSpy colorDisplaySpy(&settings, &AppSettings::colorDisplayChanged);
+    settings.setLanguage(QStringLiteral("en"));
+    settings.setTheme(QStringLiteral("dark"));
+    settings.setRestoreLastDirectory(false);
+    settings.setConfirmTrash(false);
+    settings.setAutomaticUpdateChecks(false);
+    settings.setApplyEmbeddedColorProfiles(false);
+    settings.setPreserveHighBitDepth(false);
+    settings.setHonorExifOrientation(false);
+    settings.setCanvasBackground(QStringLiteral("black"));
+    QCOMPARE(settings.setShortcut(QStringLiteral("compare"),
+                                  QStringLiteral("Ctrl+Shift+C")), QString{});
+    QCOMPARE(settings.setShortcut(QStringLiteral("rename"),
+                                  QStringLiteral("Ctrl+Shift+C")),
+             QStringLiteral("compare"));
+    QCOMPARE(settings.setShortcut(QStringLiteral("rename"),
+                                  QStringLiteral("not a shortcut")),
+             QStringLiteral("invalid"));
+
+    QCOMPARE(languageSpy.count(), 1);
+    QCOMPARE(themeSpy.count(), 1);
+    QCOMPARE(shortcutsSpy.count(), 1);
+    QCOMPARE(colorDisplaySpy.count(), 4);
+    QCOMPARE(QSettings().value(QStringLiteral("general/language")).toString(),
+             QStringLiteral("en"));
+    QCOMPARE(QSettings().value(QStringLiteral("appearance/theme")).toString(),
+             QStringLiteral("dark"));
+    QVERIFY(settings.darkTheme());
+    QVERIFY(!settings.restoreLastDirectory());
+    QVERIFY(!settings.confirmTrash());
+    QVERIFY(!settings.automaticUpdateChecks());
+    QVERIFY(!settings.applyEmbeddedColorProfiles());
+    QVERIFY(!settings.preserveHighBitDepth());
+    QVERIFY(!settings.honorExifOrientation());
+    QCOMPARE(settings.canvasBackground(), QStringLiteral("black"));
+    QVERIFY(!EncodedColorManagement::isEnabled());
+    QVERIFY(!QtImageDecoder::preserveHighBitDepth());
+    QVERIFY(!QtImageDecoder::autoOrientationEnabled());
+    QCOMPARE(settings.shortcutFor(QStringLiteral("compare")),
+             QStringLiteral("Ctrl+Shift+C"));
+    QCOMPARE(QSettings().value(QStringLiteral("shortcuts/compare")).toString(),
+             QStringLiteral("Ctrl+Shift+C"));
+
+    settings.restoreDefaults();
+    QCOMPARE(settings.language(), QStringLiteral("system"));
+    QCOMPARE(settings.theme(), QStringLiteral("system"));
+    QVERIFY(settings.restoreLastDirectory());
+    QVERIFY(settings.confirmTrash());
+    QVERIFY(settings.automaticUpdateChecks());
+    QVERIFY(settings.applyEmbeddedColorProfiles());
+    QVERIFY(settings.preserveHighBitDepth());
+    QVERIFY(settings.honorExifOrientation());
+    QCOMPARE(settings.canvasBackground(), QStringLiteral("neutral"));
+    QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("C"));
 }
 
 void QmlWorkspaceControllerTests::defersStartupDirectoryUntilExplicitlyStarted() {

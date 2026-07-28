@@ -5,10 +5,10 @@ import "."
 Dialog {
     id: root
 
-    property string dialogTitle: ""
-    property string description: ""
+    property string dialogTitle: qsTr("")
+    property string description: qsTr("")
     property string initialText: ""
-    property string acceptText: "Save"
+    property string acceptText: qsTr("Save")
     readonly property alias inputText: inputField.text
 
     signal submitted(string text)
@@ -119,7 +119,7 @@ Dialog {
             y: 168
             width: 82
             height: 34
-            text: "Cancel"
+            text: qsTr("Cancel")
             onClicked: root.close()
             contentItem: Text {
                 text: cancelButton.text
@@ -131,7 +131,7 @@ Dialog {
             }
             background: Rectangle {
                 radius: 6
-                color: cancelButton.down ? "#E2E9ED" : cancelButton.hovered ? "#F1F5F7" : Theme.paperWhite
+                color: cancelButton.down ? Theme.pressedSurface : cancelButton.hovered ? Theme.softHover : Theme.paperWhite
                 border.color: Theme.opticalGray
                 border.width: 1
             }
@@ -148,7 +148,7 @@ Dialog {
             onClicked: root.submit()
             contentItem: Text {
                 text: acceptButton.text
-                color: acceptButton.enabled ? Theme.paperWhite : "#A9B2B8"
+                color: acceptButton.enabled ? Theme.paperWhite : Theme.faintInk
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 font.family: Theme.uiFont
@@ -157,9 +157,9 @@ Dialog {
             }
             background: Rectangle {
                 radius: 6
-                color: !acceptButton.enabled ? "#E7EBEE"
-                      : acceptButton.down ? "#49677A"
-                      : acceptButton.hovered ? "#607E92" : "#526F82"
+                color: !acceptButton.enabled ? Theme.pressedSurface
+                      : acceptButton.down ? Theme.primaryButton
+                      : acceptButton.hovered ? Theme.primaryButtonHover : Theme.primaryButton
             }
         }
     }

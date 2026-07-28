@@ -12,7 +12,7 @@ Rectangle {
     required property int paneIndex
     property bool active: workspaceController.activePaneIndex === paneIndex
     property bool contentInteractionEnabled: true
-    property string iconPrefix: "qrc:/icons/ui/"
+    property string iconPrefix: Theme.iconPrefix
     property int displayMode: controller.displayMode
     readonly property string platformFolderIcon:
         iconPrefix + (Qt.platform.os === "osx" ? "macos-folder.svg"
@@ -22,7 +22,7 @@ Rectangle {
 
     color: Theme.sensorWhite
     border.width: 1
-    border.color: active ? "#9BB0BE" : Theme.opticalGray
+    border.color: active ? Theme.accentBorder : Theme.opticalGray
     clip: true
 
     function activate() { workspaceController.activatePane(paneIndex) }
@@ -44,7 +44,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: focusRail.bottom
         height: 32
-        color: root.active ? "#F7FAFC" : Theme.paperWhite
+        color: root.active ? Theme.raisedSurface : Theme.paperWhite
 
         Image {
             objectName: "paneFolderIcon-" + root.paneIndex
@@ -81,7 +81,7 @@ Rectangle {
             text: root.controller.selectionCount > 0 ? root.controller.selectionCount + " selected" : ""
             color: Theme.mutedInk
             font.family: Theme.monoFont
-            font.pixelSize: 10
+            font.pixelSize: Theme.metadataFontSize
         }
         AppIconButton {
             id: closeButton
@@ -92,7 +92,7 @@ Rectangle {
             width: 26
             height: 26
             iconSource: root.iconPrefix + "close.svg"
-            toolTipText: "Close file manager"
+            toolTipText: qsTr("Close file manager")
             onClicked: root.workspaceController.closePane(root.paneIndex)
         }
         MouseArea {
@@ -126,9 +126,9 @@ Rectangle {
             }
             Text {
                 width: parent.width
-                text: blankDropArea.containsDrag ? "Drop to open here"
-                      : root.active ? "Choose a folder from the sidebar"
-                                  : "Select this area to choose a folder"
+                text: blankDropArea.containsDrag ? qsTr("Drop to open here")
+                      : root.active ? qsTr("Choose a folder from the sidebar")
+                                    : qsTr("Select this area to choose a folder")
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
                 color: Theme.graphiteInk
@@ -172,7 +172,7 @@ Rectangle {
                 visible: blankDropArea.containsDrag
                 radius: 6
                 color: "#127893A6"
-                border.color: "#7893A6"
+                border.color: Theme.primaryButton
                 border.width: 1
             }
         }
@@ -202,7 +202,7 @@ Rectangle {
             anchors.margins: 7
             visible: paneDropArea.containsDrag
             color: "#0A7893A6"
-            border.color: "#7893A6"
+            border.color: Theme.primaryButton
             border.width: 1
             radius: 6
         }
@@ -274,7 +274,7 @@ Rectangle {
         Text {
             anchors.centerIn: parent
             visible: contactSheet.count === 0
-            text: "No supported images in this folder\nChoose another folder or drop images here"
+            text: qsTr("No supported images in this folder\nChoose another folder or drop images here")
             horizontalAlignment: Text.AlignHCenter
             color: Theme.mutedInk
             font.family: Theme.uiFont
@@ -314,14 +314,15 @@ Rectangle {
     AppMenu {
         id: workspaceMenu
         AppMenuItem {
-            text: Qt.platform.os === "osx" ? "Open in Finder" : "Open in File Explorer"
+            text: Qt.platform.os === "osx" ? qsTr("Open in Finder")
+                                          : qsTr("Open in File Explorer")
             onTriggered: root.controller.openCurrentDirectoryInFileManager()
         }
         AppMenuSeparator {}
-        AppMenuItem { text: "Refresh"; onTriggered: root.controller.refresh() }
-        AppMenuItem { text: "Select all"; onTriggered: root.controller.selectAll() }
-        AppMenuItem { text: "Paste"; enabled: root.controller.canPaste; onTriggered: root.controller.pasteItems() }
+        AppMenuItem { text: qsTr("Refresh"); onTriggered: root.controller.refresh() }
+        AppMenuItem { text: qsTr("Select all"); onTriggered: root.controller.selectAll() }
+        AppMenuItem { text: qsTr("Paste"); enabled: root.controller.canPaste; onTriggered: root.controller.pasteItems() }
         AppMenuSeparator {}
-        AppMenuItem { text: "New folder…"; onTriggered: root.newFolderRequested() }
+        AppMenuItem { text: qsTr("New folder…"); onTriggered: root.newFolderRequested() }
     }
 }

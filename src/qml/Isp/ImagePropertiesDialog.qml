@@ -9,7 +9,7 @@ Dialog {
     objectName: "imagePropertiesDialog"
 
     property var controller: null
-    property string iconPrefix: "qrc:/icons/ui/"
+    property string iconPrefix: Theme.iconPrefix
     property int currentTab: 0
     property real dragOriginX: 0
     property real dragOriginY: 0
@@ -108,7 +108,7 @@ Dialog {
                 controlSize: 28
                 renderedIconSize: 14
                 iconSource: root.iconPrefix + "close.svg"
-                toolTipText: "Close"
+                toolTipText: qsTr("Close")
                 onClicked: root.close()
             }
             Rectangle {
@@ -138,7 +138,7 @@ Dialog {
 
                 Text {
                     width: parent.width - 24
-                    text: "FILE"
+                    text: qsTr("FILE")
                     color: Theme.mutedInk
                     font.family: Theme.uiFont
                     font.pixelSize: 8
@@ -150,7 +150,7 @@ Dialog {
                     width: parent.width - 24
                     height: basicFields.implicitHeight
                     radius: 6
-                    color: "#FBFCFB"
+                    color: Theme.raisedSurface
                     border.width: 1
                     border.color: Theme.opticalGray
                     clip: true
@@ -164,7 +164,7 @@ Dialog {
                 Text {
                     visible: root.controller && root.controller.loading
                     width: parent.width - 24
-                    text: "Reading full-resolution metadata…"
+                    text: qsTr("Reading full-resolution metadata…")
                     color: Theme.mutedInk
                     font.family: Theme.uiFont
                     font.pixelSize: 10
@@ -230,7 +230,7 @@ Dialog {
                     width: parent.width - 24
                     height: visible ? exifFields.implicitHeight : 0
                     radius: 6
-                    color: "#FBFCFB"
+                    color: Theme.raisedSurface
                     border.width: 1
                     border.color: Theme.opticalGray
                     clip: true
@@ -257,7 +257,7 @@ Dialog {
                     width: parent.width - 24
                     height: visible ? rawFields.implicitHeight : 0
                     radius: 6
-                    color: "#FBFCFB"
+                    color: Theme.raisedSurface
                     border.width: 1
                     border.color: Theme.opticalGray
                     clip: true

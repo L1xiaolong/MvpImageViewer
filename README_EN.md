@@ -21,6 +21,7 @@ The project is currently in release-candidate stabilization. JPEG and PNG browsi
 - Per-pane file information, EXIF data, luma histogram, and pixel overlays
 - One-to-four-pane multi-folder workspace with cross-directory selection
 - Copy, cut, paste, rename, drag and drop, file-manager reveal, and system Trash integration
+- Settings for language, light/dark appearance, custom shortcuts, daily update checks, and an in-app guide
 - Optional RAW/YUV interpretation, source-plane pixel inspection, histograms, and ROI statistics
 - Optional camera RAW decoding, EXIF/IPTC/XMP metadata, and embedded ICC-to-sRGB conversion
 
@@ -42,7 +43,7 @@ TIFF, WebP, OpenEXR, HEIC/HEIF, AVIF, JPEG XL, PSD, SVG, PDF, and GIF are curren
 
 - CMake 3.25+
 - A C++20 compiler
-- Qt 6.7+ with Core, Gui, Quick, Quick Controls 2, Quick Layouts, Svg, ShaderTools, and private Gui headers
+- Qt 6.7+ with Core, Gui, Quick, Quick Controls 2, Quick Layouts, Svg, ShaderTools, LinguistTools, and private Gui headers
 - macOS: Apple Silicon; Qt 6.9.x is the currently validated version
 - Windows: x64; MSYS2/UCRT64 with GCC and Ninja is recommended
 

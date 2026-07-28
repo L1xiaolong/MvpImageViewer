@@ -24,7 +24,7 @@ Item {
                 width: rows.width
                 height: Math.max(28, Math.max(fieldLabel.implicitHeight,
                                                fieldValue.implicitHeight) + 10)
-                color: index % 2 === 0 ? "#FBFCFB" : "#F5F7F7"
+                color: index % 2 === 0 ? Theme.raisedSurface : Theme.softHover
 
                 Text {
                     id: fieldLabel
@@ -52,7 +52,7 @@ Item {
                     text: fieldRow.modelData.value && String(fieldRow.modelData.value).length > 0
                           ? fieldRow.modelData.value : "—"
                     color: fieldRow.modelData.value && String(fieldRow.modelData.value).length > 0
-                           ? Theme.graphiteInk : "#A2ABB1"
+                           ? Theme.graphiteInk : Theme.faintInk
                     font.family: Theme.monoFont
                     font.pixelSize: 10
                     wrapMode: Text.WrapAnywhere
@@ -63,7 +63,7 @@ Item {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     height: 1
-                    color: "#E8EBEC"
+                    color: Theme.pressedSurface
                 }
             }
         }

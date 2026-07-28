@@ -8,16 +8,40 @@
 #include <QImageReader>
 
 #include <algorithm>
+#include <atomic>
 
 namespace ispview {
+namespace {
+std::atomic_bool autoOrientation{true};
+std::atomic_bool keepHighBitDepth{true};
+}
+
+bool QtImageDecoder::autoOrientationEnabled() {
+    return autoOrientation.load(std::memory_order_relaxed);
+}
+
+bool QtImageDecoder::preserveHighBitDepth() {
+    return keepHighBitDepth.load(std::memory_order_relaxed);
+}
+
+void QtImageDecoder::setAutoOrientationEnabled(bool enabled) {
+    autoOrientation.store(enabled, std::memory_order_relaxed);
+}
+
+void QtImageDecoder::setPreserveHighBitDepth(bool enabled) {
+    keepHighBitDepth.store(enabled, std::memory_order_relaxed);
+}
 
 QString QtImageDecoder::cacheIdentity() const {
     const QString colorIdentity =
         EncodedColorManagement::isAvailable()
             ? QStringLiteral("lcms-%1").arg(EncodedColorManagement::version())
             : QStringLiteral("lcms-disabled");
-    return QStringLiteral("qt-image-v3|qt-%1|%2")
-        .arg(QString::fromLatin1(qVersion()), colorIdentity);
+    return QStringLiteral("qt-image-v4|qt-%1|%2|icc-%3|orientation-%4|depth-%5")
+        .arg(QString::fromLatin1(qVersion()), colorIdentity,
+             EncodedColorManagement::isEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
+             autoOrientationEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
+             preserveHighBitDepth() ? QStringLiteral("native") : QStringLiteral("8"));
 }
 
 bool QtImageDecoder::canDecode(const QString& path) const {
@@ -38,7 +62,7 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
 
     QByteArray readerFormat = QFileInfo(request.path).suffix().toLower().toLatin1();
     QImageReader reader(request.path, readerFormat);
-    reader.setAutoTransform(true);
+    reader.setAutoTransform(autoOrientationEnabled());
     // The registry has already validated the suffix. Selecting the corresponding Qt
     // decoder explicitly avoids a second content probe and keeps thumbnail loading cheap.
     reader.setDecideFormatFromContent(false);
@@ -57,7 +81,8 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
         return {{}, reader.errorString()};
     }
 
-    const bool highBitDepth = image.depth() > 32;
+    const bool sourceHighBitDepth = image.depth() > 32;
+    const bool highBitDepth = sourceHighBitDepth && preserveHighBitDepth();
     if (highBitDepth) {
         if (image.format() != QImage::Format_RGBA64 &&
             image.format() != QImage::Format_RGBA16FPx4 &&

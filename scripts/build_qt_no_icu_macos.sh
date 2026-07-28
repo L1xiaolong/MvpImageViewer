@@ -100,6 +100,7 @@ fetch_module qtbase c1800c2ea835801af04a05d4a32321d79a93954ee3ae2172bbeacf13d1f0
 fetch_module qtshadertools 916c40281ac3dee23b163f6ca73fb5bdeee344838b9a922b6f36269642d6f4bb
 fetch_module qtdeclarative a3175fa510847a136734f989e2bfea7f7bbb9dc9acc98b40b544d26f5ba20d3d
 fetch_module qtsvg ec359d930c95935ea48af58b100c2f5d0d275968ec8ca1e0e76629b7159215fc
+fetch_module qttools fa645589cc3f939022401a926825972a44277dead8ec8607d9f2662e6529c9a4
 
 qtbase_source="$source_dir/qtbase-everywhere-src-${qt_version}"
 agl_probe="$qtbase_source/cmake/FindWrapOpenGL.cmake"
@@ -187,6 +188,8 @@ configure_build_install_module \
     qtdeclarative "$install_dir/lib/QtQuickDialogs2.framework/Versions/A/QtQuickDialogs2"
 configure_build_install_module \
     qtsvg "$install_dir/lib/QtSvg.framework/Versions/A/QtSvg"
+configure_build_install_module \
+    qttools "$install_dir/bin/lrelease"
 
 if qtcore_links_icu "$qtcore_binary"; then
     echo "Verification failed: the custom QtCore still links ICU." >&2

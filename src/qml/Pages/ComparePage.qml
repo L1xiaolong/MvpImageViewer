@@ -18,6 +18,7 @@ Item {
     property string transientMessage: ""
     property bool transientError: false
     property int selectedSlot: 0
+    property string iconPrefix: Theme.iconPrefix
     readonly property var comparisonCanvas: comparisonCanvasLoader.item
 
     signal closeRequested()
@@ -131,7 +132,7 @@ Item {
     PlatformDialogs.FileDialog {
         id: screenshotSaveDialog
         objectName: "comparisonScreenshotSaveDialog"
-        title: "Save comparison screenshot"
+        title: qsTr("Save comparison screenshot")
         fileMode: PlatformDialogs.FileDialog.SaveFile
         nameFilters: ["PNG image (*.png)"]
         defaultSuffix: "png"
@@ -188,7 +189,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#A0A0A0"
+        color: Theme.canvasBackground
     }
 
     Rectangle {
@@ -197,14 +198,14 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 38
-        color: "#F8F9F8"
+        color: Theme.raisedSurface
 
         Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: 1
-            color: "#D7DBDD"
+            color: Theme.opticalGray
         }
 
         RowLayout {
@@ -216,8 +217,8 @@ Item {
                 renderedIconSize: 16
                 checkable: true
                 checked: root.controller.presentationMode === 0
-                iconSource: "qrc:/icons/ui/side-by-side.svg"
-                toolTipText: "Side by side · Hold Ctrl while zooming or panning to adjust one image"
+                iconSource: root.iconPrefix + "side-by-side.svg"
+                toolTipText: qsTr("Side by side · Hold Ctrl while zooming or panning to adjust one image")
                 onClicked: root.controller.setPresentationMode(0)
             }
             AppIconButton {
@@ -226,8 +227,8 @@ Item {
                 enabled: root.paths.length === 2
                 checkable: true
                 checked: root.controller.presentationMode === 1
-                iconSource: "qrc:/icons/ui/split-vertical.svg"
-                toolTipText: "Vertical split"
+                iconSource: root.iconPrefix + "split-vertical.svg"
+                toolTipText: qsTr("Vertical split")
                 onClicked: root.controller.setPresentationMode(1)
             }
             AppIconButton {
@@ -236,8 +237,8 @@ Item {
                 enabled: root.paths.length === 2 && root.controller.presentationMode === 0
                 checkable: true
                 checked: root.controller.holdCandidate
-                iconSource: "qrc:/icons/ui/cover.svg"
-                toolTipText: "Hold B to inspect the candidate"
+                iconSource: root.iconPrefix + "cover.svg"
+                toolTipText: qsTr("Hold B to inspect the candidate")
                 onPressed: root.controller.setHoldCandidate(true)
                 onReleased: root.controller.setHoldCandidate(false)
             }
@@ -247,21 +248,21 @@ Item {
                 Layout.rightMargin: 4
                 implicitWidth: 1
                 implicitHeight: 17
-                color: "#D7DBDD"
+                color: Theme.opticalGray
             }
 
             AppIconButton {
                 controlSize: 28
                 renderedIconSize: 16
-                iconSource: "qrc:/icons/ui/fit.svg"
-                toolTipText: "Fit all images"
+                iconSource: root.iconPrefix + "fit.svg"
+                toolTipText: qsTr("Fit all images")
                 onClicked: root.controller.fitAll()
             }
             AppIconButton {
                 controlSize: 28
                 renderedIconSize: 16
-                iconSource: "qrc:/icons/ui/actual-size.svg"
-                toolTipText: "Actual pixels (1:1)"
+                iconSource: root.iconPrefix + "actual-size.svg"
+                toolTipText: qsTr("Actual pixels (1:1)")
                 onClicked: root.controller.actualPixelsAll()
             }
             AppIconButton {
@@ -269,8 +270,8 @@ Item {
                 controlSize: 28
                 renderedIconSize: 16
                 enabled: root.paths.length > 0
-                iconSource: "qrc:/icons/ui/rotate-ccw-square.svg"
-                toolTipText: "Rotate selected image 90° counterclockwise"
+                iconSource: root.iconPrefix + "rotate-ccw-square.svg"
+                toolTipText: qsTr("Rotate selected image 90° counterclockwise")
                 onClicked: {
                     const error = root.controller.rotateCounterClockwise(root.selectedSlot)
                     if (error.length > 0) root.showTransientMessage(error, true)
@@ -282,8 +283,8 @@ Item {
                 controlSize: 28
                 renderedIconSize: 16
                 enabled: root.paths.length > 0
-                iconSource: "qrc:/icons/ui/rotate-cw-square.svg"
-                toolTipText: "Rotate selected image 90° clockwise"
+                iconSource: root.iconPrefix + "rotate-cw-square.svg"
+                toolTipText: qsTr("Rotate selected image 90° clockwise")
                 onClicked: {
                     const error = root.controller.rotateClockwise(root.selectedSlot)
                     if (error.length > 0) root.showTransientMessage(error, true)
@@ -296,7 +297,7 @@ Item {
                 Layout.rightMargin: 4
                 implicitWidth: 1
                 implicitHeight: 17
-                color: "#D7DBDD"
+                color: Theme.opticalGray
             }
 
             AppIconButton {
@@ -304,8 +305,8 @@ Item {
                 renderedIconSize: 16
                 checkable: true
                 checked: root.controller.fileInformationVisible
-                iconSource: "qrc:/icons/ui/info.svg"
-                toolTipText: "File information"
+                iconSource: root.iconPrefix + "info.svg"
+                toolTipText: qsTr("File information")
                 onClicked: root.controller.setFileInformationVisible(checked)
             }
             AppIconButton {
@@ -313,8 +314,8 @@ Item {
                 renderedIconSize: 16
                 checkable: true
                 checked: root.controller.exifVisible
-                iconSource: "qrc:/icons/ui/exif.svg"
-                toolTipText: "EXIF information"
+                iconSource: root.iconPrefix + "exif.svg"
+                toolTipText: qsTr("EXIF information")
                 onClicked: root.controller.setExifVisible(checked)
             }
             AppIconButton {
@@ -322,8 +323,8 @@ Item {
                 renderedIconSize: 16
                 checkable: true
                 checked: root.controller.histogramVisible
-                iconSource: "qrc:/icons/ui/histogram.svg"
-                toolTipText: "Luma histogram"
+                iconSource: root.iconPrefix + "histogram.svg"
+                toolTipText: qsTr("Luma histogram")
                 onClicked: root.controller.setHistogramVisible(checked)
             }
             AppIconButton {
@@ -331,8 +332,8 @@ Item {
                 renderedIconSize: 16
                 checkable: true
                 checked: root.controller.pixelValueVisible
-                iconSource: "qrc:/icons/ui/pixel-probe.svg"
-                toolTipText: "Pixel values"
+                iconSource: root.iconPrefix + "pixel-probe.svg"
+                toolTipText: qsTr("Pixel values")
                 onClicked: root.controller.setPixelValueVisible(checked)
             }
 
@@ -341,15 +342,15 @@ Item {
                 Layout.rightMargin: 4
                 implicitWidth: 1
                 implicitHeight: 17
-                color: "#D7DBDD"
+                color: Theme.opticalGray
             }
 
             AppIconButton {
                 objectName: "saveComparisonScreenshotButton"
                 controlSize: 28
                 renderedIconSize: 16
-                iconSource: "qrc:/icons/ui/screenshot.svg"
-                toolTipText: "Save screenshot"
+                iconSource: root.iconPrefix + "screenshot.svg"
+                toolTipText: qsTr("Save screenshot")
                 onClicked: root.saveScreenshot()
             }
         }
@@ -412,7 +413,7 @@ Item {
             x: root.comparisonCanvas ? root.comparisonCanvas.dividerPosition - 0.5 : 0
             width: 1
             height: parent.height
-            color: "#E6E8E8"
+            color: Theme.pressedSurface
         }
 
         Repeater {
@@ -448,7 +449,7 @@ Item {
                     anchors.fill: parent
                     color: "transparent"
                     border.width: root.selectedSlot === comparisonCell.index ? 2 : 0
-                    border.color: "#7893A6"
+                    border.color: Theme.primaryButton
                     z: 20
                 }
 
@@ -503,91 +504,100 @@ Item {
                     anchors.margins: 8
                     spacing: 2
 
-                    Rectangle {
-                        visible: root.controller.fileInformationVisible
-                        width: Math.min(comparisonCell.width - 16,
-                                        Math.min(250, fileInformation.implicitWidth + 14))
-                        height: 20
-                        radius: 3
-                        color: "#A61E2227"
+                Rectangle {
+                    visible: root.controller.fileInformationVisible
+                    width: Math.min(comparisonCell.width - 16,
+                                    Math.min(320, fileInformation.implicitWidth + 18))
+                    height: 26
+                    radius: 5
+                    color: Theme.inspectionOverlay
+                    border.width: 1
+                    border.color: Theme.inspectionOverlayBorder
 
-                        Label {
-                            id: fileInformation
-                            anchors.fill: parent
-                            anchors.leftMargin: 7
-                            anchors.rightMargin: 7
-                            verticalAlignment: Text.AlignVCenter
-                            text: root.comparisonFileText(comparisonCell.index)
-                            color: "#F4F5F2"
-                            font.pixelSize: 10
-                            font.weight: Font.Medium
-                            elide: Text.ElideMiddle
-                        }
-                    }
-
-                    Rectangle {
-                        visible: root.controller.exifVisible
-                        width: Math.min(comparisonCell.width - 16,
-                                        Math.min(380, exifInformation.implicitWidth + 14))
-                        height: 19
-                        radius: 3
-                        color: "#A61E2227"
-
-                        Label {
-                            id: exifInformation
-                            anchors.fill: parent
-                            anchors.leftMargin: 7
-                            anchors.rightMargin: 7
-                            verticalAlignment: Text.AlignVCenter
-                            text: root.comparisonExifText(comparisonCell.index)
-                            color: "#E4E7E8"
-                            font.pixelSize: 9
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    CompareLumaHistogram {
-                        controller: root.controller
-                        visible: root.controller.histogramVisible
-                        width: Math.min(implicitWidth, comparisonCell.width - 16)
-                        height: implicitHeight
-                        slot: comparisonCell.index
-
-                        Component.onCompleted: {
-                            if (visible)
-                                request()
-                        }
-                        onVisibleChanged: {
-                            if (visible)
-                                request()
-                        }
+                    Label {
+                        id: fileInformation
+                        anchors.fill: parent
+                        anchors.leftMargin: 9
+                        anchors.rightMargin: 9
+                        verticalAlignment: Text.AlignVCenter
+                        text: root.comparisonFileText(comparisonCell.index)
+                        color: Theme.inspectionText
+                        font.family: Theme.uiFont
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideMiddle
                     }
                 }
 
                 Rectangle {
-                    visible: root.controller.pixelValueVisible
-                             && root.pixelValues[comparisonCell.index]
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 8
-                    width: Math.min(parent.width - 16, pixelValue.implicitWidth + 14)
-                    height: 20
-                    radius: 3
-                    color: "#A61E2227"
+                    visible: root.controller.exifVisible
+                    width: Math.min(comparisonCell.width - 16,
+                                    Math.min(430, exifInformation.implicitWidth + 18))
+                    height: 24
+                    radius: 5
+                    color: Theme.inspectionOverlayMuted
+                    border.width: 1
+                    border.color: Theme.inspectionOverlayBorder
 
                     Label {
-                        id: pixelValue
+                        id: exifInformation
                         anchors.fill: parent
-                        anchors.leftMargin: 7
-                        anchors.rightMargin: 7
+                        anchors.leftMargin: 9
+                        anchors.rightMargin: 9
                         verticalAlignment: Text.AlignVCenter
-                        text: root.pixelValues[comparisonCell.index] || ""
-                        color: "#F4F5F2"
-                        font.pixelSize: 9
+                        text: root.comparisonExifText(comparisonCell.index)
+                        color: Theme.inspectionMutedText
                         font.family: Theme.monoFont
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+                }
+
+                CompareLumaHistogram {
+                    controller: root.controller
+                    visible: root.controller.histogramVisible
+                    width: Math.min(implicitWidth, comparisonCell.width - 16)
+                    height: implicitHeight
+                    slot: comparisonCell.index
+
+                    Component.onCompleted: {
+                        if (visible)
+                            request()
+                    }
+                    onVisibleChanged: {
+                        if (visible)
+                            request()
                     }
                 }
             }
+
+            Rectangle {
+                visible: root.controller.pixelValueVisible
+                         && root.pixelValues[comparisonCell.index]
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 8
+                width: Math.min(parent.width - 16, pixelValue.implicitWidth + 18)
+                height: 26
+                radius: 5
+                color: Theme.inspectionOverlay
+                border.width: 1
+                border.color: Theme.inspectionOverlayBorder
+
+                Label {
+                    id: pixelValue
+                    anchors.fill: parent
+                    anchors.leftMargin: 9
+                    anchors.rightMargin: 9
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.pixelValues[comparisonCell.index] || ""
+                    color: Theme.inspectionAccentText
+                    font.pixelSize: 10
+                    font.weight: Font.Medium
+                    font.family: Theme.monoFont
+                }
+            }
+        }
         }
 
         Rectangle {

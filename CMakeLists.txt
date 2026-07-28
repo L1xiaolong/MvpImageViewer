@@ -73,7 +73,7 @@ if(ISPVIEW_ENABLE_LCMS2)
 endif()
 
 find_package(Qt6 6.7 REQUIRED COMPONENTS
-    Core Gui Quick QuickControls2 QuickLayouts QuickTemplates2 Svg ShaderTools
+    Core Gui Network Quick QuickControls2 QuickLayouts QuickTemplates2 Svg ShaderTools LinguistTools
 )
 find_package(Qt6GuiPrivate 6.7 CONFIG REQUIRED)
 

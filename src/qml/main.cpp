@@ -1,4 +1,5 @@
 #include "io/default_image_decoder.h"
+#include "qml/app_settings.h"
 #include "qml/browse_controller.h"
 #include "qml/browse_workspace_controller.h"
 #include "qml/compare_controller.h"
@@ -8,6 +9,7 @@
 #include "qml/thumbnail_image_provider.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QFont>
 #include <QFontDatabase>
@@ -26,20 +28,24 @@ int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("ISP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.2.3"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(ISPVIEW_PROJECT_VERSION));
     app.setWindowIcon(QIcon(QStringLiteral(":/brand/app_icon.png")));
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QSettings settings;
+    ispview::AppSettings appSettings(&app);
     bool lastMainWindowStateWasMaximized =
         settings.value(QStringLiteral("window/maximized"), false).toBool();
-
-    QFont defaultFont = app.font();
-    defaultFont.setWeight(QFont::Medium);
-    app.setFont(defaultFont);
 
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-Regular.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-Bold.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/JetBrainsMono-Regular.ttf"));
+
+    QFont defaultFont(QStringLiteral("Inter"));
+    defaultFont.setPointSize(app.font().pointSize());
+    defaultFont.setWeight(QFont::Normal);
+    defaultFont.setStyleStrategy(QFont::PreferAntialias);
+    defaultFont.setHintingPreference(QFont::PreferDefaultHinting);
+    app.setFont(defaultFont);
 
     QString initialDirectory;
     QString screenshotPath;
@@ -48,6 +54,8 @@ int main(int argc, char* argv[]) {
     QString displayMode;
     int initialFileManagerCount = 1;
     bool nativeScreenshot = false;
+    bool showSettings = false;
+    int settingsStartupSection = 0;
     int screenshotDelay = 1800;
     const QStringList arguments = app.arguments();
     for (int i = 1; i < arguments.size(); ++i) {
@@ -55,6 +63,23 @@ int main(int argc, char* argv[]) {
             screenshotPath = arguments.at(++i);
         } else if (arguments.at(i) == QStringLiteral("--screenshot-native")) {
             nativeScreenshot = true;
+        } else if (arguments.at(i) == QStringLiteral("--show-settings")) {
+            showSettings = true;
+        } else if (arguments.at(i) == QStringLiteral("--show-appearance-settings")) {
+            showSettings = true;
+            settingsStartupSection = 1;
+        } else if (arguments.at(i) == QStringLiteral("--show-shortcuts-settings")) {
+            showSettings = true;
+            settingsStartupSection = 3;
+        } else if (arguments.at(i) == QStringLiteral("--show-color-settings")) {
+            showSettings = true;
+            settingsStartupSection = 2;
+        } else if (arguments.at(i) == QStringLiteral("--show-update-settings")) {
+            showSettings = true;
+            settingsStartupSection = 4;
+        } else if (arguments.at(i) == QStringLiteral("--show-help-settings")) {
+            showSettings = true;
+            settingsStartupSection = 5;
         } else if (arguments.at(i) == QStringLiteral("--select") && i + 1 < arguments.size()) {
             selectedPath = QFileInfo(arguments.at(++i)).absoluteFilePath();
         } else if (arguments.at(i) == QStringLiteral("--display-mode") &&
@@ -74,6 +99,9 @@ int main(int argc, char* argv[]) {
             initialDirectory = arguments.at(i);
         }
     }
+    if (initialDirectory.isEmpty() && !appSettings.restoreLastDirectory()) {
+        initialDirectory = QDir::homePath();
+    }
     // The browse page can use the software scene graph for deterministic CI
     // captures. ComparePage contains a QQuickRhiItem and therefore must keep a
     // hardware RHI backend even when --screenshot-native was not specified.
@@ -92,8 +120,17 @@ int main(int argc, char* argv[]) {
     ispview::ImagePropertiesController imagePropertiesController(browseController.loader());
     ispview::FullScreenController fullScreenController(browseController.loader());
     ispview::RawParametersController rawParametersController(browseController.loader());
+    QObject::connect(&appSettings, &ispview::AppSettings::colorDisplayChanged, &app, [&] {
+        browseController.loader()->clearCache();
+        browseController.refreshAll();
+        fullScreenController.reload();
+        compareController.reload();
+    });
 
     QQmlApplicationEngine engine;
+    QObject::connect(&appSettings, &ispview::AppSettings::languageChanged,
+                     &engine, &QQmlApplicationEngine::retranslate);
+    engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), &appSettings);
     engine.rootContext()->setContextProperty(QStringLiteral("browseController"), &browseController);
     engine.rootContext()->setContextProperty(QStringLiteral("compareController"), &compareController);
     engine.rootContext()->setContextProperty(QStringLiteral("imagePropertiesController"),
@@ -103,6 +140,9 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("rawParametersController"),
                                              &rawParametersController);
     engine.rootContext()->setContextProperty(QStringLiteral("initialComparePaths"), initialComparePaths);
+    engine.rootContext()->setContextProperty(QStringLiteral("showSettingsOnStartup"), showSettings);
+    engine.rootContext()->setContextProperty(QStringLiteral("settingsStartupSection"),
+                                             settingsStartupSection);
     engine.addImageProvider(QStringLiteral("thumbnail"),
                             new ispview::ThumbnailImageProvider(decoder,
                                                                 browseController.loader()));
@@ -173,7 +213,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (!screenshotPath.isEmpty()) {
-        QTimer::singleShot(screenshotDelay, &app, [&app, &engine, screenshotPath] {
+        QTimer::singleShot(screenshotDelay, &app,
+                           [&app, &engine, screenshotPath] {
             auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
             if (!window || !window->grabWindow().save(screenshotPath)) {
                 app.exit(2);

@@ -12,14 +12,40 @@ ApplicationWindow {
     height: 900
     minimumWidth: 980
     minimumHeight: 640
-    title: "ISP Image Viewer"
+    title: qsTr("ISP Image Viewer")
     color: Theme.sensorWhite
+    palette.window: Theme.sensorWhite
+    palette.windowText: Theme.graphiteInk
+    palette.base: Theme.paperWhite
+    palette.alternateBase: Theme.raisedSurface
+    palette.text: Theme.graphiteInk
+    palette.button: Theme.raisedSurface
+    palette.buttonText: Theme.graphiteInk
+    palette.highlight: Theme.explorerSelectionBg
+    palette.highlightedText: Theme.graphiteInk
+    palette.placeholderText: Theme.faintInk
+    palette.mid: Theme.opticalGray
+    palette.dark: Theme.opticalGray
+    palette.toolTipBase: Theme.raisedSurface
+    palette.toolTipText: Theme.graphiteInk
+    palette.link: Theme.probeBlue
     property bool showingCompare: false
     property bool showingFullScreen: false
     property bool forceApplicationClose: false
     property bool applicationExitPending: false
     property int visibilityBeforeFullScreen: Window.Windowed
     signal quitApplicationRequested()
+
+    Binding {
+        target: Theme
+        property: "darkMode"
+        value: appSettings.darkTheme
+    }
+    Binding {
+        target: Theme
+        property: "canvasBackgroundMode"
+        value: appSettings.canvasBackground
+    }
 
     function openFullScreen(paths, initialIndex) {
         showingCompare = false
@@ -93,9 +119,14 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        appSettings.startAutomaticUpdateCheck()
         if (initialComparePaths.length >= 2) {
             showingCompare = true
             comparePage.open(initialComparePaths)
+        }
+        if (showSettingsOnStartup) {
+            settingsCard.currentSection = settingsStartupSection
+            settingsCard.open()
         }
     }
     Connections {
@@ -113,10 +144,12 @@ ApplicationWindow {
         workspaceController: browseController
         propertiesController: imagePropertiesController
         rawController: rawParametersController
+        settingsController: appSettings
         visible: !window.showingCompare && !window.showingFullScreen
         onFullScreenRequested: function(paths, initialIndex) {
             window.openFullScreen(paths, initialIndex)
         }
+        onSettingsRequested: settingsCard.open()
     }
     ComparePage {
         id: comparePage
@@ -131,7 +164,7 @@ ApplicationWindow {
         id: fullScreenWindow
         objectName: "qmlFullScreenWindow"
         visible: false
-        color: "#A0A0A0"
+        color: Theme.canvasBackground
         flags: Qt.Window | Qt.FramelessWindowHint
         transientParent: window
 
@@ -144,6 +177,7 @@ ApplicationWindow {
         id: fullScreenPage
         controller: fullScreenController
         propertiesController: imagePropertiesController
+        settingsController: appSettings
         parent: Qt.platform.os === "osx" ? window.contentItem : fullScreenWindow.contentItem
         anchors.fill: parent
         visible: window.showingFullScreen
@@ -152,5 +186,19 @@ ApplicationWindow {
     Connections {
         target: fullScreenController
         function onFilesystemChanged() { browseController.refreshAll() }
+    }
+
+    SettingsCard {
+        id: settingsCard
+        parent: Overlay.overlay
+        settingsController: appSettings
+    }
+
+    Shortcut {
+        sequence: {
+            const revision = appSettings.shortcutsRevision
+            return appSettings.shortcutFor("settings")
+        }
+        onActivated: settingsCard.open()
     }
 }

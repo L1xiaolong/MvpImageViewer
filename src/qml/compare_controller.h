@@ -51,6 +51,7 @@ class CompareController final : public QObject {
 
     Q_INVOKABLE void setPaths(const QStringList& paths);
     Q_INVOKABLE void closeSession();
+    Q_INVOKABLE void reload();
     Q_INVOKABLE void setPresentationMode(int mode);
     Q_INVOKABLE void setSplitAmount(qreal amount);
     Q_INVOKABLE void setSynchronized(bool enabled);

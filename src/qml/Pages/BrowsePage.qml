@@ -15,14 +15,17 @@ Rectangle {
     property var workspaceController: controller
     property var propertiesController: null
     property var rawController: null
+    property var settingsController: null
     property bool navigatorVisible: true
     property real navigatorWidth: Theme.sidebarWidth
     property real galleryStripWidth: 280
     property int displayMode: controller ? controller.displayMode : 0
     property bool designMode: false
-    property string iconPrefix: "qrc:/icons/ui/"
-    readonly property var sortLabels: ["Name", "Modified", "Size", "Type"]
+    property string iconPrefix: Theme.iconPrefix
+    readonly property var sortLabels: [qsTr("Name"), qsTr("Modified"),
+                                       qsTr("Size"), qsTr("Type")]
     signal fullScreenRequested(var paths, int initialIndex)
+    signal settingsRequested()
     readonly property bool contentInteractionEnabled: !propertiesDialog.opened &&
                                                        !rawParametersDialog.opened &&
                                                        !imageResizeDialog.opened
@@ -50,6 +53,12 @@ Rectangle {
         const availablePanes = root.workspaceController.panes
         return availablePanes && index >= 0 && index < availablePanes.length
                 ? availablePanes[index] : root.controller
+    }
+    function configuredShortcut(action, fallback) {
+        const revision = root.settingsController
+                ? root.settingsController.shortcutsRevision : 0
+        return root.settingsController
+                ? root.settingsController.shortcutFor(action) : fallback
     }
 
 
@@ -138,6 +147,10 @@ Rectangle {
         function onClicked() { imageResizeDialog.openForSelection(); }
     }
     Connections {
+        target: toolbar.settingsControl
+        function onClicked() { root.settingsRequested(); }
+    }
+    Connections {
         target: root.controller
         function onGalleryImageChanged() {
             if (root.controller.galleryImageReady &&
@@ -184,27 +197,27 @@ Rectangle {
     Menu {
         id: folderMenu
         MenuItem {
-            text: "Open folder…"
+            text: qsTr("Open folder…")
             onTriggered: root.controller.chooseDirectory()
         }
         MenuItem {
-            text: "Back"
+            text: qsTr("Back")
             enabled: root.controller.canGoBack
             onTriggered: root.controller.navigateBack()
         }
         MenuItem {
-            text: "Forward"
+            text: qsTr("Forward")
             enabled: root.controller.canGoForward
             onTriggered: root.controller.navigateForward()
         }
         MenuItem {
-            text: "Parent folder"
+            text: qsTr("Parent folder")
             enabled: root.controller.canGoUp
             onTriggered: root.controller.navigateUp()
         }
         MenuSeparator {}
         MenuItem {
-            text: "Add file manager"
+            text: qsTr("Add file manager")
             enabled: root.workspaceController.canAddPane === undefined || root.workspaceController.canAddPane
             onTriggered: root.workspaceController.addFileManagerPane()
         }
@@ -244,7 +257,7 @@ Rectangle {
         anchors.top: toolbar.bottom
         anchors.bottom: statusRail.top
         width: root.navigatorVisible ? 1 : 0
-        color: resizeMouse.containsMouse || resizeMouse.pressed ? "#7893A6" : Theme.opticalGray
+        color: resizeMouse.containsMouse || resizeMouse.pressed ? Theme.primaryButton : Theme.opticalGray
         z: 20
 
         MouseArea {
@@ -326,7 +339,7 @@ Rectangle {
             handle: Rectangle {
                 objectName: "horizontalPaneHandle"
                 implicitWidth: 7
-                color: SplitHandle.pressed || SplitHandle.hovered ? "#C8D4DC" : "transparent"
+                color: SplitHandle.pressed || SplitHandle.hovered ? Theme.accentBorder : "transparent"
                 property bool handlePressed: SplitHandle.pressed
                 property real pressCoordinate: 0
                 property double lastClickAt: 0
@@ -351,7 +364,7 @@ Rectangle {
                     anchors.centerIn: parent
                     width: 1
                     height: parent.height
-                    color: SplitHandle.pressed || SplitHandle.hovered ? "#7893A6" : Theme.opticalGray
+                    color: SplitHandle.pressed || SplitHandle.hovered ? Theme.primaryButton : Theme.opticalGray
                 }
             }
             Repeater {
@@ -389,7 +402,7 @@ Rectangle {
             handle: Rectangle {
                 objectName: "verticalPaneHandle"
                 implicitHeight: 7
-                color: SplitHandle.pressed || SplitHandle.hovered ? "#C8D4DC" : "transparent"
+                color: SplitHandle.pressed || SplitHandle.hovered ? Theme.accentBorder : "transparent"
                 property bool handlePressed: SplitHandle.pressed
                 property real pressCoordinate: 0
                 property double lastClickAt: 0
@@ -414,7 +427,7 @@ Rectangle {
                     anchors.centerIn: parent
                     width: parent.width
                     height: 1
-                    color: SplitHandle.pressed || SplitHandle.hovered ? "#7893A6" : Theme.opticalGray
+                    color: SplitHandle.pressed || SplitHandle.hovered ? Theme.primaryButton : Theme.opticalGray
                 }
             }
             SplitView {
@@ -431,7 +444,7 @@ Rectangle {
                 handle: Rectangle {
                     objectName: "topRowPaneHandle"
                     implicitWidth: 7
-                    color: SplitHandle.pressed || SplitHandle.hovered ? "#C8D4DC" : "transparent"
+                    color: SplitHandle.pressed || SplitHandle.hovered ? Theme.accentBorder : "transparent"
                     property bool handlePressed: SplitHandle.pressed
                     property real pressCoordinate: 0
                     property double lastClickAt: 0
@@ -452,7 +465,7 @@ Rectangle {
                             lastClickAt = now
                         }
                     }
-                    Rectangle { anchors.centerIn: parent; width: 1; height: parent.height; color: SplitHandle.pressed || SplitHandle.hovered ? "#7893A6" : Theme.opticalGray }
+                    Rectangle { anchors.centerIn: parent; width: 1; height: parent.height; color: SplitHandle.pressed || SplitHandle.hovered ? Theme.primaryButton : Theme.opticalGray }
                 }
                 BrowserPane {
                     id: topLeft
@@ -493,7 +506,7 @@ Rectangle {
                 handle: Rectangle {
                     objectName: "bottomRowPaneHandle"
                     implicitWidth: 7
-                    color: SplitHandle.pressed || SplitHandle.hovered ? "#C8D4DC" : "transparent"
+                    color: SplitHandle.pressed || SplitHandle.hovered ? Theme.accentBorder : "transparent"
                     property bool handlePressed: SplitHandle.pressed
                     property real pressCoordinate: 0
                     property double lastClickAt: 0
@@ -514,7 +527,7 @@ Rectangle {
                             lastClickAt = now
                         }
                     }
-                    Rectangle { anchors.centerIn: parent; width: 1; height: parent.height; color: SplitHandle.pressed || SplitHandle.hovered ? "#7893A6" : Theme.opticalGray }
+                    Rectangle { anchors.centerIn: parent; width: 1; height: parent.height; color: SplitHandle.pressed || SplitHandle.hovered ? Theme.primaryButton : Theme.opticalGray }
                 }
                 BrowserPane {
                     id: bottomLeft
@@ -594,7 +607,7 @@ Rectangle {
             anchors.bottom: parent.bottom
             anchors.right: galleryResizeHandle.left
             anchors.rightMargin: 4
-            color: "#F1F3F4"
+            color: Theme.softHover
             radius: 8
             clip: true
 
@@ -657,7 +670,7 @@ Rectangle {
                         id: actualPixelsButton
                         width: 42
                         height: 26
-                        text: "1:1"
+                        text: qsTr("1:1")
                         hoverEnabled: true
                         onClicked: {
                             galleryWorkspace.actualPixels = true;
@@ -669,11 +682,11 @@ Rectangle {
                         }
                         background: Rectangle {
                             radius: 5
-                            color: actualPixelsButton.down ? "#E2E8EB"
+                            color: actualPixelsButton.down ? Theme.pressedSurface
                                                            : actualPixelsButton.hovered ? Theme.softHover : "transparent"
                             border.color: galleryWorkspace.actualPixels &&
                                           Math.abs(galleryWorkspace.manualZoom - 1.0) < 0.001
-                                          ? "#7893A6" : Theme.opticalGray
+                                          ? Theme.primaryButton : Theme.opticalGray
                         }
                         contentItem: Text {
                             text: actualPixelsButton.text
@@ -688,7 +701,7 @@ Rectangle {
                         id: fitButton
                         width: 42
                         height: 26
-                        text: "Fit"
+                        text: qsTr("Fit")
                         hoverEnabled: true
                         onClicked: {
                             galleryWorkspace.actualPixels = false;
@@ -698,9 +711,9 @@ Rectangle {
                         }
                         background: Rectangle {
                             radius: 5
-                            color: fitButton.down ? "#E2E8EB"
+                            color: fitButton.down ? Theme.pressedSurface
                                                   : fitButton.hovered ? Theme.softHover : "transparent"
-                            border.color: !galleryWorkspace.actualPixels ? "#7893A6" : Theme.opticalGray
+                            border.color: !galleryWorkspace.actualPixels ? Theme.primaryButton : Theme.opticalGray
                         }
                         contentItem: Text {
                             text: fitButton.text
@@ -715,17 +728,17 @@ Rectangle {
                         id: fullScreenButton
                         width: 28
                         height: 26
-                        text: "↗"
+                        text: qsTr("↗")
                         hoverEnabled: true
                         onClicked: {
                             if (galleryWorkspace.currentPreviewPath.length > 0)
                                 root.controller.activatePath(galleryWorkspace.currentPreviewPath);
                         }
                         ToolTip.visible: hovered
-                        ToolTip.text: "Open full screen"
+                        ToolTip.text: qsTr("Open full screen")
                         background: Rectangle {
                             radius: 5
-                            color: fullScreenButton.down ? "#E2E8EB"
+                            color: fullScreenButton.down ? Theme.pressedSurface
                                                          : fullScreenButton.hovered ? Theme.softHover : "transparent"
                             border.color: Theme.opticalGray
                         }
@@ -747,7 +760,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: galleryInfoRail.top
-                color: "#F1F3F4"
+                color: Theme.softHover
                 clip: true
 
                 Flickable {
@@ -891,7 +904,7 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 width: 1
                 color: galleryResizeMouse.containsMouse || galleryResizeMouse.pressed
-                       ? "#7893A6" : Theme.opticalGray
+                       ? Theme.primaryButton : Theme.opticalGray
             }
             MouseArea {
                 id: galleryResizeMouse
@@ -995,8 +1008,10 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 4
                         radius: 6
-                        color: galleryMouse.containsMouse ? "#F1F5F7" : "transparent"
-                        border.color: galleryDelegate.GridView.isCurrentItem ? "#6C8799" : galleryDelegate.isSelected ? "#B7C6D0" : "transparent"
+                        color: galleryMouse.containsMouse ? Theme.softHover : "transparent"
+                        border.color: galleryDelegate.GridView.isCurrentItem
+                                      ? Theme.primaryButton
+                                      : galleryDelegate.isSelected ? Theme.accentBorder : "transparent"
                         border.width: galleryDelegate.GridView.isCurrentItem ? 2 : 1
                         ToolTip.delay: 500
                         ToolTip.timeout: 8000
@@ -1157,7 +1172,7 @@ Rectangle {
             anchors.margins: 8
             visible: workspaceDropArea.externalDragActive
             color: "#0A7893A6"
-            border.color: "#7893A6"
+            border.color: Theme.primaryButton
             border.width: 1
             radius: 8
         }
@@ -1194,35 +1209,36 @@ Rectangle {
         id: workspaceContextMenu
         objectName: "workspaceContextMenu"
         AppMenuItem {
-            text: Qt.platform.os === "osx" ? "Open in Finder" : "Open in File Explorer"
+            text: Qt.platform.os === "osx" ? qsTr("Open in Finder")
+                                          : qsTr("Open in File Explorer")
             onTriggered: root.controller.openCurrentDirectoryInFileManager()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Refresh"
+            text: qsTr("Refresh")
             shortcutText: Qt.platform.os === "osx" ? "⌘R" : "Ctrl+R"
             onTriggered: root.controller.refresh()
         }
         AppMenuItem {
-            text: "Select all"
+            text: qsTr("Select all")
             shortcutText: Qt.platform.os === "osx" ? "⌘A" : "Ctrl+A"
             onTriggered: root.controller.selectAll()
         }
         AppMenuItem {
-            text: "Paste"
+            text: qsTr("Paste")
             shortcutText: Qt.platform.os === "osx" ? "⌘V" : "Ctrl+V"
             enabled: root.controller.canPaste
             onTriggered: root.controller.pasteItems()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "New folder…"
+            text: qsTr("New folder…")
             shortcutText: Qt.platform.os === "osx" ? "⇧⌘N" : "Ctrl+Shift+N"
             onTriggered: newFolderDialog.open()
         }
         AppMenuSeparator {}
         AppMenu {
-            title: "Sort by"
+            title: qsTr("Sort by")
             AppMenuItem {
                 objectName: "sortByNameAction"
                 text: (root.controller.sortMode === 0 ? "✓  " : "    ") + "Name"
@@ -1250,48 +1266,48 @@ Rectangle {
         id: galleryFileContextMenu
         objectName: "galleryFileContextMenu"
         AppMenuItem {
-            text: "Open full screen"
+            text: qsTr("Open full screen")
             onTriggered: root.controller.activatePath(galleryWorkspace.contextPath)
         }
         AppMenuItem {
-            text: "Compare selected"
+            text: qsTr("Compare selected")
             enabled: root.workspaceController.canCompare
             onTriggered: root.workspaceController.compareSelected()
         }
         AppMenuItem {
             visible: root.controller.canRestoreSelected
-            text: "Restore original"
+            text: qsTr("Restore original")
             onTriggered: root.controller.restoreSelected()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Cut"
+            text: qsTr("Cut")
             shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"
             onTriggered: root.controller.copySelected(true)
         }
         AppMenuItem {
-            text: "Copy"
+            text: qsTr("Copy")
             shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"
             onTriggered: root.controller.copySelected(false)
         }
         AppMenuItem {
-            text: "Rename…"
+            text: qsTr("Rename…")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.renameSelected()
         }
         AppMenuItem {
-            text: "Move to Trash"
+            text: qsTr("Move to Trash")
             destructive: true
             onTriggered: root.controller.moveSelectedToTrash()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Reveal in Finder / Explorer"
+            text: qsTr("Reveal in Finder / Explorer")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.revealSelected()
         }
         AppMenuItem {
-            text: "Properties"
+            text: qsTr("Properties")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.showSelectedProperties()
         }
@@ -1300,18 +1316,18 @@ Rectangle {
     AppMenu {
         id: galleryRawFileContextMenu
         objectName: "galleryRawFileContextMenu"
-        AppMenuItem { text: "Open full screen"; onTriggered: root.controller.activatePath(galleryWorkspace.contextPath) }
-        AppMenuItem { text: "Compare selected"; enabled: root.workspaceController.canCompare; onTriggered: root.workspaceController.compareSelected() }
-        AppMenuItem { text: "RAW/YUV parameters…"; enabled: root.controller.canEditRaw; onTriggered: root.controller.editSelectedRawParameters() }
-        AppMenuItem { visible: root.controller.canRestoreSelected; text: "Restore original"; onTriggered: root.controller.restoreSelected() }
+        AppMenuItem { text: qsTr("Open full screen"); onTriggered: root.controller.activatePath(galleryWorkspace.contextPath) }
+        AppMenuItem { text: qsTr("Compare selected"); enabled: root.workspaceController.canCompare; onTriggered: root.workspaceController.compareSelected() }
+        AppMenuItem { text: qsTr("RAW/YUV parameters…"); enabled: root.controller.canEditRaw; onTriggered: root.controller.editSelectedRawParameters() }
+        AppMenuItem { visible: root.controller.canRestoreSelected; text: qsTr("Restore original"); onTriggered: root.controller.restoreSelected() }
         AppMenuSeparator {}
-        AppMenuItem { text: "Cut"; shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
-        AppMenuItem { text: "Copy"; shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }
-        AppMenuItem { text: "Rename…"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.renameSelected() }
-        AppMenuItem { text: "Move to Trash"; destructive: true; onTriggered: root.controller.moveSelectedToTrash() }
+        AppMenuItem { text: qsTr("Cut"); shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copySelected(true) }
+        AppMenuItem { text: qsTr("Copy"); shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copySelected(false) }
+        AppMenuItem { text: qsTr("Rename…"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.renameSelected() }
+        AppMenuItem { text: qsTr("Move to Trash"); destructive: true; onTriggered: root.controller.moveSelectedToTrash() }
         AppMenuSeparator {}
-        AppMenuItem { text: "Reveal in Finder / Explorer"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
-        AppMenuItem { text: "Properties"; enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
+        AppMenuItem { text: qsTr("Reveal in Finder / Explorer"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
+        AppMenuItem { text: qsTr("Properties"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
     }
 
     // Separate folder/file menus avoid invisible menu rows reserving vertical space.
@@ -1319,43 +1335,43 @@ Rectangle {
         id: galleryFolderContextMenu
         objectName: "galleryFolderContextMenu"
         AppMenuItem {
-            text: "Open folder"
+            text: qsTr("Open folder")
             onTriggered: root.controller.activatePath(galleryWorkspace.contextPath)
         }
         AppMenuItem {
-            text: "Paste into folder"
+            text: qsTr("Paste into folder")
             enabled: root.controller.canPaste
             onTriggered: root.controller.pasteItemsInto(galleryWorkspace.contextPath)
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Cut"
+            text: qsTr("Cut")
             shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"
             onTriggered: root.controller.copySelected(true)
         }
         AppMenuItem {
-            text: "Copy"
+            text: qsTr("Copy")
             shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"
             onTriggered: root.controller.copySelected(false)
         }
         AppMenuItem {
-            text: "Rename…"
+            text: qsTr("Rename…")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.renameSelected()
         }
         AppMenuItem {
-            text: "Move to Trash"
+            text: qsTr("Move to Trash")
             destructive: true
             onTriggered: root.controller.moveSelectedToTrash()
         }
         AppMenuSeparator {}
         AppMenuItem {
-            text: "Reveal in Finder / Explorer"
+            text: qsTr("Reveal in Finder / Explorer")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.revealSelected()
         }
         AppMenuItem {
-            text: "Properties"
+            text: qsTr("Properties")
             enabled: root.controller.selectionCount === 1
             onTriggered: root.controller.showSelectedProperties()
         }
@@ -1363,7 +1379,7 @@ Rectangle {
 
     PlatformDialogs.FolderDialog {
         id: folderPicker
-        title: "Open folder"
+        title: qsTr("Open folder")
         onAccepted: root.controller.openDirectoryUrl(selectedFolder)
     }
 
@@ -1371,10 +1387,10 @@ Rectangle {
         id: newFolderDialog
         objectName: "newFolderDialog"
         parent: root
-        dialogTitle: "New folder"
-        description: "Create a folder in " + root.controller.currentFolderName
+        dialogTitle: qsTr("New folder")
+        description: qsTr("Create a folder in ") + root.controller.currentFolderName
         initialText: "New folder"
-        acceptText: "Create"
+        acceptText: qsTr("Create")
         onSubmitted: function(text) {
             complete(root.controller.createFolder(text))
         }
@@ -1384,9 +1400,9 @@ Rectangle {
         id: renameDialog
         objectName: "renameDialog"
         parent: root
-        dialogTitle: "Rename item"
-        description: "Enter a new name for the selected item"
-        acceptText: "Rename"
+        dialogTitle: qsTr("Rename item")
+        description: qsTr("Enter a new name for the selected item")
+        acceptText: qsTr("Rename")
         onSubmitted: function(text) {
             complete(root.controller.renameSelectedTo(text))
         }
@@ -1396,8 +1412,8 @@ Rectangle {
         id: trashDialog
         objectName: "trashConfirmationDialog"
         parent: root
-        dialogTitle: "Move to Trash?"
-        confirmText: "Move"
+        dialogTitle: qsTr("Move to Trash?")
+        confirmText: qsTr("Move")
         destructive: true
         onConfirmed: {
             complete(root.controller.moveSelectedToTrashConfirmed())
@@ -1432,9 +1448,17 @@ Rectangle {
         }
 
         function onTrashConfirmationRequested(itemCount) {
+            if (root.settingsController && !root.settingsController.confirmTrash) {
+                const error = root.controller.moveSelectedToTrashConfirmed()
+                if (error.length > 0) {
+                    trashDialog.showConfirmation()
+                    trashDialog.complete(error)
+                }
+                return
+            }
             trashDialog.message = itemCount === 1
-                    ? "The selected item will be moved to the system Trash."
-                    : itemCount + " selected items will be moved to the system Trash."
+                    ? qsTr("The selected item will be moved to the system Trash.")
+                    : qsTr("%1 selected items will be moved to the system Trash.").arg(itemCount)
             trashDialog.showConfirmation()
         }
 
@@ -1453,11 +1477,11 @@ Rectangle {
 
 
     Shortcut {
-        sequence: StandardKey.Open
+        sequence: root.configuredShortcut("openFolder", "Ctrl+O")
         onActivated: root.controller.chooseDirectory()
     }
     Shortcut {
-        sequences: [StandardKey.Find]
+        sequence: root.configuredShortcut("find", "Ctrl+F")
         onActivated: {
             toolbar.searchControl.forceActiveFocus();
             toolbar.searchControl.selectAll();
@@ -1479,20 +1503,16 @@ Rectangle {
         onActivated: root.controller.pasteItems()
     }
     Shortcut {
-        sequence: "Ctrl+B"
+        sequence: root.configuredShortcut("toggleNavigator", "Ctrl+B")
         onActivated: root.navigatorVisible = !root.navigatorVisible
     }
     Shortcut {
-        sequence: "Meta+B"
-        onActivated: root.navigatorVisible = !root.navigatorVisible
-    }
-    Shortcut {
-        sequence: "F2"
+        sequence: root.configuredShortcut("rename", "F2")
         enabled: root.fileShortcutsEnabled
         onActivated: root.controller.renameSelected()
     }
     Shortcut {
-        sequence: "C"
+        sequence: root.configuredShortcut("compare", "C")
         enabled: root.fileShortcutsEnabled && root.workspaceController.canCompare
         onActivated: root.workspaceController.compareSelected()
     }
@@ -1507,7 +1527,7 @@ Rectangle {
         onActivated: root.controller.selectAll()
     }
     Shortcut {
-        sequence: "Ctrl+Shift+N"
+        sequence: root.configuredShortcut("newFolder", "Ctrl+Shift+N")
         enabled: root.fileShortcutsEnabled
         onActivated: newFolderDialog.open()
     }
