@@ -153,7 +153,7 @@ if [[ "$command_name" != "package" ]]; then
     exit 0
 fi
 
-for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto; do
+for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto file; do
     command -v "$tool_name" >/dev/null 2>&1 || {
         echo "Required packaging tool is missing: $tool_name" >&2
         exit 1
@@ -219,6 +219,71 @@ if [[ -n "$dbus_source" && "$dbus_source" == /* ]]; then
     install_name_tool -id "@executable_path/../Frameworks/$dbus_name" "$dbus_target"
 fi
 
+# macdeployqt cannot rewrite frameworks that were absent during its scan. Relocate every
+# package-manager dependency after completing the QML plugin closure. A local dependency that
+# was not bundled is a packaging error, rather than something an end-user machine can resolve.
+echo "Relocating the completed Qt dependency closure"
+while IFS= read -r -d '' macho_binary; do
+    if ! file -b "$macho_binary" | grep -q 'Mach-O'; then
+        continue
+    fi
+    install_id="$(otool -D "$macho_binary" 2>/dev/null | awk 'NR == 2 { print $1 }')"
+    while IFS= read -r local_dependency; do
+        [[ -n "$local_dependency" ]] || continue
+        case "$local_dependency" in
+            /opt/homebrew/*|/usr/local/*)
+                ;;
+            *)
+                continue
+                ;;
+        esac
+        [[ "$local_dependency" != "$install_id" ]] || continue
+        relocated_dependency=
+        dependency_target=
+        if [[ "$local_dependency" =~ /([^/]+\.framework)/Versions/[^/]+/([^/]+)$ ]]; then
+            framework_name="${BASH_REMATCH[1]}"
+            framework_binary_name="${BASH_REMATCH[2]}"
+            dependency_target="$staged_app/Contents/Frameworks/$framework_name/Versions/A/$framework_binary_name"
+            relocated_dependency="@executable_path/../Frameworks/$framework_name/Versions/A/$framework_binary_name"
+        elif [[ "$local_dependency" =~ /([^/]+\.dylib)$ ]]; then
+            dependency_name="${BASH_REMATCH[1]}"
+            dependency_target="$staged_app/Contents/Frameworks/$dependency_name"
+            relocated_dependency="@executable_path/../Frameworks/$dependency_name"
+        fi
+        if [[ -z "$relocated_dependency" || ! -f "$dependency_target" ]]; then
+            echo "Local dependency was not bundled: $local_dependency (required by $macho_binary)" >&2
+            exit 1
+        fi
+        install_name_tool -change "$local_dependency" "$relocated_dependency" "$macho_binary"
+    done < <(otool -L "$macho_binary" | awk 'NR > 1 { print $1 }')
+done < <(find "$staged_app/Contents/MacOS" \
+              "$staged_app/Contents/Frameworks" \
+              "$staged_app/Contents/PlugIns" \
+              -type f -print0)
+
+for framework_path in "$staged_app"/Contents/Frameworks/*.framework; do
+    [[ -d "$framework_path" ]] || continue
+    framework_filename="$(basename "$framework_path")"
+    framework_binary_name="${framework_filename%.framework}"
+    framework_binary="$framework_path/Versions/A/$framework_binary_name"
+    [[ -f "$framework_binary" ]] || continue
+    install_name_tool -id \
+        "@executable_path/../Frameworks/$framework_filename/Versions/A/$framework_binary_name" \
+        "$framework_binary"
+done
+for dylib_path in "$staged_app"/Contents/Frameworks/*.dylib; do
+    [[ -f "$dylib_path" ]] || continue
+    install_name_tool -id \
+        "@executable_path/../Frameworks/$(basename "$dylib_path")" \
+        "$dylib_path"
+done
+
+echo "Pruning optional Qt styles, QML modules, and plugins"
+cmake \
+    -DPACKAGE_ROOT="$staged_app" \
+    -DPACKAGE_PLATFORM=macos \
+    -P "$script_dir/scripts/prune_qt_runtime.cmake"
+
 app_binary="$staged_app/Contents/MacOS/ISPImageViewer"
 while IFS= read -r existing_rpath; do
     case "$existing_rpath" in
@@ -248,8 +313,16 @@ else
 fi
 
 codesign --verify --deep --strict --verbose=2 "$staged_app"
-if otool -L "$app_binary" | grep -Eq '/opt/homebrew|/usr/local'; then
-    echo "The packaged executable still references a local package-manager path." >&2
+local_dependency_report="$stage_dir/local-dependencies.txt"
+find "$staged_app/Contents/MacOS" \
+     "$staged_app/Contents/Frameworks" \
+     "$staged_app/Contents/PlugIns" \
+     -type f -print0 \
+    | xargs -0 otool -L 2>/dev/null \
+    | grep -E '/opt/homebrew|/usr/local' >"$local_dependency_report" || true
+if [[ -s "$local_dependency_report" ]]; then
+    echo "The package still references local package-manager paths:" >&2
+    cat "$local_dependency_report" >&2
     exit 1
 fi
 

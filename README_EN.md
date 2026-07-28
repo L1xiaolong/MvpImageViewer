@@ -66,7 +66,7 @@ Use the project wrapper:
 
 - `dev` creates a Debug application under `build/`
 - `release` creates a Release application under `build/`
-- `package` deploys runtime dependencies and writes the `.app` and ZIP to `dist/`
+- `package` deploys runtime dependencies and writes the `.app` and ZIP to `dist/`; packaging also prunes unused Qt styles, QML modules, and plug-ins through a whitelist, then verifies that runtime dependencies are bundle-local
 
 Equivalent CMake Preset commands:
 
@@ -88,6 +88,8 @@ $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
 .\build_windows.ps1 -Toolchain msys2 -Mode release
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
+
+Windows package mode uses the same Qt runtime pruning policy as macOS. Platform-specific components remain separate: `qwindows` is retained on Windows and `qcocoa` on macOS.
 
 Equivalent CMake Preset commands:
 

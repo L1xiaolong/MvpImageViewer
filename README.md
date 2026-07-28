@@ -66,7 +66,7 @@ TIFF、WebP、OpenEXR、HEIC/HEIF、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当
 
 - `dev`：在 `build/` 中生成 Debug 应用
 - `release`：在 `build/` 中生成 Release 应用
-- `package`：部署运行时依赖，并在 `dist/` 中生成 `.app` 和 ZIP
+- `package`：部署运行时依赖，并在 `dist/` 中生成 `.app` 和 ZIP；打包阶段会按白名单裁剪未使用的 Qt 样式、QML 模块和插件，并检查运行时依赖是否全部位于包内
 
 也可以直接使用 CMake Preset：
 
@@ -88,6 +88,8 @@ $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
 .\build_windows.ps1 -Toolchain msys2 -Mode release
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
+
+Windows 的 `package` 模式采用与 macOS 相同的 Qt 运行时裁剪清单；平台插件仍分别保留 `qwindows` 和 `qcocoa`，不会强行统一操作系统专属组件。
 
 等效的 CMake Preset 命令：
 

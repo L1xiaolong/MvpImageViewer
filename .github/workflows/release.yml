@@ -101,11 +101,8 @@ jobs:
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
         run: |
-          app_bundle='dist/ISPImageViewer.app'
-          test -d "$app_bundle"
-          macdeployqt "$app_bundle" -qmldir=src/qml -always-overwrite
-          mkdir -p dist
-          ditto -c -k --sequesterRsrc --keepParent "$app_bundle" \
+          ./build_macos.sh package --no-zip
+          ditto -c -k --sequesterRsrc --keepParent dist/ISPImageViewer.app \
             "dist/ISPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip"
 
       - name: Configure and build (Windows)
@@ -145,6 +142,10 @@ jobs:
             cp -a "$source_module" "$package_directory/qml/"
             test -f "$package_directory/qml/$qml_module/qmldir"
           done
+          cmake \
+            -DPACKAGE_ROOT="$package_directory" \
+            -DPACKAGE_PLATFORM=windows \
+            -P scripts/prune_qt_runtime.cmake
           # windeployqt places platforms/, imageformats/, etc. beside the EXE.
           # Point Qt at that location instead of a non-existent plugins/ dir.
           printf '[Paths]\nPrefix = .\nPlugins = .\nQmlImports = qml\n' \

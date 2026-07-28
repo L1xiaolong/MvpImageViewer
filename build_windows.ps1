@@ -134,6 +134,11 @@ function Publish-WindowsPackage {
     & $deployQt --release --compiler-runtime --qmldir (Join-Path $ScriptDir "src\qml") $targetExe
     if ($LASTEXITCODE -ne 0) { throw "windeployqt failed with exit code $LASTEXITCODE" }
 
+    Write-Host "Pruning optional Qt styles, QML modules, and plugins"
+    cmake "-DPACKAGE_ROOT=$stageDir" "-DPACKAGE_PLATFORM=windows" `
+        -P (Join-Path $ScriptDir "scripts\prune_qt_runtime.cmake")
+    if ($LASTEXITCODE -ne 0) { throw "Qt runtime pruning failed with exit code $LASTEXITCODE" }
+
     if (-not [string]::IsNullOrWhiteSpace($MsysPrefix)) {
         Copy-Msys2DependencyClosure -TargetDir $stageDir -Prefix $MsysPrefix
     }
