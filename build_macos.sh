@@ -15,12 +15,14 @@ Examples:
   ./build_macos.sh dev --test
   ./build_macos.sh release -j 8
   ./build_macos.sh package
+  ./build_macos.sh package --qt-prefix build/qt-no-icu/install
   ./build_macos.sh package --sign "Developer ID Application: Example (TEAMID)"
 
 Options:
   --test       Run CTest when using a Debug build.
   --rhi        Run the native Metal RHI acceptance test.
   --clean      Remove the selected build directory before configuring.
+  --qt-prefix  Build with a custom Qt installation instead of the Qt on PATH.
   --sign ID    Code-sign a package with ID. Default is an ad-hoc local signature.
   --no-zip     Do not create the distributable ZIP in package mode.
   -j N         Parallel build jobs. Defaults to the local CPU count.
@@ -29,6 +31,7 @@ Options:
 Outputs:
   dev/debug  build/macos-preset-debug/src/qml/ISPImageViewer.app
   release    build/macos-preset-release/src/qml/ISPImageViewer.app
+  custom Qt  build/macos-custom-qt-<mode>/src/qml/ISPImageViewer.app
   package    dist/ISPImageViewer.app and dist/ISPImageViewer-<version>-macos-<arch>.zip
 EOF
 }
@@ -40,6 +43,7 @@ run_rhi=0
 clean=0
 create_zip=1
 sign_identity="${ISPVIEW_CODESIGN_IDENTITY:--}"
+qt_prefix="${ISPVIEW_QT_PREFIX:-}"
 jobs="$(sysctl -n hw.ncpu 2>/dev/null || echo 6)"
 
 if [[ $# -gt 0 ]]; then
@@ -80,6 +84,11 @@ while [[ $# -gt 0 ]]; do
             clean=1
             shift
             ;;
+        --qt-prefix)
+            [[ $# -ge 2 ]] || { echo "Missing directory after --qt-prefix" >&2; exit 2; }
+            qt_prefix="$2"
+            shift 2
+            ;;
         --sign)
             [[ $# -ge 2 ]] || { echo "Missing identity after --sign" >&2; exit 2; }
             sign_identity="$2"
@@ -115,7 +124,21 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$script_dir"
 
 preset="macos-${mode}"
-build_dir="$script_dir/build/macos-preset-${mode}"
+if [[ -n "$qt_prefix" ]]; then
+    [[ -d "$qt_prefix" ]] || {
+        echo "Custom Qt prefix does not exist: $qt_prefix" >&2
+        exit 2
+    }
+    qt_prefix="$(cd "$qt_prefix" && pwd)"
+    [[ -f "$qt_prefix/lib/cmake/Qt6/Qt6Config.cmake" ]] || {
+        echo "Custom Qt prefix is incomplete: $qt_prefix" >&2
+        exit 2
+    }
+    export PATH="$qt_prefix/bin:$PATH"
+    build_dir="$script_dir/build/macos-custom-qt-${mode}"
+else
+    build_dir="$script_dir/build/macos-preset-${mode}"
+fi
 built_app="$build_dir/src/qml/ISPImageViewer.app"
 
 if [[ "$clean" -eq 1 ]]; then
@@ -123,10 +146,31 @@ if [[ "$clean" -eq 1 ]]; then
     rm -rf "$build_dir"
 fi
 
-echo "Configuring preset: $preset"
-cmake --preset "$preset"
-echo "Building preset: $preset (-j $jobs)"
-cmake --build --preset "$preset" -j "$jobs"
+if [[ -n "$qt_prefix" ]]; then
+    build_type="Debug"
+    build_testing="ON"
+    build_benchmarks="OFF"
+    if [[ "$mode" == "release" ]]; then
+        build_type="Release"
+        build_testing="OFF"
+        build_benchmarks="ON"
+    fi
+    echo "Configuring with custom Qt: $qt_prefix"
+    cmake -S "$script_dir" -B "$build_dir" -G "Unix Makefiles" \
+        -DCMAKE_BUILD_TYPE="$build_type" \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 \
+        -DBUILD_TESTING="$build_testing" \
+        -DISPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
+        -DCMAKE_PREFIX_PATH="$qt_prefix" \
+        -DQt6_DIR="$qt_prefix/lib/cmake/Qt6"
+    echo "Building custom Qt configuration (-j $jobs)"
+    cmake --build "$build_dir" -j "$jobs"
+else
+    echo "Configuring preset: $preset"
+    cmake --preset "$preset"
+    echo "Building preset: $preset (-j $jobs)"
+    cmake --build --preset "$preset" -j "$jobs"
+fi
 
 if [[ ! -d "$built_app" ]]; then
     echo "Expected app bundle was not produced: $built_app" >&2
@@ -135,8 +179,13 @@ fi
 
 if [[ "$run_tests" -eq 1 ]]; then
     if [[ "$mode" == "debug" ]]; then
-        echo "Running tests: macos-debug"
-        ctest --preset macos-debug --output-on-failure
+        if [[ -n "$qt_prefix" ]]; then
+            echo "Running tests from custom Qt build"
+            ctest --test-dir "$build_dir" --output-on-failure
+        else
+            echo "Running tests: macos-debug"
+            ctest --preset macos-debug --output-on-failure
+        fi
     else
         echo "Release builds do not enable CTest; skipping --test."
     fi

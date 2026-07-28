@@ -78,6 +78,20 @@ ctest --preset macos-debug --output-on-failure
 
 Run `./build_macos.sh --help` for cleanup, signing, RHI validation, and parallel-build options.
 
+For a smaller package, build the validated Qt 6.9 No-ICU variant:
+
+```sh
+./scripts/build_qt_no_icu_macos.sh -j 8
+./build_macos.sh debug --qt-prefix build/qt-no-icu/install --test
+./build_macos.sh package --qt-prefix build/qt-no-icu/install
+```
+
+This variant retains QML, SVG, international file names, and native natural sorting while
+removing the packaged ICU libraries. The initial Qt build is long; later runs reuse
+`build/qt-no-icu`. This custom Qt toolchain has currently been build-, test-, and
+package-validated on macOS arm64 only. Windows continues to use the regular Qt build and
+cannot reuse the macOS artifacts.
+
 ### Windows
 
 The recommended toolchain is MSYS2/UCRT64:

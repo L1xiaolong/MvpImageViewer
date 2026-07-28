@@ -15,6 +15,7 @@
 #include "io/thumbnail_disk_cache.h"
 
 #include <QColorSpace>
+#include <QCollator>
 #include <QDir>
 #include <QFile>
 #include <QImage>
@@ -194,6 +195,7 @@ class IoTests final : public QObject {
     void singleFileRenameMovesSidecarAndRejectsConflicts();
     void dropCopyCopiesFilesAndFoldersWithoutOverwriting();
     void scannerFiltersAndNaturallySortsFiles();
+    void nativeCollatorKeepsNumericAndCaseInsensitiveOrdering();
     void scannerExcludesHiddenFilesAndDirectoryTrees();
     void directoryScannerPublishesIncrementalBatches();
     void recursiveImageFolderScanFindsOnlyBranchesContainingImages();
@@ -683,6 +685,27 @@ void IoTests::scannerFiltersAndNaturallySortsFiles() {
         DirectoryScanner::isSupportedImageFile(directory.filePath(QStringLiteral("image1.png"))));
     QVERIFY(!DirectoryScanner::isSupportedImageFile(
         QDir(unsupportedChild).filePath(QStringLiteral("notes.txt"))));
+}
+
+void IoTests::nativeCollatorKeepsNumericAndCaseInsensitiveOrdering() {
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+
+    QVERIFY(collator.compare(QStringLiteral("image2.jpg"), QStringLiteral("image10.jpg")) < 0);
+    QCOMPARE(collator.compare(QStringLiteral("IMAGE2.JPG"), QStringLiteral("image2.jpg")), 0);
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString unicodeName = QStringLiteral("图像3.png");
+    QFile unicodeFile(directory.filePath(unicodeName));
+    QVERIFY(unicodeFile.open(QIODevice::WriteOnly));
+    unicodeFile.write("fixture");
+    unicodeFile.close();
+
+    const QVector<ImageFileRecord> files = DirectoryScanner::scan(directory.path());
+    QCOMPARE(files.size(), 1);
+    QCOMPARE(files.constFirst().fileName, unicodeName);
 }
 
 void IoTests::scannerExcludesHiddenFilesAndDirectoryTrees() {

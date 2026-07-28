@@ -78,6 +78,18 @@ ctest --preset macos-debug --output-on-failure
 
 运行 `./build_macos.sh --help` 可查看清理、签名、RHI 验证、并行任务数等选项。
 
+如需进一步缩小包体，可以构建项目验证过的 Qt 6.9 No-ICU 变体：
+
+```sh
+./scripts/build_qt_no_icu_macos.sh -j 8
+./build_macos.sh debug --qt-prefix build/qt-no-icu/install --test
+./build_macos.sh package --qt-prefix build/qt-no-icu/install
+```
+
+该变体保留 QML、SVG、国际化文件名和原生自然排序，但不再打包 ICU。首次编译 Qt
+耗时较长，后续会复用 `build/qt-no-icu`。目前这条自定义 Qt 构建链只在 macOS arm64
+完成了编译、自动测试和打包验证；Windows 仍使用常规 Qt，不能直接复用 macOS 产物。
+
 ### Windows
 
 推荐使用 MSYS2/UCRT64：
