@@ -34,7 +34,11 @@ void LoadHandle::cancel() const {
     bool expected = false;
     if (state_->cancelled.compare_exchange_strong(expected, true, std::memory_order_relaxed) &&
         state_->activeConsumers) {
-        --(*state_->activeConsumers);
+        int consumers = state_->activeConsumers->load(std::memory_order_relaxed);
+        while (consumers > 0 &&
+               !state_->activeConsumers->compare_exchange_weak(
+                   consumers, consumers - 1, std::memory_order_relaxed)) {
+        }
     }
 }
 
@@ -80,15 +84,25 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     }
     auto state = std::make_shared<LoadHandle::State>();
     if (auto found = inFlight_.find(key); found != inFlight_.end()) {
-        state->activeConsumers = found->activeConsumers;
-        ++(*found->activeConsumers);
-        found->pending.push_back({requestId, std::move(callback), state});
-        return LoadHandle(state);
+        int consumers = found->activeConsumers->load(std::memory_order_relaxed);
+        while (consumers >= 0) {
+            if (found->activeConsumers->compare_exchange_weak(
+                    consumers, consumers + 1, std::memory_order_relaxed)) {
+                state->activeConsumers = found->activeConsumers;
+                found->pending.push_back({requestId, std::move(callback), state});
+                return LoadHandle(state);
+            }
+        }
+        // The worker already committed to skipping an unobserved request. Replace that
+        // generation instead of attaching a new consumer to a result that will be empty.
+        inFlight_.erase(found);
     }
     auto activeConsumers = std::make_shared<std::atomic_int>(1);
     state->activeConsumers = activeConsumers;
     InFlightRequest inFlight;
     inFlight.activeConsumers = activeConsumers;
+    inFlight.generation = ++nextInFlightGeneration_;
+    const quint64 generation = inFlight.generation;
     inFlight.pending.push_back({requestId, std::move(callback), state});
     inFlight_.insert(key, std::move(inFlight));
 
@@ -100,10 +114,13 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             ? serializedPool_
             : pool_;
     executionPool.start(
-        [self, decoder, diskCache, request = std::move(request), key, activeConsumers] {
+        [self, decoder, diskCache, request = std::move(request), key, generation,
+         activeConsumers] {
             DecodeResult result;
-            if (activeConsumers->load(std::memory_order_relaxed) > 0 &&
-                request.purpose == DecodePurpose::Thumbnail) {
+            int noConsumers = 0;
+            const bool abandoned = activeConsumers->compare_exchange_strong(
+                noConsumers, -1, std::memory_order_relaxed);
+            if (!abandoned && request.purpose == DecodePurpose::Thumbnail) {
                 QImage cachedImage = diskCache->load(key);
                 if (!cachedImage.isNull()) {
                     const QFileInfo info(request.path);
@@ -140,7 +157,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     // the frame with its source metadata and RAW parameters.
                 }
             }
-            if (!result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
+            if (!abandoned && !result.frame) {
                 result = decoder->decode(request);
                 if (result.frame && request.purpose == DecodePurpose::Thumbnail &&
                     activeConsumers->load(std::memory_order_relaxed) > 0) {
@@ -163,7 +180,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             QMetaObject::invokeMethod(
                 self,
                 [self, result = std::move(result), key, purpose = request.purpose,
-                 sourcePath = request.path, activeConsumers]() {
+                 sourcePath = request.path, generation, activeConsumers]() {
                     if (!self) {
                         return;
                     }
@@ -176,6 +193,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                                                          : result.frame->descriptor.size;
                             emit self->thumbnailMetadataReady(sourcePath, sourceSize);
                         }
+                    }
+                    const auto current = self->inFlight_.constFind(key);
+                    if (current == self->inFlight_.cend() ||
+                        current->generation != generation) {
+                        return;
                     }
                     const InFlightRequest inFlight = self->inFlight_.take(key);
                     for (const PendingRequest& request : inFlight.pending) {

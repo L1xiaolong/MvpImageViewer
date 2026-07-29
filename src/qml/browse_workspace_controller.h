@@ -60,6 +60,8 @@ class BrowseWorkspaceController final : public QObject {
     Q_INVOKABLE void compareSelected();
     Q_INVOKABLE void refreshAll();
     Q_INVOKABLE void startDeferredInitialDirectory();
+    Q_INVOKABLE void confirmPendingTransfer();
+    Q_INVOKABLE void cancelPendingTransfer();
 
   signals:
     void panesChanged();
@@ -67,6 +69,8 @@ class BrowseWorkspaceController final : public QObject {
     void workspaceSelectionChanged();
     void statusTextChanged();
     void compareRequested(const QStringList& paths);
+    void transferConfirmationRequested(bool move, int itemCount,
+                                       const QString& targetDirectory);
 
   private:
     BrowseController* createPane(const QString& initialDirectory, bool startEmpty);
@@ -84,6 +88,7 @@ class BrowseWorkspaceController final : public QObject {
     bool deferredInitialDirectoryPending_ = false;
     int activePaneIndex_ = -1;
     bool synchronizingRecentFolders_ = false;
+    BrowseController* pendingTransferPane_ = nullptr;
 };
 
 } // namespace ispview

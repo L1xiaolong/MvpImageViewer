@@ -124,6 +124,29 @@ TestCase {
         trashDialog.close();
     }
 
+    function test_copyAndMoveConfirmationsAreQmlDialogs() {
+        const transferDialog = findChild(browsePage, "transferConfirmationDialog");
+        verify(transferDialog !== null);
+
+        mockWorkspace.transferConfirmationRequested(false, 2, "/Images/Target");
+        tryCompare(transferDialog, "opened", true);
+        compare(transferDialog.dialogTitle, "Copy items?");
+        compare(transferDialog.confirmText, "Copy");
+        verify(transferDialog.message.indexOf("2 items") >= 0);
+        verify(transferDialog.message.indexOf("/Images/Target") >= 0);
+        transferDialog.confirmAction();
+        tryCompare(transferDialog, "opened", false);
+        compare(mockController.statusText, "Transfer confirmed");
+
+        mockWorkspace.transferConfirmationRequested(true, 1, "/Images/Archive");
+        tryCompare(transferDialog, "opened", true);
+        compare(transferDialog.dialogTitle, "Move items?");
+        compare(transferDialog.confirmText, "Move");
+        verify(transferDialog.message.indexOf("1 item") >= 0);
+        transferDialog.close();
+        tryCompare(mockController, "statusText", "Transfer cancelled");
+    }
+
     ThumbnailTile {
         id: directoryTile
         visible: false

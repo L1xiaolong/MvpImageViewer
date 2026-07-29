@@ -86,6 +86,7 @@ class ImageLoader final : public QObject {
     struct InFlightRequest {
         QVector<PendingRequest> pending;
         std::shared_ptr<std::atomic_int> activeConsumers;
+        quint64 generation = 0;
     };
 
     [[nodiscard]] LoadHandle requestImpl(quint64 requestId, DecodeRequest request,
@@ -108,6 +109,7 @@ class ImageLoader final : public QObject {
     mutable QReadWriteLock rawParametersLock_;
     QHash<QString, RawImageParameters> rawParameters_;
     QHash<QString, InFlightRequest> inFlight_;
+    quint64 nextInFlightGeneration_ = 0;
 };
 
 } // namespace ispview

@@ -10,6 +10,7 @@
 #include "qml/raw_parameters_controller.h"
 #include "qml/qml_image_canvas.h"
 #include "qml/thumbnail_image_provider.h"
+#include "browser/file_clipboard.h"
 #include "browser/thumbnail_model.h"
 
 #include <QImage>
@@ -470,8 +471,16 @@ void QmlWorkspaceControllerTests::copiesDropsIntoSubfoldersAndAcrossPanes() {
 
     BrowseWorkspaceController workspace(std::make_shared<QtImageDecoder>(),
                                         sourceDirectory.path());
+    QSignalSpy transferConfirmation(
+        &workspace, &BrowseWorkspaceController::transferConfirmationRequested);
     BrowseController* first = paneAt(workspace, 0);
     first->copyDroppedUrlsInto({QUrl::fromLocalFile(source)}, child);
+    QCOMPARE(transferConfirmation.size(), 1);
+    QCOMPARE(transferConfirmation.constFirst().at(0).toBool(), false);
+    QCOMPARE(transferConfirmation.constFirst().at(1).toInt(), 1);
+    QCOMPARE(transferConfirmation.constFirst().at(2).toString(), child);
+    QVERIFY(!QFileInfo::exists(QDir(child).filePath(QStringLiteral("drag.png"))));
+    workspace.confirmPendingTransfer();
     QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(QDir(child).filePath(QStringLiteral("drag.png"))),
                              3000);
 
@@ -479,8 +488,27 @@ void QmlWorkspaceControllerTests::copiesDropsIntoSubfoldersAndAcrossPanes() {
     BrowseController* second = paneAt(workspace, 1);
     second->openDirectory(targetDirectory.path());
     second->copyDroppedUrls({QUrl::fromLocalFile(source)});
+    QCOMPARE(transferConfirmation.size(), 2);
+    workspace.cancelPendingTransfer();
+    QTest::qWait(100);
+    QVERIFY(!QFileInfo::exists(targetDirectory.filePath(QStringLiteral("drag.png"))));
+
+    second->copyDroppedUrls({QUrl::fromLocalFile(source)});
+    QCOMPARE(transferConfirmation.size(), 3);
+    workspace.confirmPendingTransfer();
     QTRY_VERIFY_WITH_TIMEOUT(
         QFileInfo::exists(targetDirectory.filePath(QStringLiteral("drag.png"))), 3000);
+
+    const QString moveSource = createImage(sourceDirectory, QStringLiteral("move.png"));
+    FileClipboard::setPaths({moveSource}, true);
+    second->pasteItems();
+    QCOMPARE(transferConfirmation.size(), 4);
+    QCOMPARE(transferConfirmation.constLast().at(0).toBool(), true);
+    QVERIFY(QFileInfo::exists(moveSource));
+    workspace.confirmPendingTransfer();
+    QTRY_VERIFY_WITH_TIMEOUT(
+        QFileInfo::exists(targetDirectory.filePath(QStringLiteral("move.png"))), 3000);
+    QVERIFY(!QFileInfo::exists(moveSource));
 }
 
 void QmlWorkspaceControllerTests::emptyPaneOpensDroppedFoldersAndImageLocations() {

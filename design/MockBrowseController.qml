@@ -6,6 +6,7 @@ QtObject {
     signal directorySelectionRequested(url initialFolder)
     signal renameRequested(string currentName)
     signal trashConfirmationRequested(int itemCount)
+    signal transferConfirmationRequested(bool move, int itemCount, string targetDirectory)
     signal propertiesRequested(string path)
     signal fullScreenRequested(var paths, int initialIndex)
     signal rawParametersRequested(string path)
@@ -254,16 +255,22 @@ QtObject {
         statusText = cut ? "Cut selection" : "Copied selection";
     }
     function pasteItems() {
-        statusText = "Paste preview";
+        transferConfirmationRequested(false, 1, currentDirectory);
     }
     function pasteItemsInto(path) {
-        statusText = "Paste into " + path.split("/").pop();
+        transferConfirmationRequested(false, 1, path);
     }
     function copyDroppedUrls(urls) {
-        statusText = urls.length + " dropped item(s)";
+        transferConfirmationRequested(false, urls.length, currentDirectory);
     }
     function copyDroppedUrlsInto(urls, path) {
-        statusText = urls.length + " item(s) dropped into " + String(path).split("/").pop();
+        transferConfirmationRequested(false, urls.length, path);
+    }
+    function confirmPendingTransfer() {
+        statusText = "Transfer confirmed";
+    }
+    function cancelPendingTransfer() {
+        statusText = "Transfer cancelled";
     }
     function openDroppedUrls(urls) {
         statusText = urls.length + " dropped item(s) opened";

@@ -124,6 +124,8 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void pasteItemsInto(const QString& directory);
     Q_INVOKABLE void copyDroppedUrls(const QList<QUrl>& urls);
     Q_INVOKABLE void copyDroppedUrlsInto(const QList<QUrl>& urls, const QString& directory);
+    Q_INVOKABLE void confirmPendingTransfer();
+    Q_INVOKABLE void cancelPendingTransfer();
     Q_INVOKABLE void openDroppedUrls(const QList<QUrl>& urls);
     Q_INVOKABLE void renameSelected();
     Q_INVOKABLE QString renameSelectedTo(const QString& newName);
@@ -163,6 +165,8 @@ class BrowseController final : public QObject {
     void directorySelectionRequested(const QUrl& initialFolder);
     void renameRequested(const QString& currentName);
     void trashConfirmationRequested(int itemCount);
+    void transferConfirmationRequested(bool move, int itemCount,
+                                       const QString& targetDirectory);
     void imageTransformed(const QString& path);
 
   private:
@@ -173,6 +177,8 @@ class BrowseController final : public QObject {
     void requestGalleryFull();
     void applyGalleryFrame(const ImageFramePtr& frame, bool fullResolution);
     void updateSelection(const QStringList& paths);
+    void requestTransferPaths(const QStringList& paths, bool move,
+                              const QString& targetDirectory = {});
     void transferPaths(const QStringList& paths, bool move, const QString& targetDirectory = {});
     [[nodiscard]] QStringList allImagePaths() const;
     void initialize(const QString& initialDirectory, bool startEmpty);
@@ -206,6 +212,9 @@ class BrowseController final : public QObject {
     QString galleryPath_;
     QString selectionAnchorPath_;
     QString galleryInfoText_;
+    QStringList pendingTransferPaths_;
+    QString pendingTransferTarget_;
+    bool pendingTransferMove_ = false;
     QSize galleryImageSize_;
     ImageFramePtr galleryFrame_;
     LoadHandle galleryPreviewHandle_;

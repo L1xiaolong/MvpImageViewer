@@ -608,7 +608,7 @@ void BrowseController::pasteItems() {
         setStatusText(QStringLiteral("The clipboard does not contain files"));
         return;
     }
-    transferPaths(clipboard.paths, clipboard.cut);
+    requestTransferPaths(clipboard.paths, clipboard.cut);
 }
 
 void BrowseController::pasteItemsInto(const QString& directory) {
@@ -617,7 +617,7 @@ void BrowseController::pasteItemsInto(const QString& directory) {
         setStatusText(QStringLiteral("The clipboard does not contain files"));
         return;
     }
-    transferPaths(clipboard.paths, clipboard.cut, directory);
+    requestTransferPaths(clipboard.paths, clipboard.cut, directory);
 }
 
 void BrowseController::copyDroppedUrls(const QList<QUrl>& urls) {
@@ -631,7 +631,21 @@ void BrowseController::copyDroppedUrlsInto(const QList<QUrl>& urls, const QStrin
             paths.append(url.toLocalFile());
         }
     }
-    transferPaths(paths, false, directory);
+    requestTransferPaths(paths, false, directory);
+}
+
+void BrowseController::confirmPendingTransfer() {
+    if (pendingTransferPaths_.isEmpty()) return;
+    const QStringList paths = std::exchange(pendingTransferPaths_, {});
+    const QString target = std::exchange(pendingTransferTarget_, {});
+    const bool move = std::exchange(pendingTransferMove_, false);
+    transferPaths(paths, move, target);
+}
+
+void BrowseController::cancelPendingTransfer() {
+    pendingTransferPaths_.clear();
+    pendingTransferTarget_.clear();
+    pendingTransferMove_ = false;
 }
 
 void BrowseController::openDroppedUrls(const QList<QUrl>& urls) {
@@ -1049,13 +1063,24 @@ void BrowseController::setSharedRecentFolders(const QStringList& paths) {
     emit recentFoldersChanged();
 }
 
-void BrowseController::transferPaths(const QStringList& paths, bool move,
-                                     const QString& targetDirectory) {
+void BrowseController::requestTransferPaths(const QStringList& paths, bool move,
+                                            const QString& targetDirectory) {
     const QString target = targetDirectory.isEmpty() ? currentDirectory_
                                                       : QFileInfo(targetDirectory).absoluteFilePath();
     if (paths.isEmpty() || target.isEmpty() || !QFileInfo(target).isDir()) {
         return;
     }
+    pendingTransferPaths_ = paths;
+    pendingTransferMove_ = move;
+    pendingTransferTarget_ = target;
+    emit transferConfirmationRequested(move, static_cast<int>(paths.size()), target);
+}
+
+void BrowseController::transferPaths(const QStringList& paths, bool move,
+                                     const QString& targetDirectory) {
+    const QString target = targetDirectory.isEmpty() ? currentDirectory_
+                                                      : QFileInfo(targetDirectory).absoluteFilePath();
+    if (paths.isEmpty() || target.isEmpty() || !QFileInfo(target).isDir()) return;
     setStatusText(QStringLiteral("%1 %2 item(s)…")
                       .arg(move ? QStringLiteral("Moving") : QStringLiteral("Copying"))
                       .arg(paths.size()));

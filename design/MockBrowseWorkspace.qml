@@ -2,6 +2,7 @@ import QtQuick
 
 QtObject {
     id: root
+    signal transferConfirmationRequested(bool move, int itemCount, string targetDirectory)
 
     // Change this value from 1 through 4 in Design Studio to inspect every
     // production workspace geometry without substituting a design-only page.
@@ -56,6 +57,14 @@ QtObject {
         activePaneIndex = paneCount - 1;
         normalizeDisplayModes();
         refreshOrdinals();
+    }
+
+    function confirmPendingTransfer() {
+        activePane.confirmPendingTransfer()
+    }
+
+    function cancelPendingTransfer() {
+        activePane.cancelPendingTransfer()
     }
 
     function activatePane(index) {

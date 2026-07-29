@@ -35,6 +35,7 @@ Rectangle {
                                                   !newFolderDialog.opened &&
                                                   !renameDialog.opened &&
                                                   !trashDialog.opened &&
+                                                  !transferDialog.opened &&
                                                   !propertiesDialog.opened &&
                                                   !rawParametersDialog.opened &&
                                                   !imageResizeDialog.opened &&
@@ -1420,6 +1421,25 @@ Rectangle {
         }
     }
 
+    AppConfirmDialog {
+        id: transferDialog
+        objectName: "transferConfirmationDialog"
+        parent: root
+        property bool transferPending: false
+        destructive: false
+        onConfirmed: {
+            transferPending = false
+            root.workspaceController.confirmPendingTransfer()
+            complete("")
+        }
+        onClosed: {
+            if (transferPending) {
+                transferPending = false
+                root.workspaceController.cancelPendingTransfer()
+            }
+        }
+    }
+
     ImagePropertiesDialog {
         id: propertiesDialog
         parent: root
@@ -1475,6 +1495,27 @@ Rectangle {
         }
     }
 
+    Connections {
+        target: root.workspaceController
+        ignoreUnknownSignals: true
+
+        function onTransferConfirmationRequested(move, itemCount, targetDirectory) {
+            transferDialog.dialogTitle = move ? qsTr("Move items?") : qsTr("Copy items?")
+            transferDialog.confirmText = move ? qsTr("Move") : qsTr("Copy")
+            const target = String(targetDirectory)
+            if (itemCount === 1) {
+                transferDialog.message = move
+                        ? qsTr("Move 1 item to “%1”?").arg(target)
+                        : qsTr("Copy 1 item to “%1”?").arg(target)
+            } else {
+                transferDialog.message = move
+                        ? qsTr("Move %1 items to “%2”?").arg(itemCount).arg(target)
+                        : qsTr("Copy %1 items to “%2”?").arg(itemCount).arg(target)
+            }
+            transferDialog.transferPending = true
+            transferDialog.showConfirmation()
+        }
+    }
 
     Shortcut {
         sequence: root.configuredShortcut("openFolder", "Ctrl+O")

@@ -234,6 +234,7 @@ class IoTests final : public QObject {
     void filenameRulesApplyOrderedPresetAndCapturedOverrides();
     void imageLoaderCoalescesIdenticalInFlightRequests();
     void imageLoaderCancellationSuppressesStaleCallbacks();
+    void imageLoaderRestartsRequestAfterCancelledWorkerAbandonsIt();
     void imageLoaderSerializedQueuePrioritizesAndCancelsWithoutBlockingParallelWork();
     void imageLoaderEnforcesCombinedMemoryBudget();
     void imageTransformerRotatesResizesAndRestoresEncodedImage();
@@ -1740,6 +1741,39 @@ void IoTests::imageLoaderCancellationSuppressesStaleCallbacks() {
                        ++liveCallbacks;
                    });
     cancelled.cancel();
+    QTRY_COMPARE_WITH_TIMEOUT(liveCallbacks, 1, 2000);
+    QCOMPARE(cancelledCallbacks, 0);
+    QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 1);
+}
+
+void IoTests::imageLoaderRestartsRequestAfterCancelledWorkerAbandonsIt() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("cancel-restart.raw"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("fixture"), 7);
+    file.close();
+
+    auto decoder = std::make_shared<DelayedCountingDecoder>();
+    ImageLoader loader(decoder);
+    int cancelledCallbacks = 0;
+    LoadHandle cancelled = loader.request(
+        1, {path, DecodePurpose::Thumbnail, QSize(128, 128)},
+        [&cancelledCallbacks](quint64, const DecodeResult&) { ++cancelledCallbacks; });
+    cancelled.cancel();
+
+    // Keep the loader thread from consuming its queued completion while the worker observes
+    // that the first request has no consumers and marks that generation as abandoned.
+    QThread::msleep(50);
+
+    int liveCallbacks = 0;
+    loader.request(2, {path, DecodePurpose::Thumbnail, QSize(128, 128)},
+                   [&liveCallbacks](quint64, const DecodeResult& result) {
+                       QVERIFY2(result.succeeded(), qPrintable(result.error));
+                       ++liveCallbacks;
+                   });
+
     QTRY_COMPARE_WITH_TIMEOUT(liveCallbacks, 1, 2000);
     QCOMPARE(cancelledCallbacks, 0);
     QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 1);

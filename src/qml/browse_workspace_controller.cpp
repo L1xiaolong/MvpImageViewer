@@ -85,6 +85,24 @@ void BrowseWorkspaceController::connectPane(BrowseController* pane) {
     });
     connect(pane, &BrowseController::recentFoldersChanged, this,
             [this, pane] { synchronizeRecentFolders(pane); });
+    connect(pane, &BrowseController::transferConfirmationRequested, this,
+            [this, pane](bool move, int itemCount, const QString& targetDirectory) {
+                if (pendingTransferPane_ && pendingTransferPane_ != pane) {
+                    pendingTransferPane_->cancelPendingTransfer();
+                }
+                pendingTransferPane_ = pane;
+                emit transferConfirmationRequested(move, itemCount, targetDirectory);
+            });
+}
+
+void BrowseWorkspaceController::confirmPendingTransfer() {
+    BrowseController* pane = std::exchange(pendingTransferPane_, nullptr);
+    if (pane) pane->confirmPendingTransfer();
+}
+
+void BrowseWorkspaceController::cancelPendingTransfer() {
+    BrowseController* pane = std::exchange(pendingTransferPane_, nullptr);
+    if (pane) pane->cancelPendingTransfer();
 }
 
 void BrowseWorkspaceController::synchronizeRecentFolders(BrowseController* source) {
@@ -118,6 +136,7 @@ void BrowseWorkspaceController::closePane(int index) {
     if (index < 0 || index >= panes_.size()) return;
     if (panes_.size() == 1) {
         BrowseController* removed = panes_.takeFirst();
+        if (pendingTransferPane_ == removed) pendingTransferPane_ = nullptr;
         panes_.append(createPane({}, true));
         activePaneIndex_ = 0;
         removed->deleteLater();
@@ -129,6 +148,7 @@ void BrowseWorkspaceController::closePane(int index) {
     }
     const int previousActiveIndex = activePaneIndex_;
     BrowseController* removed = panes_.takeAt(index);
+    if (pendingTransferPane_ == removed) pendingTransferPane_ = nullptr;
     const bool closedActive = activePaneIndex_ == index;
     if (panes_.isEmpty()) {
         activePaneIndex_ = -1;
