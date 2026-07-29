@@ -9,7 +9,7 @@ print_usage() {
     cat <<'EOF'
 Usage: ./scripts/build_qt_no_icu_macos.sh [--clean] [-j N]
 
-Builds the Qt modules used by ISP Image Viewer without ICU. The installation is
+Builds the Qt modules used by MVP Image Viewer without ICU. The installation is
 written to build/qt-no-icu/install and can be selected with:
 
   ./build_macos.sh package --qt-prefix build/qt-no-icu/install

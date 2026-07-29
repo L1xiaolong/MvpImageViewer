@@ -1,16 +1,75 @@
-# ISP Image Viewer
-
-[English](README_EN.md) | 简体中文
-
 <p align="center">
-  <img src="assets/brand/app_icon.png" width="128" alt="ISP Image Viewer 图标">
+  <img src="assets/brand/app_icon.png" width="128" alt="MVP Image Viewer 图标">
 </p>
 
-ISP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片查看与对比工具，面向需要快速浏览、检查像素并同步比较多张图片的用户。
+<h1 align="center">MVP Image Viewer</h1>
+
+<p align="center">
+  <strong>看图、验像、对比，刚刚好。</strong><br>
+  <em>Maybe the MVP is all you need.</em>
+</p>
+
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-111111?style=flat-square&logo=apple">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows11">
+  <img alt="Qt 6" src="https://img.shields.io/badge/Qt-6.7%2B-41CD52?style=flat-square&logo=qt&logoColor=white">
+  <img alt="C++20" src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus">
+</p>
+
+<p align="center">
+  简体中文 · <a href="README_EN.md">English</a>
+  <br>
+  <a href="https://github.com/L1xiaolong/IspImageViewer/releases">下载</a> ·
+  <a href="#核心能力">核心能力</a> ·
+  <a href="#支持的格式">支持格式</a> ·
+  <a href="#构建">从源码构建</a>
+</p>
+
+MVP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片浏览与对比工具。它为摄影、设计、图像算法和 ISP 调试场景保留真正高频的能力：快速浏览、像素检查，以及 2～4 张图片的同步对比。
+
+软件不追求功能数量，而追求核心流程足够快、足够清晰。复杂功能只有在确实服务于图片检查时才会出现。
 
 项目当前处于 Release Candidate 稳定化阶段。JPEG、PNG 浏览与对比是主要发布范围；无头 RAW/YUV 和相机 RAW 支持作为可选的高级能力保留。
 
-## 功能亮点
+## 界面预览
+
+### Gallery 大图浏览与检查
+
+目录树、缩略图和大图预览位于同一个工作区，选中图片后即可缩放、平移并检查像素。
+
+![MVP Image Viewer 图片浏览界面](assets/screenshots/browse-gallery.png)
+
+### Grid 缩略图浏览
+
+使用清晰的图片卡片快速扫过整个目录，并直接查看文件名、分辨率、格式与文件大小。
+
+![MVP Image Viewer Grid 缩略图浏览界面](assets/screenshots/grid-thumbnails.png)
+
+### 跨文件夹浏览与选择
+
+在一个窗口中打开 1～4 个独立文件管理器，从不同目录选择图片，再直接进入统一对比。
+
+![MVP Image Viewer 跨文件夹浏览界面](assets/screenshots/cross-folder-workspace.png)
+
+### 同步图片对比
+
+在 2～4 张图片之间同步缩放和平移，也可以使用滑动分割或按住 B 覆盖 A，快速发现构图、色彩和细节差异。
+
+![MVP Image Viewer 双图对比界面](assets/screenshots/compare-two-images.png)
+
+> 截图中的演示图片是专门为项目生成的无版权风险测试素材，不属于软件安装包内容。
+
+## 核心能力
+
+| 场景 | 能力 |
+|---|---|
+| 浏览 | 类 Finder/Explorer 的目录树、历史导航、搜索、排序、缩略图和多文件夹工作区 |
+| 检查 | Fit、100%、光标中心缩放、平移、坐标、RGBA 像素值、文件信息、EXIF 和亮度直方图 |
+| 对比 | 2～4 图同步缩放与平移、水平/垂直滑动分割、按住 B 覆盖 A、独立窗格信息 |
+| 文件管理 | 复制、剪切、粘贴、重命名、拖放、系统定位和回收站集成 |
+| 扩展格式 | 可选 RAW/YUV 参数解释、相机 RAW、元数据读取和 ICC 到 sRGB 转换 |
+
+### 体验亮点
 
 - 类 Finder/Explorer 的目录树、历史导航、搜索、排序和缩略图浏览
 - 异步目录扫描、图片解码和持久化缩略图缓存
@@ -24,6 +83,21 @@ ISP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片查看与
 - 设置中心支持语言、亮暗主题、自定义快捷键、每日更新检查和内置使用指南
 - 可选的 RAW/YUV 参数解释、源平面像素检查、直方图和 ROI 统计
 - 可选的相机 RAW、EXIF/IPTC/XMP 元数据和 ICC 到 sRGB 转换
+
+## 下载与运行
+
+预编译版本发布在 [GitHub Releases](https://github.com/L1xiaolong/IspImageViewer/releases)。
+
+- macOS：Apple Silicon
+- Windows：x64
+
+直接启动应用，或在命令行传入一个初始目录：
+
+```sh
+MVPImageViewer /path/to/images
+```
+
+当前 macOS 包可能没有 Apple notarization。首次运行时，可能需要在 Finder 中右键应用并选择“打开”。
 
 ## 支持的格式
 
@@ -134,16 +208,6 @@ cmake --preset macos-debug \
 项目的 GitHub Release 构建目前关闭这三个可选组件，只发布基础 JPEG/PNG 功能，以缩小包体并隔离可选依赖的许可证要求。
 
 > **许可证提示：** Exiv2 采用 GPL-2.0-or-later。启用并分发 Exiv2 的构建前，请确认整个分发方案与其许可证兼容。Qt、LibRaw、LittleCMS 及打包产生的传递依赖也各自保留原有许可证。
-
-## 运行
-
-直接启动应用，或在命令行传入一个初始目录：
-
-```sh
-ISPImageViewer /path/to/images
-```
-
-预编译版本发布在 [GitHub Releases](https://github.com/L1xiaolong/IspImageViewer/releases)。当前 macOS 包可能没有 Apple notarization，首次运行时可能需要在 Finder 中右键选择“打开”。
 
 ## 测试与性能工具
 

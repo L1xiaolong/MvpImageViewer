@@ -7,7 +7,7 @@ ApplicationWindow {
     height: 900
     minimumWidth: 980
     minimumHeight: 640
-    title: "ISP Image Viewer · Design Preview"
+    title: "MVP Image Viewer · Design Preview"
 
     DesignPreview {
         anchors.fill: parent

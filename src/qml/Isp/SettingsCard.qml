@@ -58,7 +58,7 @@ Popup {
         case "error":
             return qsTr("Couldn’t check for updates. Check your connection and try again.")
         default:
-            return qsTr("Check for a newer published version of ISP Image Viewer.")
+            return qsTr("Check for a newer published version of MVP Image Viewer.")
         }
     }
 

@@ -28,8 +28,8 @@ if [[ ! -d "$package_directory" ]]; then
     echo "Package directory does not exist: $package_directory" >&2
     exit 2
 fi
-if [[ ! -f "$package_directory/ISPImageViewer.exe" ]]; then
-    echo "ISPImageViewer.exe is missing from: $package_directory" >&2
+if [[ ! -f "$package_directory/MVPImageViewer.exe" ]]; then
+    echo "MVPImageViewer.exe is missing from: $package_directory" >&2
     exit 2
 fi
 if [[ ! -d "$runtime_directory" ]]; then

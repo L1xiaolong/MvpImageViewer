@@ -163,8 +163,8 @@ ispview_enable_warnings(ISPImageViewerQml)
 set_target_properties(ISPImageViewerQml PROPERTIES
     WIN32_EXECUTABLE ON
     MACOSX_BUNDLE ON
-    OUTPUT_NAME "ISPImageViewer"
-    MACOSX_BUNDLE_BUNDLE_NAME "ISP Image Viewer"
+    OUTPUT_NAME "MVPImageViewer"
+    MACOSX_BUNDLE_BUNDLE_NAME "MVP Image Viewer"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.ispview.viewer"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
@@ -184,8 +184,34 @@ endif()
 set(_ispview_qml_windows_icon "${PROJECT_SOURCE_DIR}/assets/icons/windows/ISPImageViewer.ico")
 if(WIN32 AND EXISTS "${_ispview_qml_windows_icon}")
     set(_ispview_qml_windows_icon_rc "${CMAKE_CURRENT_BINARY_DIR}/ISPImageViewerQmlIcon.rc")
+    string(CONCAT _ispview_qml_windows_icon_rc_content
+        "IDI_ICON1 ICON \"${_ispview_qml_windows_icon}\"\n"
+        "1 VERSIONINFO\n"
+        "FILEVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0\n"
+        "PRODUCTVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0\n"
+        "FILEFLAGSMASK 0x3fL\n"
+        "FILEOS 0x40004L\n"
+        "FILETYPE 0x1L\n"
+        "BEGIN\n"
+        "  BLOCK \"StringFileInfo\"\n"
+        "  BEGIN\n"
+        "    BLOCK \"040904b0\"\n"
+        "    BEGIN\n"
+        "      VALUE \"FileDescription\", \"MVP Image Viewer\"\n"
+        "      VALUE \"FileVersion\", \"${PROJECT_VERSION}\"\n"
+        "      VALUE \"InternalName\", \"MVPImageViewer\"\n"
+        "      VALUE \"OriginalFilename\", \"MVPImageViewer.exe\"\n"
+        "      VALUE \"ProductName\", \"MVP Image Viewer\"\n"
+        "      VALUE \"ProductVersion\", \"${PROJECT_VERSION}\"\n"
+        "    END\n"
+        "  END\n"
+        "  BLOCK \"VarFileInfo\"\n"
+        "  BEGIN\n"
+        "    VALUE \"Translation\", 0x0409, 1200\n"
+        "  END\n"
+        "END\n")
     file(GENERATE OUTPUT "${_ispview_qml_windows_icon_rc}"
-        CONTENT "IDI_ICON1 ICON \"${_ispview_qml_windows_icon}\"\n")
+        CONTENT "${_ispview_qml_windows_icon_rc_content}")
     add_library(ISPImageViewerQml_windows_icon OBJECT "${_ispview_qml_windows_icon_rc}")
     target_sources(ISPImageViewerQml PRIVATE
         $<TARGET_OBJECTS:ISPImageViewerQml_windows_icon>
@@ -197,3 +223,4 @@ unset(_ispview_brand_assets)
 unset(_ispview_qml_macos_icon)
 unset(_ispview_qml_windows_icon)
 unset(_ispview_qml_windows_icon_rc)
+unset(_ispview_qml_windows_icon_rc_content)

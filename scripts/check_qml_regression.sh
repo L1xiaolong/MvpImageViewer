@@ -32,7 +32,7 @@ if rg -n 'Qt6::Widgets|#include <Q(Application|Widget|MainWindow|Dialog)>' src C
     exit 1
 fi
 
-debug_executable="build/macos-preset-debug/src/qml/ISPImageViewer.app/Contents/MacOS/ISPImageViewer"
+debug_executable="build/macos-preset-debug/src/qml/MVPImageViewer.app/Contents/MacOS/MVPImageViewer"
 test -x "$debug_executable"
 if otool -L "$debug_executable" | rg -q 'QtWidgets'; then
     echo "Production executable links QtWidgets." >&2
@@ -43,7 +43,7 @@ echo "[6/6] Verify optional Release build"
 if $build_release; then
     cmake --preset macos-release
     cmake --build --preset macos-release --parallel
-    release_executable="dist/ISPImageViewer.app/Contents/MacOS/ISPImageViewer"
+    release_executable="build/macos-preset-release/src/qml/MVPImageViewer.app/Contents/MacOS/MVPImageViewer"
     test -x "$release_executable"
     if otool -L "$release_executable" | rg -q 'QtWidgets'; then
         echo "Release executable links QtWidgets." >&2

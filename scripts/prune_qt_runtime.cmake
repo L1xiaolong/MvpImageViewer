@@ -12,14 +12,14 @@ if(PACKAGE_PLATFORM STREQUAL "macos")
     set(contents_root "${package_root}/Contents")
     set(qml_root "${contents_root}/Resources/qml")
     set(plugin_root "${contents_root}/PlugIns")
-    set(application_binary "${contents_root}/MacOS/ISPImageViewer")
+    set(application_binary "${contents_root}/MacOS/MVPImageViewer")
     set(plugin_prefix "lib")
     set(plugin_suffix ".dylib")
 elseif(PACKAGE_PLATFORM STREQUAL "windows")
     set(contents_root "${package_root}")
     set(qml_root "${package_root}/qml")
     set(plugin_root "${package_root}")
-    set(application_binary "${package_root}/ISPImageViewer.exe")
+    set(application_binary "${package_root}/MVPImageViewer.exe")
     set(plugin_prefix "")
     set(plugin_suffix ".dll")
 else()
@@ -61,7 +61,7 @@ function(remove_plugins plugin_type)
     endforeach()
 endfunction()
 
-# ISP Image Viewer explicitly selects Qt Quick Controls Basic before the QML engine starts.
+# MVP Image Viewer explicitly selects Qt Quick Controls Basic before the QML engine starts.
 # Shipping every alternative style adds several megabytes and can also pull GPL-only modules
 # into an otherwise LGPL deployment. Keep Basic, Templates, impl, Shapes and Dialogs.
 remove_qml_paths(

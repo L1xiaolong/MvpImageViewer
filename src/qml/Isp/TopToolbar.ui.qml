@@ -40,7 +40,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: brandDivider.left
         anchors.verticalCenter: parent.verticalCenter
-        text: qsTr("ISP Image Viewer")
+        text: qsTr("MVP Image Viewer")
         horizontalAlignment: Text.AlignHCenter
         color: Theme.graphiteInk
         font.family: Theme.uiFont

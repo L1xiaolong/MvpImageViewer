@@ -104,8 +104,8 @@ jobs:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
         run: |
           ./build_macos.sh package --no-zip
-          ditto -c -k --sequesterRsrc --keepParent dist/ISPImageViewer.app \
-            "dist/ISPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip"
+          ditto -c -k --sequesterRsrc --keepParent dist/MVPImageViewer.app \
+            "dist/MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip"
 
       - name: Configure and build (Windows)
         if: runner.os == 'Windows'
@@ -126,16 +126,16 @@ jobs:
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
         run: |
-          executable='dist/ISPImageViewer.exe'
+          executable='build/windows-msys2-release/src/qml/MVPImageViewer.exe'
           test -f "$executable"
-          package_directory='dist/ISPImageViewer'
+          package_directory='dist/MVPImageViewer'
           mkdir -p "$package_directory"
-          cp "$executable" "$package_directory/ISPImageViewer.exe"
+          cp "$executable" "$package_directory/MVPImageViewer.exe"
           # MSYS2's windeployqt cannot launch its QML import scanner reliably.
           # Our QML module is compiled into the executable; deploy the required
           # Qt runtime and Qt-provided QML import trees explicitly.
           windeployqt6 --release --compiler-runtime --no-translations \
-            --no-quick-import "$package_directory/ISPImageViewer.exe"
+            --no-quick-import "$package_directory/MVPImageViewer.exe"
           mkdir -p "$package_directory/qml"
           qt_qml_directory='/ucrt64/share/qt6/qml'
           for qml_module in QtCore QtQml QtQuick; do
@@ -170,20 +170,20 @@ jobs:
             QML2_IMPORT_PATH= \
             QT_FORCE_STDERR_LOGGING=1 \
             /usr/bin/timeout 30s \
-            "$package_directory/ISPImageViewer.exe" \
+            "$package_directory/MVPImageViewer.exe" \
             --screenshot "$smoke_screenshot_windows" \
             --screenshot-delay 1500
           test -s "$smoke_screenshot"
           rm -f "$smoke_screenshot"
           (
             cd dist
-            zip -r "ISPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip" ISPImageViewer
+            zip -r "MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip" MVPImageViewer
           )
 
       - name: Upload release asset
         uses: actions/upload-artifact@v7
         with:
-          name: ISPImageViewer-${{ matrix.asset_suffix }}
+          name: MVPImageViewer-${{ matrix.asset_suffix }}
           path: dist/*.zip
           if-no-files-found: error
 
@@ -210,6 +210,6 @@ jobs:
             gh release create "$RELEASE_TAG" release-assets/*.zip \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "ISP Image Viewer $RELEASE_TAG" \
+              --title "MVP Image Viewer $RELEASE_TAG" \
               --generate-notes
           fi

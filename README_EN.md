@@ -1,16 +1,75 @@
-# ISP Image Viewer
-
-English | [简体中文](README.md)
-
 <p align="center">
-  <img src="assets/brand/app_icon.png" width="128" alt="ISP Image Viewer icon">
+  <img src="assets/brand/app_icon.png" width="128" alt="MVP Image Viewer icon">
 </p>
 
-ISP Image Viewer is a lightweight cross-platform desktop application built with Qt 6 for fast image browsing, pixel inspection, and synchronized multi-image comparison.
+<h1 align="center">MVP Image Viewer</h1>
+
+<p align="center">
+  <strong>Browse, inspect, compare—nothing in the way.</strong><br>
+  <em>Maybe the MVP is all you need.</em>
+</p>
+
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-111111?style=flat-square&logo=apple">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows11">
+  <img alt="Qt 6" src="https://img.shields.io/badge/Qt-6.7%2B-41CD52?style=flat-square&logo=qt&logoColor=white">
+  <img alt="C++20" src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus">
+</p>
+
+<p align="center">
+  English · <a href="README.md">简体中文</a>
+  <br>
+  <a href="https://github.com/L1xiaolong/IspImageViewer/releases">Download</a> ·
+  <a href="#core-capabilities">Core capabilities</a> ·
+  <a href="#supported-formats">Formats</a> ·
+  <a href="#building">Build from source</a>
+</p>
+
+MVP Image Viewer is a lightweight cross-platform desktop application built with Qt 6. It keeps the high-frequency tools that matter to photographers, designers, imaging engineers, and ISP developers: fast browsing, precise pixel inspection, and synchronized comparison of two to four images.
+
+The product is intentionally focused. Complexity is added only when it directly improves the image-inspection workflow.
 
 The project is currently in release-candidate stabilization. JPEG and PNG browsing and comparison are the primary release scope; headerless RAW/YUV and camera RAW support remain available as optional advanced capabilities.
 
-## Highlights
+## Screenshots
+
+### Gallery view and inspection
+
+Keep the directory tree, thumbnails, and a large image preview in one workspace. Select an image to zoom, pan, and inspect its pixels immediately.
+
+![MVP Image Viewer browsing workspace](assets/screenshots/browse-gallery.png)
+
+### Grid thumbnail browsing
+
+Scan an entire folder through clear image cards with filenames, dimensions, formats, and file sizes visible at a glance.
+
+![MVP Image Viewer Grid thumbnail view](assets/screenshots/grid-thumbnails.png)
+
+### Browse and select across folders
+
+Open one to four independent file managers in the same window, select images from different folders, and send them directly into one comparison session.
+
+![MVP Image Viewer cross-folder workspace](assets/screenshots/cross-folder-workspace.png)
+
+### Compare in sync
+
+Synchronize zoom and pan across two to four images, or use split inspection and hold-B-over-A comparison to spot differences in composition, color, and detail.
+
+![MVP Image Viewer two-image comparison](assets/screenshots/compare-two-images.png)
+
+> The images shown in these screenshots are generated, copyright-safe demo fixtures and are not bundled with the application.
+
+## Core capabilities
+
+| Workflow | Capabilities |
+|---|---|
+| Browse | Finder/Explorer-style directory tree, history, search, sorting, thumbnails, and multi-folder workspaces |
+| Inspect | Fit, 100%, cursor-centered zoom, pan, coordinates, RGBA values, file details, EXIF, and luma histograms |
+| Compare | Synchronized two-to-four-image zoom/pan, horizontal or vertical split, hold-B-over-A, and per-pane details |
+| Manage files | Copy, cut, paste, rename, drag and drop, reveal in file manager, and system Trash integration |
+| Extended formats | Optional RAW/YUV interpretation, camera RAW, metadata extraction, and ICC-to-sRGB conversion |
+
+### Experience highlights
 
 - Finder/Explorer-style directory tree, history navigation, search, sorting, and thumbnail browsing
 - Asynchronous directory scanning, image decoding, and persistent thumbnail caching
@@ -24,6 +83,21 @@ The project is currently in release-candidate stabilization. JPEG and PNG browsi
 - Settings for language, light/dark appearance, custom shortcuts, daily update checks, and an in-app guide
 - Optional RAW/YUV interpretation, source-plane pixel inspection, histograms, and ROI statistics
 - Optional camera RAW decoding, EXIF/IPTC/XMP metadata, and embedded ICC-to-sRGB conversion
+
+## Download and run
+
+Prebuilt packages are published through [GitHub Releases](https://github.com/L1xiaolong/IspImageViewer/releases).
+
+- macOS: Apple Silicon
+- Windows: x64
+
+Launch the application normally, or pass an initial directory on the command line:
+
+```sh
+MVPImageViewer /path/to/images
+```
+
+Current macOS packages may not be Apple-notarized. On first launch, you may need to Control-click the application in Finder and choose **Open**.
 
 ## Supported formats
 
@@ -136,16 +210,6 @@ The vcpkg manifest exposes these optional features:
 The current GitHub Release workflow disables all three optional components and ships the core JPEG/PNG feature set. This keeps release packages smaller and isolates the licensing requirements of optional dependencies.
 
 > **License note:** Exiv2 is licensed under GPL-2.0-or-later. Before enabling and distributing an Exiv2-backed build, make sure the complete distribution is compatible with that license. Qt, LibRaw, LittleCMS, and transitive packaged dependencies retain their respective licenses as well.
-
-## Running
-
-Launch the application normally, or pass an initial directory on the command line:
-
-```sh
-ISPImageViewer /path/to/images
-```
-
-Prebuilt packages are published through [GitHub Releases](https://github.com/L1xiaolong/IspImageViewer/releases). Current macOS packages may not be Apple-notarized; on first launch, you may need to Control-click the application in Finder and choose **Open**.
 
 ## Tests and benchmarks
 

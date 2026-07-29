@@ -12,7 +12,7 @@ ApplicationWindow {
     height: 900
     minimumWidth: 980
     minimumHeight: 640
-    title: qsTr("ISP Image Viewer")
+    title: qsTr("MVP Image Viewer")
     color: Theme.sensorWhite
     palette.window: Theme.sensorWhite
     palette.windowText: Theme.graphiteInk

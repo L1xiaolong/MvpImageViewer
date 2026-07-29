@@ -321,7 +321,7 @@ void AppSettings::checkForUpdates() {
 #endif
     QNetworkRequest request{endpoint};
     request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("ISPImageViewer/%1").arg(applicationVersion()));
+                      QStringLiteral("MVPImageViewer/%1").arg(applicationVersion()));
     request.setRawHeader("Accept", "application/vnd.github+json");
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);

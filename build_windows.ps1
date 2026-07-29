@@ -41,18 +41,18 @@ Options:
 
 Outputs:
   dev/release  build\windows-* only
-  package      dist\ISPImageViewer-windows-x64 and a versioned ZIP
+  package      dist\MVPImageViewer-windows-x64 and a versioned ZIP
 "@
 }
 
 function Find-ApplicationExecutable {
     param([Parameter(Mandatory = $true)][string]$Root)
 
-    $candidate = Get-ChildItem -LiteralPath $Root -Filter "ISPImageViewer.exe" -File -Recurse |
+    $candidate = Get-ChildItem -LiteralPath $Root -Filter "MVPImageViewer.exe" -File -Recurse |
         Where-Object { $_.FullName -notmatch "CMakeFiles|_autogen|tests" } |
         Select-Object -First 1
     if ($null -eq $candidate) {
-        throw "ISPImageViewer.exe was not produced under $Root"
+        throw "MVPImageViewer.exe was not produced under $Root"
     }
     return $candidate.FullName
 }
@@ -121,13 +121,13 @@ function Publish-WindowsPackage {
     )
 
     $stageDir = Join-Path $ScriptDir "build\package-windows-staging"
-    $distDir = Join-Path $ScriptDir "dist\ISPImageViewer-windows-x64"
+    $distDir = Join-Path $ScriptDir "dist\MVPImageViewer-windows-x64"
     if (Test-Path -LiteralPath $stageDir) {
         Remove-Item -LiteralPath $stageDir -Recurse -Force
     }
     New-Item -ItemType Directory -Path $stageDir | Out-Null
 
-    $targetExe = Join-Path $stageDir "ISPImageViewer.exe"
+    $targetExe = Join-Path $stageDir "MVPImageViewer.exe"
     Copy-Item -LiteralPath $Executable -Destination $targetExe
     $deployQt = Find-WinDeployQt -QtBin $QtBin
     Write-Host "Deploying Qt and QML dependencies with $deployQt"
@@ -151,7 +151,7 @@ function Publish-WindowsPackage {
     $versionMatch = Select-String -LiteralPath (Join-Path $ScriptDir "CMakeLists.txt") `
         -Pattern "project\(ISPImageViewer VERSION ([0-9.]+)" | Select-Object -First 1
     $version = if ($null -ne $versionMatch) { $versionMatch.Matches[0].Groups[1].Value } else { "unknown" }
-    $zipPath = Join-Path $ScriptDir "dist\ISPImageViewer-$version-windows-x64.zip"
+    $zipPath = Join-Path $ScriptDir "dist\MVPImageViewer-$version-windows-x64.zip"
     if (-not $NoZip) {
         if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
         Compress-Archive -LiteralPath $distDir -DestinationPath $zipPath -CompressionLevel Optimal

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate ISP Image Viewer app icon assets from a single logo source.
+"""Generate MVP Image Viewer app icon assets from a single logo source.
 
 The script is intentionally conservative: it never invents artwork and only derives platform
 assets from the logo file supplied by the user. SVG sources are rasterized with PyQt5 when
@@ -130,7 +130,7 @@ def generate_windows_ico(source: Path, output_root: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate ISP Image Viewer app icon assets.")
+    parser = argparse.ArgumentParser(description="Generate MVP Image Viewer app icon assets.")
     parser.add_argument("source", type=Path, help="Logo source image, preferably a square PNG.")
     parser.add_argument(
         "--output-root",

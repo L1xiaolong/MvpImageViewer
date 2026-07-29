@@ -26,7 +26,7 @@
 
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
-    QCoreApplication::setApplicationName(QStringLiteral("ISP Image Viewer"));
+    QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
     QCoreApplication::setApplicationVersion(QStringLiteral(ISPVIEW_PROJECT_VERSION));
     app.setWindowIcon(QIcon(QStringLiteral(":/brand/app_icon.png")));

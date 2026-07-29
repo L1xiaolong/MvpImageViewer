@@ -549,8 +549,8 @@ Choose another folder or drop images here</source>
     <name>Main</name>
     <message>
         <location filename="../Main.qml" line="15"/>
-        <source>ISP Image Viewer</source>
-        <translation>ISP Image Viewer</translation>
+        <source>MVP Image Viewer</source>
+        <translation>MVP Image Viewer</translation>
     </message>
 </context>
 <context>
@@ -778,8 +778,8 @@ Choose another folder or drop images here</source>
     </message>
     <message>
         <location filename="../Isp/SettingsCard.qml" line="61"/>
-        <source>Check for a newer published version of ISP Image Viewer.</source>
-        <translation>检查是否有更新的 ISP Image Viewer 正式版本。</translation>
+        <source>Check for a newer published version of MVP Image Viewer.</source>
+        <translation>检查是否有更新的 MVP Image Viewer 正式版本。</translation>
     </message>
     <message>
         <location filename="../Isp/SettingsCard.qml" line="239"/>
@@ -1203,8 +1203,8 @@ Choose another folder or drop images here</source>
     <name>TopToolbar.ui</name>
     <message>
         <location filename="../Isp/TopToolbar.ui.qml" line="43"/>
-        <source>ISP Image Viewer</source>
-        <translation>ISP Image Viewer</translation>
+        <source>MVP Image Viewer</source>
+        <translation>MVP Image Viewer</translation>
     </message>
     <message>
         <location filename="../Isp/TopToolbar.ui.qml" line="69"/>

@@ -1,10 +1,10 @@
-# ISP Image Viewer Windows 版本适配与验证计划
+# MVP Image Viewer Windows 版本适配与验证计划
 
 ## 1. 文档信息
 
 | 项目 | 内容 |
 |---|---|
-| 基线版本 | ISP Image Viewer 0.2.4 |
+| 基线版本 | MVP Image Viewer 0.2.4 |
 | 基线提交 | `2aabb46` |
 | 当前阶段 | Release Candidate 稳定化 |
 | 目标平台 | Windows x64 |
@@ -262,7 +262,7 @@ Windows RC 只有同时满足以下条件才可发布：
 ## 9. 交付物
 
 - Windows 适配代码和自动化测试。
-- `ISPImageViewer-<version>-windows-x64.zip` 及 SHA-256。
+- `MVPImageViewer-<version>-windows-x64.zip` 及 SHA-256。
 - 构建环境锁定清单、包内文件清单、DLL 依赖审计报告。
 - Windows 兼容性矩阵和测试执行报告。
 - 性能基线、8 小时稳定性报告、截图差异报告。

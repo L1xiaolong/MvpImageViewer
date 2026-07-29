@@ -29,10 +29,10 @@ Options:
   -h,--help    Show this help.
 
 Outputs:
-  dev/debug  build/macos-preset-debug/src/qml/ISPImageViewer.app
-  release    build/macos-preset-release/src/qml/ISPImageViewer.app
-  custom Qt  build/macos-custom-qt-<mode>/src/qml/ISPImageViewer.app
-  package    dist/ISPImageViewer.app and dist/ISPImageViewer-<version>-macos-<arch>.zip
+  dev/debug  build/macos-preset-debug/src/qml/MVPImageViewer.app
+  release    build/macos-preset-release/src/qml/MVPImageViewer.app
+  custom Qt  build/macos-custom-qt-<mode>/src/qml/MVPImageViewer.app
+  package    dist/MVPImageViewer.app and dist/MVPImageViewer-<version>-macos-<arch>.zip
 EOF
 }
 
@@ -139,7 +139,7 @@ if [[ -n "$qt_prefix" ]]; then
 else
     build_dir="$script_dir/build/macos-preset-${mode}"
 fi
-built_app="$build_dir/src/qml/ISPImageViewer.app"
+built_app="$build_dir/src/qml/MVPImageViewer.app"
 
 if [[ "$clean" -eq 1 ]]; then
     echo "Removing build directory: $build_dir"
@@ -211,7 +211,7 @@ done
 
 stage_dir="$(mktemp -d /tmp/ispview-package.XXXXXX)"
 trap 'rm -rf "$stage_dir"' EXIT
-staged_app="$stage_dir/ISPImageViewer.app"
+staged_app="$stage_dir/MVPImageViewer.app"
 ditto "$built_app" "$staged_app"
 
 echo "Deploying Qt and QML dependencies"
@@ -333,7 +333,7 @@ cmake \
     -DPACKAGE_PLATFORM=macos \
     -P "$script_dir/scripts/prune_qt_runtime.cmake"
 
-app_binary="$staged_app/Contents/MacOS/ISPImageViewer"
+app_binary="$staged_app/Contents/MacOS/MVPImageViewer"
 while IFS= read -r existing_rpath; do
     case "$existing_rpath" in
         /opt/homebrew/*|/usr/local/*)
@@ -379,8 +379,8 @@ version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
     "$staged_app/Contents/Info.plist")"
 architecture="$(uname -m)"
 dist_dir="$script_dir/dist"
-dist_app="$dist_dir/ISPImageViewer.app"
-zip_name="ISPImageViewer-${version}-macos-${architecture}.zip"
+dist_app="$dist_dir/MVPImageViewer.app"
+zip_name="MVPImageViewer-${version}-macos-${architecture}.zip"
 zip_path="$dist_dir/$zip_name"
 
 mkdir -p "$dist_dir"
