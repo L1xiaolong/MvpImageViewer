@@ -22,9 +22,6 @@ Project {
     ImageFiles {
         directory: "../assets/icons/ui"
     }
-    ImageFiles {
-        directory: "../test_images"
-    }
     Files {
         filter: "qtquickcontrols2.conf"
     }

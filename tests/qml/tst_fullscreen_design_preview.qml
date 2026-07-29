@@ -41,7 +41,7 @@ TestCase {
     function test_propertyTabsExposeAllInspectorSections() {
         const dialog = findChild(preview, "imagePropertiesDialog")
         verify(dialog !== null)
-        dialog.openForPath("/Images/ISP calibration/XAG040_0001.JPG")
+        dialog.openForPath("/Images/Demo/sample_0001.jpg")
         tryCompare(dialog, "opened", true)
         compare(dialog.tabs.length, 3)
         compare(dialog.tabs[0], "EXIF")
@@ -64,7 +64,7 @@ TestCase {
         compare(closeButton, null)
 
         page.forceActiveFocus()
-        dialog.openForPath("/Images/ISP calibration/XAG040_0001.JPG")
+        dialog.openForPath("/Images/Demo/sample_0001.jpg")
         tryCompare(dialog, "opened", true)
         dialog.close()
         tryCompare(dialog, "opened", false)

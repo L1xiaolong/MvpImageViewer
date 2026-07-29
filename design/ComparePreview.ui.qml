@@ -18,7 +18,7 @@ Item {
     }
 
     Component.onCompleted: productionComparePage.open([
-        "/Images/ISP calibration/XAG040_0001.JPG",
-        "/Images/Outdoor samples/XAG040_0002.JPG"
+        "/Images/Demo/sample_0001.jpg",
+        "/Images/Outdoor samples/sample_0002.jpg"
     ])
 }

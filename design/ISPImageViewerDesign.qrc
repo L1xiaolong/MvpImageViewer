@@ -40,15 +40,5 @@
         <file>../src/qml/Main.qml</file>
         <file>../src/qml/Pages/BrowsePage.qml</file>
         <file>../src/qml/Pages/qmldir</file>
-        <file>../test_images/0-IMG_20230301_0011.JPG</file>
-        <file>../test_images/2.png</file>
-        <file>../test_images/res.png</file>
-        <file>../test_images/vlcsnap-2026-07-14-18h37m27s260.png</file>
-        <file>../test_images/vlcsnap-2026-07-14-18h37m36s061.png</file>
-        <file>../test_images/XAG040_0001 2.JPG</file>
-        <file>../test_images/XAG040_0001.JPG</file>
-        <file>../test_images/XAG040_0002.JPG</file>
-        <file>../test_images/XAG040_0003.JPG</file>
-        <file>../test_images/XAG040_0004.JPG</file>
     </qresource>
 </RCC>

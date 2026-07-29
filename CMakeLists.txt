@@ -6,6 +6,8 @@ option(ISPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
 option(ISPVIEW_ENABLE_LIBRAW "Enable camera RAW decoding when LibRaw is available" ON)
 option(ISPVIEW_ENABLE_EXIV2 "Enable EXIF/IPTC/XMP metadata when Exiv2 is available" ON)
 option(ISPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
+set(ISPVIEW_GITHUB_REPOSITORY "" CACHE STRING
+    "GitHub owner/repository used for update checks and project links")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

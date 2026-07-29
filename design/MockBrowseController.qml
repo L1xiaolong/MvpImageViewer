@@ -21,11 +21,11 @@ QtObject {
     property bool canGoUp: true
     property bool canPaste: true
     readonly property bool canCompare: selectionCount >= 2 && selectionCount <= 4
-    property string currentDirectory: "/Images/ISP calibration"
-    property string currentFolderName: "ISP calibration"
+    property string currentDirectory: "/Images/Demo"
+    property string currentFolderName: "Demo"
     property var currentFolderTreeIndex: undefined
-    property var recentFolders: ["/Images/ISP calibration", "/Images/Outdoor samples"]
-    property var selectedPaths: ["/Images/ISP calibration/XAG040_0001.JPG", "/Images/ISP calibration/XAG040_0002.JPG"]
+    property var recentFolders: ["/Images/Demo", "/Images/Outdoor samples"]
+    property var selectedPaths: ["/Images/Demo/sample_0001.jpg", "/Images/Demo/sample_0002.jpg"]
     property var selectedFileUrls: selectedPaths.map(path => "file://" + path)
     property string selectedUriList: selectedFileUrls.join("\r\n")
     property int selectionCount: selectedPaths.length
@@ -39,91 +39,91 @@ QtObject {
 
     property ListModel thumbnails: ListModel {
         ListElement {
-            path: "/Images/ISP calibration/XAG040_0001.JPG"
-            fileName: "XAG040_0001.JPG"
+            path: "/Images/Demo/sample_0001.jpg"
+            fileName: "sample_0001.jpg"
             technicalLabel: "4000×3000 · JPG · 14,221 KB"
-            thumbnailUrl: "../../../test_images/XAG040_0001.JPG"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: true
             selectionOrdinal: 1
         }
         ListElement {
-            path: "/Images/ISP calibration/XAG040_0002.JPG"
-            fileName: "XAG040_0002.JPG"
+            path: "/Images/Demo/sample_0002.jpg"
+            fileName: "sample_0002.jpg"
             technicalLabel: "4000×3000 · JPG · 4,262 KB"
-            thumbnailUrl: "../../../test_images/XAG040_0002.JPG"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: true
             selectionOrdinal: 2
         }
         ListElement {
-            path: "/Images/ISP calibration/XAG040_0003.JPG"
-            fileName: "XAG040_0003.JPG"
+            path: "/Images/Demo/sample_0003.jpg"
+            fileName: "sample_0003.jpg"
             technicalLabel: "4000×3000 · JPG · 4,226 KB"
-            thumbnailUrl: "../../../test_images/XAG040_0003.JPG"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/vlcsnap-27.png"
-            fileName: "vlcsnap-2026-07-14-18h37m27s260.png"
+            path: "/Images/Demo/sample_0004.png"
+            fileName: "sample_0004.png"
             technicalLabel: "4000×3000 · PNG · 11,353 KB"
-            thumbnailUrl: "../../../test_images/vlcsnap-2026-07-14-18h37m27s260.png"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/vlcsnap-36.png"
-            fileName: "vlcsnap-2026-07-14-18h37m36s061.png"
+            path: "/Images/Demo/sample_0005.png"
+            fileName: "sample_0005.png"
             technicalLabel: "4000×3000 · PNG · 11,109 KB"
-            thumbnailUrl: "../../../test_images/vlcsnap-2026-07-14-18h37m36s061.png"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/0-IMG_20230301_0011.JPG"
-            fileName: "0-IMG_20230301_0011.JPG"
+            path: "/Images/Demo/sample_0006.jpg"
+            fileName: "sample_0006.jpg"
             technicalLabel: "6144×4096 · JPG · 2,459 KB"
-            thumbnailUrl: "../../../test_images/0-IMG_20230301_0011.JPG"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/img.dng"
-            fileName: "img.dng"
+            path: "/Images/Demo/sample_0007.dng"
+            fileName: "sample_0007.dng"
             technicalLabel: "5464×3070 · DNG · 24,572 KB"
-            thumbnailUrl: "../../../test_images/res.png"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/2.png"
-            fileName: "2.png"
+            path: "/Images/Demo/sample_0008.png"
+            fileName: "sample_0008.png"
             technicalLabel: "4000×3000 · PNG · 9,713 KB"
-            thumbnailUrl: "../../../test_images/2.png"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/res.png"
-            fileName: "res.png"
+            path: "/Images/Demo/sample_0009.png"
+            fileName: "sample_0009.png"
             technicalLabel: "4000×3000 · PNG · 13,193 KB"
-            thumbnailUrl: "../../../test_images/res.png"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
         }
         ListElement {
-            path: "/Images/ISP calibration/xag_00001.raw"
-            fileName: "xag_00001.raw"
+            path: "/Images/Demo/sample_0010.raw"
+            fileName: "sample_0010.raw"
             technicalLabel: "6236×4178 · RAW · 50,886 KB"
-            thumbnailUrl: "../../../test_images/2.png"
+            thumbnailUrl: ""
             isDirectory: false
             isSelected: false
             selectionOrdinal: 0
@@ -132,8 +132,8 @@ QtObject {
 
     property ListModel folderTree: ListModel {
         ListElement {
-            display: "ISP calibration"
-            filePath: "/Images/ISP calibration"
+            display: "Demo"
+            filePath: "/Images/Demo"
         }
         ListElement {
             display: "Outdoor samples"

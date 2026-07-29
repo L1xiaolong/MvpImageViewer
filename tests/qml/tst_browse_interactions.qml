@@ -113,7 +113,7 @@ TestCase {
         verify(renameDialog !== null);
         mockController.renameSelected();
         tryCompare(renameDialog, "opened", true);
-        compare(renameDialog.inputText, "XAG040_0001.JPG");
+        compare(renameDialog.inputText, "sample_0001.jpg");
         renameDialog.close();
 
         const trashDialog = findChild(browsePage, "trashConfirmationDialog");
@@ -281,7 +281,7 @@ TestCase {
         const rawHeader = findChild(rawDialog, "rawParametersDragHeader")
         verify(rawDialog !== null)
         verify(rawHeader !== null)
-        rawDialog.openForPath("/Images/ISP calibration/xag_00001.raw")
+        rawDialog.openForPath("/Images/Demo/sample_0010.raw")
         tryCompare(rawDialog, "opened", true)
         compare(contactSheet.interactive, false)
         compare(galleryStrip.interactive, false)

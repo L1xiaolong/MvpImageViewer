@@ -95,7 +95,9 @@ jobs:
       - name: Configure and build (macOS)
         if: runner.os == 'macOS'
         run: |
-          cmake --preset macos-release -DISPVIEW_BUILD_BENCHMARKS=OFF
+          cmake --preset macos-release \
+            -DISPVIEW_BUILD_BENCHMARKS=OFF \
+            -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
           cmake --build --preset macos-release --parallel
 
       - name: Package (macOS)
@@ -117,7 +119,8 @@ jobs:
             -DISPVIEW_BUILD_BENCHMARKS=OFF \
             -DISPVIEW_ENABLE_LIBRAW=OFF \
             -DISPVIEW_ENABLE_EXIV2=OFF \
-            -DISPVIEW_ENABLE_LCMS2=OFF
+            -DISPVIEW_ENABLE_LCMS2=OFF \
+            -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
           cmake --build --preset windows-msys2-release --parallel
 
       - name: Package (Windows)

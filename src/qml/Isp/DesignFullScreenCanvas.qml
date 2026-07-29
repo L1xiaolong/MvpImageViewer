@@ -16,12 +16,17 @@ Rectangle {
             "viewport": Qt.rect(0.22, 0.18, 0.52, 0.56), "zoom": "135%" }
     }
 
-    Image {
+    Rectangle {
         anchors.fill: parent
         anchors.margins: 54
-        source: Qt.resolvedUrl("../../../test_images/XAG040_0001.JPG")
-        fillMode: Image.PreserveAspectFit
-        asynchronous: true
+        color: "#52616B"
+
+        Text {
+            anchors.centerIn: parent
+            text: qsTr("Demo image")
+            color: "#F4F5F2"
+            font.pixelSize: 28
+        }
     }
 
     MouseArea {

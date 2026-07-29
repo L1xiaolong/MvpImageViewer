@@ -19,7 +19,7 @@
 <p align="center">
   English · <a href="README.md">简体中文</a>
   <br>
-  <a href="https://github.com/L1xiaolong/IspImageViewer/releases">Download</a> ·
+  <a href="../../releases">Download</a> ·
   <a href="#core-capabilities">Core capabilities</a> ·
   <a href="#supported-formats">Formats</a> ·
   <a href="#building">Build from source</a>
@@ -86,7 +86,7 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 
 ## Download and run
 
-Prebuilt packages are published through [GitHub Releases](https://github.com/L1xiaolong/IspImageViewer/releases).
+Prebuilt packages are published through [GitHub Releases](../../releases).
 
 - macOS: Apple Silicon
 - Windows: x64

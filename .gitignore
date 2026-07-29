@@ -8,4 +8,5 @@
 /CMakeUserPresets.json
 .DS_Store
 *.user
+*.qtds
 *.swp

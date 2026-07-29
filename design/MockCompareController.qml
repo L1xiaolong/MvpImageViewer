@@ -14,10 +14,7 @@ QtObject {
     property bool pixelValueVisible: true
     property int revision: 1
     property int histogramRevision: 1
-    property var previewUrls: [
-        Qt.resolvedUrl("../test_images/XAG040_0001.JPG"),
-        Qt.resolvedUrl("../test_images/XAG040_0002.JPG")
-    ]
+    property var previewUrls: ["", ""]
 
     signal frameChanged(int slot, bool fullResolution)
     signal histogramChanged(int slot)
@@ -35,10 +32,10 @@ QtObject {
     function fitAll() {}
     function actualPixelsAll() {}
     function requestHistogram(slot) { histogramChanged(slot) }
-    function fileText(slot) { return ["XAG040_0001.JPG", "XAG040_0002.JPG"][slot] || "" }
+    function fileText(slot) { return ["sample_0001.jpg", "sample_0002.jpg"][slot] || "" }
     function cameraText(slot) {
-        return slot === 0 ? "Sony ILCE-7RM5  •  1/320 s  •  f/5.6  •  ISO 100"
-                          : "DJI FC3582  •  1/640 s  •  f/2.8  •  ISO 100"
+        return slot === 0 ? "Demo Camera A  •  1/320 s  •  f/5.6  •  ISO 100"
+                          : "Demo Camera B  •  1/640 s  •  f/2.8  •  ISO 100"
     }
     function pixelTexts(sourceSlot, x, y) {
         return ["(" + x + "," + y + ") RGBA(92,118,73,255)",

@@ -53,4 +53,4 @@ else
     echo "Skipped (run with --release before packaging)."
 fi
 
-echo "QML regression automation passed. Complete the applicable manual rows in docs/test-checklist.md."
+echo "QML regression automation passed."

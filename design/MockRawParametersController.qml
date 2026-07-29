@@ -7,8 +7,8 @@ QtObject {
     signal parametersApplied(string path)
     signal notificationRequested(string message, bool error)
 
-    property string path: "/Images/ISP calibration/xag_00001.raw"
-    property string fileName: "xag_00001.raw"
+    property string path: "/Images/Demo/sample_0010.raw"
+    property string fileName: "sample_0010.raw"
     property var values: ({
         "format": 4, "width": 6236, "height": 4178,
         "rowStride": 7800, "chromaStride": 0, "headerOffset": 0,

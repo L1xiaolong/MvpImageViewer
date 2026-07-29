@@ -19,6 +19,10 @@
 #include <QTimer>
 #include <QVersionNumber>
 
+#ifndef ISPVIEW_GITHUB_REPOSITORY
+#define ISPVIEW_GITHUB_REPOSITORY ""
+#endif
+
 namespace ispview {
 namespace {
 constexpr auto kLanguageKey = "general/language";
@@ -31,10 +35,24 @@ constexpr auto kPreserveHighBitDepthKey = "color/preserveHighBitDepth";
 constexpr auto kHonorExifOrientationKey = "display/honorExifOrientation";
 constexpr auto kCanvasBackgroundKey = "display/canvasBackground";
 constexpr auto kLastUpdateCheckKey = "updates/lastCheckUtc";
-constexpr auto kLatestReleaseApi =
-    "https://api.github.com/repos/L1xiaolong/IspImageViewer/releases/latest";
-constexpr auto kReleasesUrl = "https://github.com/L1xiaolong/IspImageViewer/releases";
-constexpr auto kGuideUrl = "https://github.com/L1xiaolong/IspImageViewer#readme";
+
+QString repositorySlug() {
+    return QString::fromUtf8(ISPVIEW_GITHUB_REPOSITORY).trimmed();
+}
+
+QUrl repositoryUrl(const QString& suffix = {}) {
+    const QString slug = repositorySlug();
+    if (slug.isEmpty())
+        return {};
+    return QUrl(QStringLiteral("https://github.com/%1%2").arg(slug, suffix));
+}
+
+QUrl latestReleaseApiUrl() {
+    const QString slug = repositorySlug();
+    if (slug.isEmpty())
+        return {};
+    return QUrl(QStringLiteral("https://api.github.com/repos/%1/releases/latest").arg(slug));
+}
 
 struct ShortcutDefinition {
     const char* id;
@@ -300,6 +318,8 @@ void AppSettings::startAutomaticUpdateCheck() {
         return;
     }
 #endif
+    if (repositorySlug().isEmpty())
+        return;
     const QDateTime lastCheck =
         QSettings().value(QLatin1String(kLastUpdateCheckKey)).toDateTime();
     if (lastCheck.isValid() && lastCheck.secsTo(QDateTime::currentDateTimeUtc()) < 24 * 60 * 60)
@@ -314,11 +334,15 @@ void AppSettings::checkForUpdates() {
         networkManager_ = new QNetworkAccessManager(this);
 
     setUpdateState(QStringLiteral("checking"));
-    QUrl endpoint{QLatin1String(kLatestReleaseApi)};
+    QUrl endpoint = latestReleaseApiUrl();
 #ifndef NDEBUG
     if (qEnvironmentVariableIsSet("ISPVIEW_UPDATE_API_URL"))
         endpoint = QUrl(qEnvironmentVariable("ISPVIEW_UPDATE_API_URL"));
 #endif
+    if (!endpoint.isValid()) {
+        setUpdateState(QStringLiteral("error"));
+        return;
+    }
     QNetworkRequest request{endpoint};
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("MVPImageViewer/%1").arg(applicationVersion()));
@@ -352,12 +376,16 @@ void AppSettings::checkForUpdates() {
 }
 
 void AppSettings::openReleasePage() const {
-    QDesktopServices::openUrl(releaseUrl_.isValid() ? releaseUrl_
-                                                    : QUrl(QLatin1String(kReleasesUrl)));
+    const QUrl url = releaseUrl_.isValid() ? releaseUrl_ : repositoryUrl(QStringLiteral("/releases"));
+    if (url.isValid())
+        QDesktopServices::openUrl(url);
 }
 
 void AppSettings::openUserGuide() const {
-    QDesktopServices::openUrl(QUrl(QLatin1String(kGuideUrl)));
+    QUrl url = repositoryUrl();
+    url.setFragment(QStringLiteral("readme"));
+    if (url.isValid())
+        QDesktopServices::openUrl(url);
 }
 
 void AppSettings::restoreDefaults() {

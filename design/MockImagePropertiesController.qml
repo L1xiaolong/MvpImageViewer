@@ -3,16 +3,16 @@ import QtQuick
 QtObject {
     id: root
 
-    property string path: "/Images/ISP calibration/XAG040_0001.JPG"
-    property string fileName: "XAG040_0001.JPG"
+    property string path: "/Images/Demo/sample_0001.jpg"
+    property string fileName: "sample_0001.jpg"
     property bool directory: false
     property bool loading: false
     property string errorText: ""
     property bool hasRawParameters: true
     property int histogramRevision: 1
     property var basicFields: [
-        { "label": "File Name", "value": "XAG040_0001.JPG" },
-        { "label": "Location", "value": "/Images/ISP calibration/XAG040_0001.JPG" },
+        { "label": "File Name", "value": "sample_0001.jpg" },
+        { "label": "Location", "value": "/Images/Demo/sample_0001.jpg" },
         { "label": "Type", "value": "JPEG" },
         { "label": "File Size", "value": "13.89 MiB" },
         { "label": "Date / Time", "value": "2026-07-18T16:42:08" },
@@ -20,9 +20,9 @@ QtObject {
         { "label": "Bit Depth", "value": "8-bit valid in 8-bit storage" }
     ]
     property var exifFields: [
-        { "label": "Make", "value": "XAG" },
-        { "label": "Model", "value": "Engineering Camera" },
-        { "label": "Software", "value": "ISP capture 2.4" },
+        { "label": "Make", "value": "Demo" },
+        { "label": "Model", "value": "Reference Camera" },
+        { "label": "Software", "value": "Demo Capture" },
         { "label": "Captured At", "value": "2026-07-18T16:41:52" },
         { "label": "Exposure Time", "value": "1/320 s" },
         { "label": "Aperture", "value": "f/2.8" },

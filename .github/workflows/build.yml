@@ -50,7 +50,10 @@ jobs:
             mingw-w64-ucrt-x86_64-lcms2
       - name: Configure (macOS)
         if: runner.os == 'macOS'
-        run: cmake --preset macos-debug -DISPVIEW_BUILD_BENCHMARKS=OFF
+        run: >-
+          cmake --preset macos-debug
+          -DISPVIEW_BUILD_BENCHMARKS=OFF
+          -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: cmake --build --preset macos-debug
@@ -62,7 +65,10 @@ jobs:
         shell: msys2 {0}
         env:
           MSYS2_UCRT64: C:/msys64/ucrt64
-        run: cmake --preset windows-msys2-debug -DISPVIEW_BUILD_BENCHMARKS=OFF
+        run: >-
+          cmake --preset windows-msys2-debug
+          -DISPVIEW_BUILD_BENCHMARKS=OFF
+          -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
       - name: Build (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}

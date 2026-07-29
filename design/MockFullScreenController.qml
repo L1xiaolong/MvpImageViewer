@@ -8,9 +8,9 @@ QtObject {
     signal closeRequested()
 
     property var paths: [
-        "/Images/ISP calibration/XAG040_0001.JPG",
-        "/Images/ISP calibration/XAG040_0002.JPG",
-        "/Images/ISP calibration/XAG040_0003.JPG"
+        "/Images/Demo/sample_0001.jpg",
+        "/Images/Demo/sample_0002.jpg",
+        "/Images/Demo/sample_0003.jpg"
     ]
     property int currentIndex: 0
     readonly property string currentPath: paths.length > 0 ? paths[currentIndex] : ""

@@ -19,7 +19,7 @@
 <p align="center">
   简体中文 · <a href="README_EN.md">English</a>
   <br>
-  <a href="https://github.com/L1xiaolong/IspImageViewer/releases">下载</a> ·
+  <a href="../../releases">下载</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#支持的格式">支持格式</a> ·
   <a href="#构建">从源码构建</a>
@@ -86,7 +86,7 @@ MVP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片浏览与
 
 ## 下载与运行
 
-预编译版本发布在 [GitHub Releases](https://github.com/L1xiaolong/IspImageViewer/releases)。
+预编译版本发布在 [GitHub Releases](../../releases)。
 
 - macOS：Apple Silicon
 - Windows：x64

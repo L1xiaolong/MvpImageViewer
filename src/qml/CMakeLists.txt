@@ -140,6 +140,7 @@ qt_add_resources(ISPImageViewerQml "ispview_brand_assets"
 target_include_directories(ISPImageViewerQml PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(ISPImageViewerQml PRIVATE
     ISPVIEW_PROJECT_VERSION="${PROJECT_VERSION}"
+    ISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY}"
 )
 target_link_libraries(ISPImageViewerQml PRIVATE
     ispview_browser_backend

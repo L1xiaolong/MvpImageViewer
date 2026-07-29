@@ -203,7 +203,6 @@ class IoTests final : public QObject {
     void metadataCapabilityMatchesBuildFeature();
     void thumbnailDecodeSkipsOptionalMetadata();
     void decoderMapsTypedExifIptcAndXmpMetadata();
-    void decoderReadsRealCameraMetadataWithoutCoordinates();
     void metadataFailureDoesNotReplaceSuccessfulPixelDecode();
     void colorManagementCapabilityMatchesBuildFeature();
     void decoderConvertsEmbeddedLinearIccToSrgb();
@@ -451,30 +450,6 @@ void IoTests::decoderMapsTypedExifIptcAndXmpMetadata() {
     QCOMPARE(result.frame->metadata.descriptive->title, QStringLiteral("XMP title"));
     QCOMPARE(result.frame->metadata.descriptive->creator, QStringLiteral("XMP creator"));
     QCOMPARE(result.frame->metadata.descriptive->description, QStringLiteral("EXIF description"));
-#else
-    QSKIP("This build does not include Exiv2");
-#endif
-}
-
-void IoTests::decoderReadsRealCameraMetadataWithoutCoordinates() {
-#if ISPVIEW_HAS_EXIV2
-    const QString path = QFINDTESTDATA("../test_images/XAG040_0001 2.JPG");
-    if (path.isEmpty()) {
-        QSKIP("Optional local XAG JPEG sample is not available");
-    }
-    QtImageDecoder decoder;
-    const DecodeResult result = decoder.decode({path, DecodePurpose::Preview, QSize(640, 640)});
-    QVERIFY2(result.succeeded(), qPrintable(result.error));
-    QVERIFY2(result.frame->metadata.camera.has_value(),
-             qPrintable(result.frame->metadata.metadataWarning));
-    QCOMPARE(result.frame->metadata.camera->make, QStringLiteral("XAG"));
-    QCOMPARE(result.frame->metadata.camera->model, QStringLiteral("Xcam12DC02"));
-    QCOMPARE(result.frame->metadata.camera->iso, 50);
-    QVERIFY(std::abs(result.frame->metadata.camera->aperture - 2.8) < 0.001);
-    QVERIFY(std::abs(result.frame->metadata.camera->focalLengthMm - 10.6) < 0.001);
-    QVERIFY(result.frame->metadata.gpsMetadataPresent);
-    QVERIFY(result.frame->metadata.descriptive.has_value());
-    QCOMPARE(result.frame->metadata.descriptive->description, QStringLiteral("XAG Geography"));
 #else
     QSKIP("This build does not include Exiv2");
 #endif
