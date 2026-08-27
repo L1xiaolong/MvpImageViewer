@@ -369,6 +369,9 @@ QString transformRaw(const QString& path, RawImageParameters sourceParameters,
     QFile input(path);
     if (!input.open(QIODevice::ReadOnly)) return input.errorString();
     const QByteArray bytes = input.readAll();
+    // QSaveFile replaces the destination during commit. Windows does not allow
+    // that while the original file is still open, even for read-only access.
+    input.close();
     const qsizetype sourceFrameSize = frameByteSize(sourceParameters);
     if (sourceFrameSize <= 0 || sourceParameters.headerOffset > bytes.size())
         return QStringLiteral("Invalid RAW/YUV layout.");

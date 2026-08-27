@@ -210,11 +210,14 @@ if ($Toolchain -eq "msys2") {
 
     Write-Host "Configuring MSYS2/UCRT64 build: $BuildDir"
     cmake @configureArgs
+    if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed with exit code $LASTEXITCODE" }
     cmake --build $BuildDir --parallel $Jobs
+    if ($LASTEXITCODE -ne 0) { throw "CMake build failed with exit code $LASTEXITCODE" }
 
     if ($Test) {
         if ($BuildMode -eq "debug") {
             ctest --test-dir $BuildDir --output-on-failure
+            if ($LASTEXITCODE -ne 0) { throw "CTest failed with exit code $LASTEXITCODE" }
         } else {
             Write-Host "Release builds do not enable CTest; skipping -Test."
         }
@@ -238,10 +241,13 @@ if ($Clean -and (Test-Path -LiteralPath $BuildDir)) {
 }
 
 cmake --preset $Preset
+if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed with exit code $LASTEXITCODE" }
 cmake --build --preset $Preset --parallel $Jobs
+if ($LASTEXITCODE -ne 0) { throw "CMake build failed with exit code $LASTEXITCODE" }
 if ($Test) {
     if ($BuildMode -eq "debug") {
         ctest --preset windows-debug --output-on-failure
+        if ($LASTEXITCODE -ne 0) { throw "CTest failed with exit code $LASTEXITCODE" }
     } else {
         Write-Host "Release builds do not enable CTest; skipping -Test."
     }
