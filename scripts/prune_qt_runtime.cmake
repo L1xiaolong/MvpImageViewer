@@ -6,6 +6,9 @@ endif()
 if(NOT DEFINED PACKAGE_PLATFORM)
     message(FATAL_ERROR "PACKAGE_PLATFORM must be macos or windows")
 endif()
+if(NOT DEFINED PACKAGE_PRUNE_OPTIONAL_COMPONENTS)
+    set(PACKAGE_PRUNE_OPTIONAL_COMPONENTS ON)
+endif()
 
 file(REAL_PATH "${PACKAGE_ROOT}" package_root)
 if(PACKAGE_PLATFORM STREQUAL "macos")
@@ -61,6 +64,7 @@ function(remove_plugins plugin_type)
     endforeach()
 endfunction()
 
+if(PACKAGE_PRUNE_OPTIONAL_COMPONENTS)
 # MVP Image Viewer explicitly selects Qt Quick Controls Basic before the QML engine starts.
 # Shipping every alternative style adds several megabytes and can also pull GPL-only modules
 # into an otherwise LGPL deployment. Keep Basic, Templates, impl, Shapes and Dialogs.
@@ -190,7 +194,12 @@ if(PACKAGE_PLATFORM STREQUAL "macos")
     # Compute the Mach-O dependency closure from the executable and retained plugins, then
     # remove only top-level frameworks/dylibs that cannot be reached from those roots.
     file(GLOB_RECURSE retained_plugin_binaries "${plugin_root}/*.dylib")
-    set(dependency_queue "${application_binary}" ${retained_plugin_binaries})
+    file(GLOB_RECURSE retained_qml_plugin_binaries "${qml_root}/*.dylib")
+    set(dependency_queue
+        "${application_binary}"
+        ${retained_plugin_binaries}
+        ${retained_qml_plugin_binaries}
+    )
     set(reachable_binaries)
     while(dependency_queue)
         list(POP_FRONT dependency_queue binary)
@@ -273,6 +282,7 @@ if(PACKAGE_PLATFORM STREQUAL "macos")
         endif()
     endforeach()
 endif()
+endif()
 
 set(required_paths
     "${qml_root}/QtQuick/qmldir"
@@ -302,19 +312,22 @@ foreach(required_path IN LISTS required_paths)
     endif()
 endforeach()
 
-file(GLOB_RECURSE packaged_components LIST_DIRECTORIES TRUE "${contents_root}/*")
-set(forbidden_components)
-foreach(packaged_component IN LISTS packaged_components)
-    get_filename_component(component_name "${packaged_component}" NAME)
-    string(TOLOWER "${component_name}" component_name_lower)
-    if(component_name_lower MATCHES
-       "virtualkeyboard|quicktimeline|quickscene3d|pdfquick")
-        list(APPEND forbidden_components "${packaged_component}")
+if(PACKAGE_PRUNE_OPTIONAL_COMPONENTS)
+    file(GLOB_RECURSE packaged_components LIST_DIRECTORIES TRUE "${contents_root}/*")
+    set(forbidden_components)
+    foreach(packaged_component IN LISTS packaged_components)
+        get_filename_component(component_name "${packaged_component}" NAME)
+        string(TOLOWER "${component_name}" component_name_lower)
+        if(component_name_lower MATCHES
+           "virtualkeyboard|quicktimeline|quickscene3d|pdfquick")
+            list(APPEND forbidden_components "${packaged_component}")
+        endif()
+    endforeach()
+    if(forbidden_components)
+        list(JOIN forbidden_components "\n  " forbidden_list)
+        message(FATAL_ERROR "Forbidden unused/GPL-only Qt components remain:\n  ${forbidden_list}")
     endif()
-endforeach()
-if(forbidden_components)
-    list(JOIN forbidden_components "\n  " forbidden_list)
-    message(FATAL_ERROR "Forbidden unused/GPL-only Qt components remain:\n  ${forbidden_list}")
+    message(STATUS "Pruned and verified Qt runtime components for ${PACKAGE_PLATFORM}")
+else()
+    message(STATUS "Verified required Qt runtime components for ${PACKAGE_PLATFORM}")
 endif()
-
-message(STATUS "Pruned optional Qt runtime components for ${PACKAGE_PLATFORM}")

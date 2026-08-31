@@ -28,6 +28,9 @@ Options:
   -j N         Parallel build jobs. Defaults to the local CPU count.
   -h,--help    Show this help.
 
+Environment:
+  ISPVIEW_GITHUB_REPOSITORY  GitHub owner/repository embedded in update links.
+
 Outputs:
   dev/debug  build/macos-preset-debug/src/qml/MVPImageViewer.app
   release    build/macos-preset-release/src/qml/MVPImageViewer.app
@@ -153,7 +156,7 @@ if [[ -n "$qt_prefix" ]]; then
     if [[ "$mode" == "release" ]]; then
         build_type="Release"
         build_testing="OFF"
-        build_benchmarks="ON"
+        build_benchmarks="OFF"
     fi
     echo "Configuring with custom Qt: $qt_prefix"
     cmake -S "$script_dir" -B "$build_dir" -G "Unix Makefiles" \
@@ -161,13 +164,16 @@ if [[ -n "$qt_prefix" ]]; then
         -DCMAKE_OSX_ARCHITECTURES=arm64 \
         -DBUILD_TESTING="$build_testing" \
         -DISPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
+        -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}" \
         -DCMAKE_PREFIX_PATH="$qt_prefix" \
         -DQt6_DIR="$qt_prefix/lib/cmake/Qt6"
     echo "Building custom Qt configuration (-j $jobs)"
     cmake --build "$build_dir" -j "$jobs"
 else
     echo "Configuring preset: $preset"
-    cmake --preset "$preset"
+    cmake --preset "$preset" \
+        -DISPVIEW_BUILD_BENCHMARKS=OFF \
+        -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}"
     echo "Building preset: $preset (-j $jobs)"
     cmake --build --preset "$preset" -j "$jobs"
 fi
@@ -202,7 +208,7 @@ if [[ "$command_name" != "package" ]]; then
     exit 0
 fi
 
-for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto file; do
+for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto file lipo unzip; do
     command -v "$tool_name" >/dev/null 2>&1 || {
         echo "Required packaging tool is missing: $tool_name" >&2
         exit 1
@@ -308,6 +314,7 @@ while IFS= read -r -d '' macho_binary; do
 done < <(find "$staged_app/Contents/MacOS" \
               "$staged_app/Contents/Frameworks" \
               "$staged_app/Contents/PlugIns" \
+              "$staged_app/Contents/Resources/qml" \
               -type f -print0)
 
 for framework_path in "$staged_app"/Contents/Frameworks/*.framework; do
@@ -327,13 +334,18 @@ for dylib_path in "$staged_app"/Contents/Frameworks/*.dylib; do
         "$dylib_path"
 done
 
-echo "Pruning optional Qt styles, QML modules, and plugins"
+echo "Pruning optional Qt modules and verifying the retained runtime"
 cmake \
     -DPACKAGE_ROOT="$staged_app" \
     -DPACKAGE_PLATFORM=macos \
     -P "$script_dir/scripts/prune_qt_runtime.cmake"
 
 app_binary="$staged_app/Contents/MacOS/MVPImageViewer"
+if ! lipo -archs "$app_binary" | tr ' ' '\n' | grep -Fxq arm64; then
+    echo "Packaged application does not contain the required arm64 architecture." >&2
+    lipo -info "$app_binary" >&2
+    exit 1
+fi
 while IFS= read -r existing_rpath; do
     case "$existing_rpath" in
         /opt/homebrew/*|/usr/local/*)
@@ -366,6 +378,7 @@ local_dependency_report="$stage_dir/local-dependencies.txt"
 find "$staged_app/Contents/MacOS" \
      "$staged_app/Contents/Frameworks" \
      "$staged_app/Contents/PlugIns" \
+     "$staged_app/Contents/Resources/qml" \
      -type f -print0 \
     | xargs -0 otool -L 2>/dev/null \
     | grep -E '/opt/homebrew|/usr/local' >"$local_dependency_report" || true
@@ -390,6 +403,7 @@ ditto "$staged_app" "$dist_app"
 if [[ "$create_zip" -eq 1 ]]; then
     rm -f "$zip_path"
     ditto -c -k --sequesterRsrc --keepParent "$dist_app" "$zip_path"
+    unzip -tq "$zip_path"
     echo "SHA-256: $(shasum -a 256 "$zip_path" | awk '{print $1}')"
     echo "Distributable ZIP: $zip_path"
 fi

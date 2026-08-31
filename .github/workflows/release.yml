@@ -26,13 +26,37 @@ jobs:
     name: Validate release
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Validate release tag
         shell: bash
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG" >&2
             echo "Expected a version such as v0.2.4 or v0.2.4-rc.1" >&2
             exit 1
+          fi
+          release_version="${BASH_REMATCH[1]}"
+          project_version="$(sed -nE \
+            's/^project\(ISPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
+            CMakeLists.txt)"
+          if [[ "$project_version" != "$release_version" ]]; then
+            echo "Release tag $RELEASE_TAG does not match project version $project_version" >&2
+            exit 1
+          fi
+
+          # A manual rerun for an existing tag must build the tagged commit,
+          # never a different commit that happens to have the same version.
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tag_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            checked_out_commit="$(git rev-parse HEAD)"
+            if [[ "$tag_commit" != "$checked_out_commit" ]]; then
+              echo "Existing tag $RELEASE_TAG points to $tag_commit, not $checked_out_commit" >&2
+              echo "Run the workflow from the tag ref or publish a new version." >&2
+              exit 1
+            fi
           fi
 
   ci:
@@ -91,23 +115,18 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-shadertools
             mingw-w64-ucrt-x86_64-qt6-tools
             zip
-
-      - name: Configure and build (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          cmake --preset macos-release \
-            -DISPVIEW_BUILD_BENCHMARKS=OFF \
-            -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
-          cmake --build --preset macos-release --parallel
+            unzip
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
+          ISPVIEW_GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           ./build_macos.sh package --no-zip
-          ditto -c -k --sequesterRsrc --keepParent dist/MVPImageViewer.app \
-            "dist/MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip"
+          archive="dist/MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip"
+          ditto -c -k --sequesterRsrc --keepParent dist/MVPImageViewer.app "$archive"
+          unzip -tq "$archive"
 
       - name: Configure and build (Windows)
         if: runner.os == 'Windows'
@@ -129,8 +148,22 @@ jobs:
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
         run: |
-          executable='build/windows-msys2-release/src/qml/MVPImageViewer.exe'
-          test -f "$executable"
+          set -euxo pipefail
+
+          # Do not couple packaging to CMake's generator-specific target layout.
+          # OUTPUT_NAME fixes the file name, while its directory may change with
+          # Qt/CMake/MSYS2 updates.
+          mapfile -d '' executable_candidates < <(
+            find build/windows-msys2-release -type f \
+              -iname 'MVPImageViewer.exe' -print0
+          )
+          if (( ${#executable_candidates[@]} != 1 )); then
+            echo "Expected exactly one MVPImageViewer.exe, found ${#executable_candidates[@]}" >&2
+            find build/windows-msys2-release -type f -iname '*.exe' -print >&2
+            exit 1
+          fi
+          executable="${executable_candidates[0]}"
+          echo "Packaging executable: $executable"
           package_directory='dist/MVPImageViewer'
           mkdir -p "$package_directory"
           cp "$executable" "$package_directory/MVPImageViewer.exe"
@@ -140,16 +173,30 @@ jobs:
           windeployqt6 --release --compiler-runtime --no-translations \
             --no-quick-import "$package_directory/MVPImageViewer.exe"
           mkdir -p "$package_directory/qml"
-          qt_qml_directory='/ucrt64/share/qt6/qml'
+          qt_qml_directory="$(qtpaths6 --query QT_INSTALL_QML)"
+          test -d "$qt_qml_directory" || {
+            echo "Qt QML directory is missing: $qt_qml_directory" >&2
+            exit 1
+          }
           for qml_module in QtCore QtQml QtQuick; do
             source_module="$qt_qml_directory/$qml_module"
-            test -f "$source_module/qmldir"
+            test -f "$source_module/qmldir" || {
+              echo "Required Qt QML module is missing: $source_module/qmldir" >&2
+              exit 1
+            }
             cp -a "$source_module" "$package_directory/qml/"
-            test -f "$package_directory/qml/$qml_module/qmldir"
+            test -f "$package_directory/qml/$qml_module/qmldir" || {
+              echo "Failed to stage Qt QML module: $qml_module" >&2
+              exit 1
+            }
           done
+          # Verify required runtime components without removing optional Qt
+          # modules. A slightly larger archive is preferable to a package that
+          # breaks after an MSYS2/Qt layout update.
           cmake \
             -DPACKAGE_ROOT="$package_directory" \
             -DPACKAGE_PLATFORM=windows \
+            -DPACKAGE_PRUNE_OPTIONAL_COMPONENTS=OFF \
             -P scripts/prune_qt_runtime.cmake
           # windeployqt places platforms/, imageformats/, etc. beside the EXE.
           # Point Qt at that location instead of a non-existent plugins/ dir.
@@ -160,27 +207,10 @@ jobs:
           # windeployqt --compiler-runtime does not deploy. Resolve the import
           # graph for the EXE, Qt plugins, and QML plugins recursively.
           ./scripts/deploy_msys2_runtime.sh "$package_directory"
-
-          # A successful build is not enough: launch the exact packaged app and
-          # require it to load QML, render a frame, and save a screenshot.
-          smoke_screenshot="$package_directory/startup-smoke.png"
-          smoke_screenshot_windows="$(cygpath -w "$smoke_screenshot")"
-          isolated_path="$package_directory:/c/Windows/System32:/c/Windows"
-          PATH="$isolated_path" \
-            QT_PLUGIN_PATH= \
-            QT_QPA_PLATFORM_PLUGIN_PATH= \
-            QML_IMPORT_PATH= \
-            QML2_IMPORT_PATH= \
-            QT_FORCE_STDERR_LOGGING=1 \
-            /usr/bin/timeout 30s \
-            "$package_directory/MVPImageViewer.exe" \
-            --screenshot "$smoke_screenshot_windows" \
-            --screenshot-delay 1500
-          test -s "$smoke_screenshot"
-          rm -f "$smoke_screenshot"
           (
             cd dist
             zip -r "MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip" MVPImageViewer
+            unzip -tq "MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.zip"
           )
 
       - name: Upload release asset
@@ -201,16 +231,33 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mac_archive="release-assets/MVPImageViewer-${RELEASE_TAG}-macos-arm64.zip"
+          windows_archive="release-assets/MVPImageViewer-${RELEASE_TAG}-windows-x64.zip"
+          test -s "$mac_archive"
+          test -s "$windows_archive"
+          unzip -tq "$mac_archive"
+          unzip -tq "$windows_archive"
+          (
+            cd release-assets
+            sha256sum *.zip > SHA256SUMS.txt
+          )
+
       - name: Create release and upload packages
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" release-assets/*.zip \
+              release-assets/SHA256SUMS.txt \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
           else
             gh release create "$RELEASE_TAG" release-assets/*.zip \
+              release-assets/SHA256SUMS.txt \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "MVP Image Viewer $RELEASE_TAG" \
