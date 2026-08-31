@@ -78,6 +78,26 @@ TestCase {
         page.closeRequested.disconnect(countClose)
     }
 
+    function test_escapeClosesFullScreenAfterContextMenuCloses() {
+        const page = findChild(preview, "fullScreenPage")
+        const menu = findChild(page, "fullScreenContextMenu")
+        verify(menu !== null)
+
+        page.forceActiveFocus()
+        menu.popup()
+        tryCompare(menu, "opened", true)
+        menu.close()
+        tryCompare(menu, "opened", false)
+        tryCompare(page, "activeFocus", true)
+
+        let closeCount = 0
+        function countClose() { closeCount += 1 }
+        page.closeRequested.connect(countClose)
+        keyClick(Qt.Key_Escape)
+        compare(closeCount, 1)
+        page.closeRequested.disconnect(countClose)
+    }
+
     function test_propertiesOpenExplicitlyAndCardCanBeDragged() {
         const page = findChild(preview, "fullScreenPage")
         const dialog = findChild(page, "imagePropertiesDialog")

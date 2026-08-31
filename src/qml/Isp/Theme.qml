@@ -67,7 +67,7 @@ QtObject {
     readonly property int metadataFontSize: darkMode ? 11 : 10
 
     readonly property int unit: 4
-    readonly property int toolbarHeight: 52
+    readonly property int toolbarHeight: 38
     readonly property int sidebarWidth: 272
     readonly property int radius: 4
     readonly property int iconSize: 20

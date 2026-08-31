@@ -5,8 +5,11 @@ import "."
 Rectangle {
     id: root
     width: 1440
-    height: 52
+    height: Theme.toolbarHeight
     color: Theme.raisedSurface
+
+    readonly property int toolbarButtonSize: 28
+    readonly property int toolbarIconSize: 16
 
     property string iconPrefix: Theme.iconPrefix
     property int displayMode: 0
@@ -51,9 +54,9 @@ Rectangle {
     Rectangle {
         id: brandDivider
         x: Math.round(root.navigationWidth)
-        y: 14
+        anchors.verticalCenter: parent.verticalCenter
         width: 1
-        height: 24
+        height: 17
         color: Theme.opticalGray
     }
 
@@ -61,9 +64,9 @@ Rectangle {
         id: openFolderButton
         objectName: "openFolderButton"
         x: brandDivider.x + 14
-        y: 8
-        width: 36
-        height: 36
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.activePaneAvailable
         iconSource: root.iconPrefix + "folder-open.svg"
         toolTipText: qsTr("Open folder")
@@ -72,10 +75,10 @@ Rectangle {
     AppIconButton {
         id: newFolderButton
         objectName: "newFolderButton"
-        x: brandDivider.x + 52
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 44
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         iconSource: root.iconPrefix + "folder-plus.svg"
         toolTipText: qsTr("New folder")
@@ -84,10 +87,10 @@ Rectangle {
     AppIconButton {
         id: folderCompareButton
         objectName: "folderCompareButton"
-        x: brandDivider.x + 90
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 74
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.canAddPane
         iconSource: root.iconPrefix + "folder-pane-plus.svg"
         toolTipText: enabled ? qsTr("Add file manager") : qsTr("Maximum 4 file managers")
@@ -95,20 +98,20 @@ Rectangle {
 
     Rectangle {
         id: fileDivider
-        x: brandDivider.x + 140
-        y: 14
+        x: brandDivider.x + 116
+        anchors.verticalCenter: parent.verticalCenter
         width: 1
-        height: 24
+        height: 17
         color: Theme.opticalGray
     }
 
     AppIconButton {
         id: gridModeButton
         objectName: "gridModeButton"
-        x: brandDivider.x + 154
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 130
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         checkable: true
         checked: root.displayMode === 0
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable && root.gridEnabled
@@ -119,10 +122,10 @@ Rectangle {
     AppIconButton {
         id: listModeButton
         objectName: "listModeButton"
-        x: brandDivider.x + 192
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 160
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         checkable: true
         checked: root.displayMode === 1
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
@@ -133,10 +136,10 @@ Rectangle {
     AppIconButton {
         id: galleryModeButton
         objectName: "galleryModeButton"
-        x: brandDivider.x + 230
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 190
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         checkable: true
         checked: root.displayMode === 2
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable && root.galleryEnabled
@@ -147,8 +150,8 @@ Rectangle {
     Rectangle {
         id: activeViewRail
         visible: root.activePaneAvailable && root.activeDirectoryAvailable
-        x: root.displayMode === 0 ? brandDivider.x + 164 : root.displayMode === 1 ? brandDivider.x + 202 : brandDivider.x + 240
-        y: 47
+        x: root.displayMode === 0 ? brandDivider.x + 136 : root.displayMode === 1 ? brandDivider.x + 166 : brandDivider.x + 196
+        y: 33
         width: 16
         height: 2
         radius: 1
@@ -163,20 +166,20 @@ Rectangle {
 
     Rectangle {
         id: viewDivider
-        x: brandDivider.x + 276
-        y: 14
+        x: brandDivider.x + 232
+        anchors.verticalCenter: parent.verticalCenter
         width: 1
-        height: 24
+        height: 17
         color: Theme.opticalGray
     }
 
     AppIconButton {
         id: sortButton
         objectName: "sortButton"
-        x: brandDivider.x + 290
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 246
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         iconSource: root.iconPrefix + "sort.svg"
         toolTipText: [qsTr("Sort by name"), qsTr("Sort by modified time"),
@@ -186,10 +189,10 @@ Rectangle {
     AppIconButton {
         id: rotateCounterClockwiseButton
         objectName: "rotateCounterClockwiseButton"
-        x: brandDivider.x + 328
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 276
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.transformEnabled
         iconSource: root.iconPrefix + "rotate-ccw-square.svg"
         toolTipText: enabled ? qsTr("Rotate 90° counterclockwise")
@@ -199,10 +202,10 @@ Rectangle {
     AppIconButton {
         id: rotateClockwiseButton
         objectName: "rotateClockwiseButton"
-        x: brandDivider.x + 366
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 306
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.transformEnabled
         iconSource: root.iconPrefix + "rotate-cw-square.svg"
         toolTipText: enabled ? qsTr("Rotate 90° clockwise")
@@ -212,10 +215,10 @@ Rectangle {
     AppIconButton {
         id: resizeImageButton
         objectName: "resizeImageButton"
-        x: brandDivider.x + 404
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 336
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.transformEnabled
         iconSource: root.iconPrefix + "image-resize.svg"
         toolTipText: enabled ? qsTr("Resize image…") : qsTr("Select one image to resize")
@@ -224,10 +227,10 @@ Rectangle {
     AppIconButton {
         id: compareButton
         objectName: "compareButton"
-        x: brandDivider.x + 442
-        y: 8
-        width: 36
-        height: 36
+        x: brandDivider.x + 366
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         enabled: root.compareEnabled
         iconSource: root.iconPrefix + "compare.svg"
         toolTipText: enabled ? "Compare selected images" : "Select 2–4 images to compare"
@@ -237,9 +240,9 @@ Rectangle {
         id: fileSearch
         objectName: "browserSearchField"
         x: root.width - width - 18
-        y: 9
+        anchors.verticalCenter: parent.verticalCenter
         width: 236
-        height: 34
+        height: root.toolbarButtonSize
         placeholderText: qsTr("Search files")
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         selectByMouse: true
@@ -261,10 +264,11 @@ Rectangle {
             Image {
                 x: 9
                 anchors.verticalCenter: parent.verticalCenter
-                width: 20
-                height: 20
+                width: root.toolbarIconSize
+                height: root.toolbarIconSize
                 source: root.iconPrefix + "search.svg"
-                sourceSize: Qt.size(40, 40)
+                sourceSize: Qt.size(root.toolbarIconSize * 2,
+                                    root.toolbarIconSize * 2)
             }
         }
 
@@ -300,10 +304,10 @@ Rectangle {
     AppIconButton {
         id: settingsButton
         objectName: "settingsButton"
-        x: fileSearch.x - 42
-        y: 9
-        width: 34
-        height: 34
+        x: fileSearch.x - 36
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
         iconSource: root.iconPrefix + "settings.svg"
         toolTipText: qsTr("Settings")
     }

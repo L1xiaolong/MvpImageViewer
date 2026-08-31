@@ -45,6 +45,24 @@ TestCase {
         wait(80);
     }
 
+    function test_topToolbarMatchesComparisonToolbarMetrics() {
+        const toolbar = findChild(browsePage, "topToolbar")
+        const openFolderButton = findChild(toolbar, "openFolderButton")
+        const searchField = findChild(toolbar, "browserSearchField")
+        const settingsButton = findChild(toolbar, "settingsButton")
+        verify(toolbar !== null)
+        verify(openFolderButton !== null)
+        verify(searchField !== null)
+        verify(settingsButton !== null)
+        compare(toolbar.height, 38)
+        compare(openFolderButton.width, 28)
+        compare(openFolderButton.height, 28)
+        compare(openFolderButton.renderedIconSize, 16)
+        compare(searchField.height, 28)
+        compare(settingsButton.width, 28)
+        compare(settingsButton.renderedIconSize, 16)
+    }
+
     function test_galleryThumbnailReceivesLeftAndRightClicks() {
         const thumbnailMouse = findChild(browsePage, "galleryMouse-2");
         verify(thumbnailMouse !== null);

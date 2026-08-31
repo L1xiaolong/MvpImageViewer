@@ -253,6 +253,10 @@ Item {
     AppMenu {
         id: fullScreenContextMenu
         objectName: "fullScreenContextMenu"
+        // Menus can leave focus on their transient popup window after dismissal,
+        // notably on macOS. Restore it so the page keeps receiving Escape and
+        // navigation shortcuts.
+        onClosed: Qt.callLater(function() { root.forceActiveFocus() })
         AppMenuItem { text: qsTr("Cut"); shortcutText: Qt.platform.os === "osx" ? "⌘X" : "Ctrl+X"; onTriggered: root.controller.copyCurrent(true) }
         AppMenuItem { text: qsTr("Copy"); shortcutText: Qt.platform.os === "osx" ? "⌘C" : "Ctrl+C"; onTriggered: root.controller.copyCurrent(false) }
         AppMenuItem { text: qsTr("Rename…"); onTriggered: renameDialog.openWith(root.controller.fileName) }
