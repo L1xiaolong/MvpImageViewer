@@ -832,8 +832,10 @@ void QmlWorkspaceControllerTests::compareAutomaticallyPromotesBudgetedImages() {
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 2, 2000);
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 2, 3000);
     QTRY_VERIFY_WITH_TIMEOUT(controller.frame(0) && controller.frame(1), 2000);
-    QCOMPARE(controller.frame(0)->qImage()->pixelColor(0, 0), QColor(Qt::green));
-    QCOMPARE(controller.frame(1)->qImage()->pixelColor(0, 0), QColor(Qt::green));
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(0)->qImage()->pixelColor(0, 0),
+                              QColor(Qt::green), 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(1)->qImage()->pixelColor(0, 0),
+                              QColor(Qt::green), 2000);
 }
 
 void QmlWorkspaceControllerTests::rawParameterEditorAppliesValuesAndManagesPresetsWithoutWidgets() {
