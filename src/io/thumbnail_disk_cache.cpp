@@ -31,7 +31,7 @@ QImage ThumbnailDiskCache::load(const QString& key) const {
 }
 
 bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
-                               const QSize& sourceSize) const {
+                               const QSize& sourceSize, int validBits) const {
     if (image.isNull()) {
         return false;
     }
@@ -41,6 +41,9 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
                             QString::number(sourceSize.width()));
         storedImage.setText(QStringLiteral("ispview.sourceHeight"),
                             QString::number(sourceSize.height()));
+    }
+    if (validBits > 0) {
+        storedImage.setText(QStringLiteral("ispview.validBits"), QString::number(validBits));
     }
     bool hasTransparency = false;
     if (storedImage.hasAlphaChannel()) {

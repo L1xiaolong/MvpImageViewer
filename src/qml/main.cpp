@@ -11,7 +11,6 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
-#include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QIcon>
@@ -26,6 +25,13 @@
 
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
+#ifdef Q_OS_WIN
+    // Qt defaults to D3D11 on Windows. Some Intel drivers crash while Qt Quick creates
+    // or migrates RHI resources during full-screen and cross-monitor transitions.
+    // OpenGL avoids that driver path while preserving hardware-accelerated rendering.
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+#endif
+    QGuiApplication::setQuitOnLastWindowClosed(false);
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
     QCoreApplication::setApplicationVersion(QStringLiteral(ISPVIEW_PROJECT_VERSION));
@@ -35,17 +41,6 @@ int main(int argc, char* argv[]) {
     ispview::AppSettings appSettings(&app);
     bool lastMainWindowStateWasMaximized =
         settings.value(QStringLiteral("window/maximized"), false).toBool();
-
-    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-Regular.ttf"));
-    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-Bold.ttf"));
-    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/JetBrainsMono-Regular.ttf"));
-
-    QFont defaultFont(QStringLiteral("Inter"));
-    defaultFont.setPointSize(app.font().pointSize());
-    defaultFont.setWeight(QFont::Normal);
-    defaultFont.setStyleStrategy(QFont::PreferAntialias);
-    defaultFont.setHintingPreference(QFont::PreferDefaultHinting);
-    app.setFont(defaultFont);
 
     QString initialDirectory;
     QString screenshotPath;
@@ -131,6 +126,11 @@ int main(int argc, char* argv[]) {
     QObject::connect(&appSettings, &ispview::AppSettings::languageChanged,
                      &engine, &QQmlApplicationEngine::retranslate);
     engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), &appSettings);
+    engine.rootContext()->setContextProperty(QStringLiteral("systemUiFontFamily"),
+                                             app.font().family());
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("systemFixedFontFamily"),
+        QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
     engine.rootContext()->setContextProperty(QStringLiteral("browseController"), &browseController);
     engine.rootContext()->setContextProperty(QStringLiteral("compareController"), &compareController);
     engine.rootContext()->setContextProperty(QStringLiteral("imagePropertiesController"),
@@ -158,10 +158,10 @@ int main(int argc, char* argv[]) {
     if (!mainWindow) {
         return 1;
     }
-    // The hidden full-screen helper Window means quitOnLastWindowClosed cannot be the owner of
-    // application shutdown. QML emits this signal only for a real application close; closing a
-    // compare/full-screen session is deliberately kept inside QML.
-    QObject::connect(mainWindow, SIGNAL(quitApplicationRequested()), &app, SLOT(quit()));
+    // QML emits this signal only for a real application close; closing a compare/full-screen
+    // session is deliberately kept inside QML.
+    QObject::connect(mainWindow, SIGNAL(quitApplicationRequested()), &app, SLOT(quit()),
+                     Qt::QueuedConnection);
     if (lastMainWindowStateWasMaximized) {
         mainWindow->showMaximized();
     } else {
@@ -169,10 +169,8 @@ int main(int argc, char* argv[]) {
     }
     // Remember the most recent stable state so closing from the taskbar still restores to
     // normal/maximized instead of starting minimized.
-    // The QML scene owns an additional hidden full-screen Window on Windows, so Qt's
-    // quitOnLastWindowClosed mechanism cannot reliably terminate the event loop when the main
-    // window is closed. The Hidden fallback is gated by applicationExitPending so rejecting a
-    // compare/full-screen close can never terminate the process.
+    // The Hidden fallback is gated by applicationExitPending so rejecting a compare/full-screen
+    // close can never terminate the process.
     QObject::connect(
         mainWindow, &QWindow::visibilityChanged, &app,
         [mainWindow, &lastMainWindowStateWasMaximized](QWindow::Visibility visibility) {
@@ -189,6 +187,16 @@ int main(int argc, char* argv[]) {
                 lastMainWindowStateWasMaximized = false;
             }
         });
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, mainWindow, [mainWindow] {
+        // Make any transient helper window accept shutdown so none can strand the event loop
+        // after the main window has disappeared.
+        mainWindow->setProperty("forceApplicationClose", true);
+        mainWindow->setProperty("applicationExitPending", true);
+        const auto windows = QGuiApplication::allWindows();
+        for (QWindow* window : windows) {
+            if (window != mainWindow) window->close();
+        }
+    });
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &app,
                      [&lastMainWindowStateWasMaximized] {
                          QSettings().setValue(QStringLiteral("window/maximized"),

@@ -74,7 +74,7 @@ class ImageLoader final : public QObject {
 
   signals:
     void rawParametersChanged(const QString& path);
-    void thumbnailMetadataReady(const QString& path, const QSize& sourceSize);
+    void thumbnailMetadataReady(const QString& path, const QSize& sourceSize, int validBits);
 
   private:
     struct PendingRequest {

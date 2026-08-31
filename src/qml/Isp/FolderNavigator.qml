@@ -21,7 +21,7 @@ Rectangle {
     readonly property color selectionBg: macStyle ? Theme.probeBlue : Theme.explorerSelectionBg
     readonly property color hoverBg: macStyle ? "#12000000" : Theme.explorerSelectionBg
     readonly property color sidebarText: macStyle ? Theme.graphiteInk : Theme.graphiteInk
-    readonly property string nativeFont: macStyle ? ".AppleSystemUIFont" : "Segoe UI"
+    readonly property string nativeFont: Theme.uiFont
 
     objectName: "folderNavigatorSurface"
     color: macStyle ? Theme.softHover : Theme.raisedSurface

@@ -60,12 +60,17 @@ ThumbnailModel::ThumbnailModel(ImageLoader* loader, QObject* parent)
     connect(loader_, &ImageLoader::rawParametersChanged, this,
             [this](const QString& path) { invalidateThumbnail(path); });
     connect(loader_, &ImageLoader::thumbnailMetadataReady, this,
-            [this](const QString& path, const QSize& sourceSize) {
+            [this](const QString& path, const QSize& sourceSize, int validBits) {
                 const int row = pathToRow_.value(path, -1);
-                if (row < 0 || dimensions_.value(path) == sourceSize) return;
+                if (row < 0 || (dimensions_.value(path) == sourceSize &&
+                                bitDepths_.value(path) == validBits)) {
+                    return;
+                }
                 dimensions_.insert(path, sourceSize);
+                bitDepths_.insert(path, validBits);
                 const QModelIndex changed = index(row);
-                emit dataChanged(changed, changed, {DimensionsRole, TechnicalLabelRole});
+                emit dataChanged(changed, changed,
+                                 {DimensionsRole, BitDepthRole, TechnicalLabelRole});
             });
 }
 
@@ -108,6 +113,10 @@ QVariant ThumbnailModel::data(const QModelIndex& index, int role) const {
                          : file.fileType;
     case DimensionsRole:
         return dimensions_.value(file.path);
+    case BitDepthRole:
+        return bitDepths_.value(file.path);
+    case FileSizeTextRole:
+        return file.isDirectory ? QString{} : formattedFileSize(file.fileSize);
     case ThumbnailUrlRole: {
         if (file.isDirectory) {
             return QStringLiteral("qrc:/icons/ui/%1").arg(platformFolderIconName());
@@ -136,8 +145,11 @@ QVariant ThumbnailModel::data(const QModelIndex& index, int role) const {
         const QString type = (file.fileType.isEmpty() ? QFileInfo(file.fileName).suffix()
                                                        : file.fileType)
                                  .toUpper();
-        return QStringLiteral("%1 · %2 · %3")
-            .arg(dimensionText, type, formattedFileSize(file.fileSize));
+        const int bitDepth = bitDepths_.value(file.path);
+        const QString bitDepthText =
+            bitDepth > 0 ? QStringLiteral("%1 bit").arg(bitDepth) : QStringLiteral("Reading…");
+        return QStringLiteral("%1 | %2 | %3 | %4")
+            .arg(type, dimensionText, bitDepthText, formattedFileSize(file.fileSize));
     }
     case SelectedRole:
         return selectedOrdinals_.contains(file.path);
@@ -156,6 +168,8 @@ QHash<int, QByteArray> ThumbnailModel::roleNames() const {
     roles.insert(DirectoryRole, "isDirectory");
     roles.insert(TypeRole, "fileType");
     roles.insert(DimensionsRole, "dimensions");
+    roles.insert(BitDepthRole, "bitDepth");
+    roles.insert(FileSizeTextRole, "fileSizeText");
     roles.insert(ThumbnailUrlRole, "thumbnailUrl");
     roles.insert(FileNameRole, "fileName");
     roles.insert(TechnicalLabelRole, "technicalLabel");
@@ -233,6 +247,7 @@ void ThumbnailModel::setFiles(QVector<ImageFileRecord> files) {
     beginResetModel();
     files_ = std::move(files);
     dimensions_.clear();
+    bitDepths_.clear();
     rebuildPathIndex();
     endResetModel();
 }
@@ -270,6 +285,7 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
                                                     static_cast<int>(files.size())));
     if (changedCount * 5 > referenceCount) {
         QHash<QString, QSize> retainedDimensions;
+        QHash<QString, int> retainedBitDepths;
         for (const auto& incoming : files) {
             const int oldRow = pathToRow_.value(incoming.path, -1);
             if (oldRow < 0) continue;
@@ -277,11 +293,13 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
             if (old.fileSize == incoming.fileSize && old.modifiedAt == incoming.modifiedAt &&
                 dimensions_.contains(incoming.path)) {
                 retainedDimensions.insert(incoming.path, dimensions_.value(incoming.path));
+                retainedBitDepths.insert(incoming.path, bitDepths_.value(incoming.path));
             }
         }
         beginResetModel();
         files_ = files;
         dimensions_ = std::move(retainedDimensions);
+        bitDepths_ = std::move(retainedBitDepths);
         rebuildPathIndex();
         endResetModel();
         return;
@@ -296,6 +314,7 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
         beginRemoveRows({}, static_cast<int>(row), static_cast<int>(row));
         files_.removeAt(row);
         dimensions_.remove(path);
+        bitDepths_.remove(path);
         endRemoveRows();
     }
     rebuildPathIndex();
@@ -309,6 +328,7 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
             existing = incoming;
             if (contentChanged) {
                 dimensions_.remove(incoming.path);
+                bitDepths_.remove(incoming.path);
             }
             const QModelIndex changed = index(row);
             emit dataChanged(changed, changed);
@@ -330,11 +350,12 @@ QString ThumbnailModel::pathAt(int row) const {
 
 void ThumbnailModel::invalidateThumbnail(const QString& path) {
     dimensions_.remove(path);
+    bitDepths_.remove(path);
     const int row = pathToRow_.value(path, -1);
     if (row >= 0) {
         const QModelIndex changed = index(row);
         emit dataChanged(changed, changed,
-                         {Qt::DecorationRole, DimensionsRole, ThumbnailUrlRole,
+                         {Qt::DecorationRole, DimensionsRole, BitDepthRole, ThumbnailUrlRole,
                           TechnicalLabelRole});
     }
 }

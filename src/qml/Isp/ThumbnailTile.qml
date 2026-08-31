@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 // qmllint disable unqualified
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import "."
 
 Item {
@@ -11,6 +12,10 @@ Item {
     property string path
     property string fileName
     property string technicalLabel
+    property string fileType
+    property var dimensions
+    property int bitDepth: 0
+    property string fileSizeText
     property url thumbnailUrl
     property bool directory: false
     property bool selected: false
@@ -22,6 +27,90 @@ Item {
     readonly property bool pathHoverActive: tileMouse.containsMouse
     signal activated
     signal selectionRequested(bool extend, bool toggle)
+
+    component MetadataStrip: Item {
+        id: metadataStrip
+        required property string typeText
+        required property var imageDimensions
+        required property int sourceBitDepth
+        required property string sizeText
+        required property bool directory
+        property string labelObjectName
+        property string badgeObjectName
+
+        readonly property string normalizedType: typeText.toUpperCase()
+        readonly property bool yuvType: normalizedType === "YUV"
+        readonly property bool rawType: normalizedType === "RAW" || normalizedType === "DNG" ||
+                                        normalizedType === "CR2" || normalizedType === "CR3" ||
+                                        normalizedType === "NEF" || normalizedType === "NRW" ||
+                                        normalizedType === "ARW" || normalizedType === "SR2" ||
+                                        normalizedType === "SRF" || normalizedType === "RAF" ||
+                                        normalizedType === "ORF" || normalizedType === "ORW" ||
+                                        normalizedType === "RW2" || normalizedType === "PEF" ||
+                                        normalizedType === "IIQ" || normalizedType === "3FR" ||
+                                        normalizedType === "ERF" || normalizedType === "MEF" ||
+                                        normalizedType === "MOS" || normalizedType === "MRW" ||
+                                        normalizedType === "X3F"
+        readonly property color badgeSurface: yuvType ? Theme.yuvBadgeSurface
+                                                     : rawType ? Theme.rawBadgeSurface
+                                                               : Theme.encodedBadgeSurface
+        readonly property color badgeBorder: yuvType ? Theme.yuvBadgeBorder
+                                                    : rawType ? Theme.rawBadgeBorder
+                                                              : Theme.encodedBadgeBorder
+        readonly property color badgeInk: yuvType ? Theme.yuvBadgeText
+                                                 : rawType ? Theme.rawBadgeText
+                                                           : Theme.encodedBadgeText
+        readonly property string dimensionText:
+            imageDimensions && imageDimensions.width > 0 && imageDimensions.height > 0
+                ? imageDimensions.width + "×" + imageDimensions.height
+                : qsTr("Reading size…")
+        readonly property string depthText: sourceBitDepth > 0
+                                                ? sourceBitDepth + " bit"
+                                                : qsTr("Reading…")
+
+        height: 18
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: 5
+
+            Rectangle {
+                id: typeBadge
+                objectName: metadataStrip.badgeObjectName
+                visible: !metadataStrip.directory
+                Layout.preferredWidth: typeLabel.implicitWidth + 10
+                Layout.preferredHeight: 17
+                radius: 4
+                color: metadataStrip.badgeSurface
+                border.width: 1
+                border.color: metadataStrip.badgeBorder
+
+                Text {
+                    id: typeLabel
+                    anchors.centerIn: parent
+                    text: metadataStrip.normalizedType
+                    color: metadataStrip.badgeInk
+                    font.family: Theme.uiFont
+                    font.pixelSize: 9
+                    font.weight: Font.DemiBold
+                }
+            }
+
+            Text {
+                id: technicalText
+                objectName: metadataStrip.labelObjectName
+                Layout.fillWidth: true
+                text: metadataStrip.directory
+                      ? qsTr("Folder")
+                      : "| " + metadataStrip.dimensionText + " | " +
+                        metadataStrip.depthText + " | " + metadataStrip.sizeText
+                elide: Text.ElideRight
+                color: Theme.mutedInk
+                font.family: Theme.uiFont
+                font.pixelSize: Theme.metadataFontSize
+            }
+        }
+    }
 
     Drag.active: tileDragHandler.active && root.selected
     Drag.dragType: Drag.Automatic
@@ -112,20 +201,19 @@ Item {
                 font.family: Theme.uiFont
                 font.pixelSize: 13
             }
-            Text {
-                id: gridTechnicalLabel
-                objectName: "gridTechnicalLabel"
+            MetadataStrip {
                 visible: root.displayMode !== 2
                 anchors.left: gridName.left
                 anchors.right: gridName.right
                 anchors.top: gridName.bottom
                 anchors.topMargin: 1
-                text: root.technicalLabel
-                elide: Text.ElideRight
-                color: Theme.mutedInk
-                font.family: Theme.monoFont
-                font.pixelSize: Theme.metadataFontSize
-                font.letterSpacing: -0.15
+                typeText: root.fileType
+                imageDimensions: root.dimensions
+                sourceBitDepth: root.bitDepth
+                sizeText: root.fileSizeText
+                directory: root.directory
+                labelObjectName: "gridTechnicalLabel"
+                badgeObjectName: "gridTypeBadge"
             }
         }
     }
@@ -192,19 +280,18 @@ Item {
                 font.pixelSize: 13
                 font.weight: Font.Medium
             }
-            Text {
-                id: listTechnicalLabel
-                objectName: "listTechnicalLabel"
+            MetadataStrip {
                 anchors.left: listName.left
                 anchors.right: listName.right
                 anchors.top: listName.bottom
                 anchors.topMargin: 2
-                text: root.technicalLabel
-                elide: Text.ElideRight
-                color: Theme.mutedInk
-                font.family: Theme.monoFont
-                font.pixelSize: Theme.metadataFontSize
-                font.letterSpacing: -0.15
+                typeText: root.fileType
+                imageDimensions: root.dimensions
+                sourceBitDepth: root.bitDepth
+                sizeText: root.fileSizeText
+                directory: root.directory
+                labelObjectName: "listTechnicalLabel"
+                badgeObjectName: "listTypeBadge"
             }
         }
     }

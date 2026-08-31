@@ -239,6 +239,10 @@ Rectangle {
             required property string path
             required property string fileName
             required property string technicalLabel
+            required property string fileType
+            required property var dimensions
+            required property int bitDepth
+            required property string fileSizeText
             required property url thumbnailUrl
             required property bool isDirectory
             required property bool isSelected
@@ -255,6 +259,10 @@ Rectangle {
                 path: parent.path
                 fileName: parent.fileName
                 technicalLabel: parent.technicalLabel
+                fileType: parent.fileType
+                dimensions: parent.dimensions
+                bitDepth: parent.bitDepth
+                fileSizeText: parent.fileSizeText
                 thumbnailUrl: parent.thumbnailUrl
                 directory: parent.isDirectory
                 selected: parent.isSelected

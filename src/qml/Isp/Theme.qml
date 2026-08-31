@@ -47,6 +47,17 @@ QtObject {
     readonly property color inspectionMutedText: "#DDE7EBEE"
     readonly property color inspectionAccentText: "#FF9BCBFF"
 
+    // Compact file-type badges used by image metadata rows.
+    readonly property color encodedBadgeSurface: darkMode ? "#22364D" : "#E8F1FC"
+    readonly property color encodedBadgeBorder: darkMode ? "#36587A" : "#C5D9F1"
+    readonly property color encodedBadgeText: darkMode ? "#A9CFF4" : "#315F91"
+    readonly property color yuvBadgeSurface: darkMode ? "#203C39" : "#E5F5F2"
+    readonly property color yuvBadgeBorder: darkMode ? "#35605B" : "#B9DED7"
+    readonly property color yuvBadgeText: darkMode ? "#8BD6CA" : "#267266"
+    readonly property color rawBadgeSurface: darkMode ? "#453320" : "#FFF1DE"
+    readonly property color rawBadgeBorder: darkMode ? "#6D4F2D" : "#EDCFA4"
+    readonly property color rawBadgeText: darkMode ? "#F3BE78" : "#955817"
+
     // VS Code-style file tree
     readonly property color explorerSelectionBg: darkMode ? "#094771" : "#E4E6F1"
     readonly property color explorerHoverBg: softHover
@@ -63,6 +74,10 @@ QtObject {
     readonly property int touchTarget: 32
     readonly property int fast: 120
     readonly property int normal: 180
-    readonly property string uiFont: "Inter"
-    readonly property string monoFont: "JetBrains Mono"
+    // The application provides the platform's current UI and fixed-width fonts.
+    // Empty fallbacks keep standalone QML tooling and tests on their own defaults.
+    readonly property string uiFont:
+        typeof systemUiFontFamily !== "undefined" ? systemUiFontFamily : ""
+    readonly property string monoFont:
+        typeof systemFixedFontFamily !== "undefined" ? systemFixedFontFamily : ""
 }

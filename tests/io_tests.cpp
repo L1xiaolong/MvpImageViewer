@@ -795,12 +795,13 @@ void IoTests::thumbnailDiskCacheRoundTripsImage() {
     QImage source(32, 24, QImage::Format_RGBA8888);
     source.fill(QColor(90, 80, 70, 123));
 
-    QVERIFY(cache.store(QStringLiteral("stable-key"), source, QSize(640, 480)));
+    QVERIFY(cache.store(QStringLiteral("stable-key"), source, QSize(640, 480), 12));
     const QImage restored = cache.load(QStringLiteral("stable-key"));
     QCOMPARE(restored.size(), source.size());
     QCOMPARE(restored.pixelColor(4, 5), source.pixelColor(4, 5));
     QCOMPARE(restored.text(QStringLiteral("ispview.sourceWidth")), QStringLiteral("640"));
     QCOMPARE(restored.text(QStringLiteral("ispview.sourceHeight")), QStringLiteral("480"));
+    QCOMPARE(restored.text(QStringLiteral("ispview.validBits")), QStringLiteral("12"));
     QVERIFY(cache.load(QStringLiteral("missing-key")).isNull());
 }
 
@@ -808,7 +809,7 @@ void IoTests::imageLoaderDiskCacheKeepsSourceDimensions() {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("source-size.png"));
-    QImage source(640, 360, QImage::Format_RGBA8888);
+    QImage source(640, 360, QImage::Format_RGBA64);
     source.fill(Qt::cyan);
     QVERIFY(source.save(path));
 
@@ -826,6 +827,7 @@ void IoTests::imageLoaderDiskCacheKeepsSourceDimensions() {
 
     QSize cachedSourceSize;
     QSize cachedPixelSize;
+    int cachedValidBits = 0;
     {
         ImageLoader loader(decoder);
         loader.request(2, {path, DecodePurpose::Thumbnail, QSize(160, 120)},
@@ -833,10 +835,12 @@ void IoTests::imageLoaderDiskCacheKeepsSourceDimensions() {
                            QVERIFY(result.frame != nullptr);
                            cachedSourceSize = result.frame->metadata.sourceSize;
                            cachedPixelSize = result.frame->descriptor.size;
+                           cachedValidBits = result.frame->descriptor.validBits;
                        });
         QTRY_COMPARE_WITH_TIMEOUT(cachedSourceSize, QSize(640, 360), 5000);
     }
     QCOMPARE(cachedPixelSize, QSize(160, 90));
+    QCOMPARE(cachedValidBits, 16);
 }
 
 void IoTests::nv12LimitedRangeProducesReferencePixels() {

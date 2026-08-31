@@ -14,7 +14,7 @@ class ThumbnailDiskCache final {
 
     [[nodiscard]] QImage load(const QString& key) const;
     [[nodiscard]] bool store(const QString& key, const QImage& image,
-                             const QSize& sourceSize = {}) const;
+                             const QSize& sourceSize = {}, int validBits = 0) const;
     [[nodiscard]] QString rootDirectory() const { return rootDirectory_; }
     [[nodiscard]] QString pathForKey(const QString& key) const;
 

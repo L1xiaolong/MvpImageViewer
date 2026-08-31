@@ -131,6 +131,15 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     frame->metadata.format = info.suffix().toUpper();
                     frame->metadata.fileSize = info.size();
                     frame->metadata.modifiedAt = info.lastModified();
+                    frame->descriptor.validBits = request.rawParameters
+                                                      ? request.rawParameters->validBits()
+                                                      : cachedImage
+                                                            .text(QStringLiteral(
+                                                                "ispview.validBits"))
+                                                            .toInt();
+                    if (frame->descriptor.validBits <= 0) {
+                        frame->descriptor.validBits = 8;
+                    }
                     if (request.rawParameters && request.rawParameters->size.isValid()) {
                         frame->metadata.sourceSize = request.rawParameters->size;
                     } else {
@@ -165,10 +174,13 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                         const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                      ? result.frame->metadata.sourceSize
                                                      : result.frame->descriptor.size;
+                        const int validBits = result.frame->rawParameters
+                                                  ? result.frame->rawParameters->validBits()
+                                                  : result.frame->descriptor.validBits;
                         const QImage cacheImage = *image;
                         QThreadPool::globalInstance()->start(
-                            [diskCache, key, cacheImage, sourceSize] {
-                                (void)diskCache->store(key, cacheImage, sourceSize);
+                            [diskCache, key, cacheImage, sourceSize, validBits] {
+                                (void)diskCache->store(key, cacheImage, sourceSize, validBits);
                             },
                             -80);
                     }
@@ -191,7 +203,10 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                          ? result.frame->metadata.sourceSize
                                                          : result.frame->descriptor.size;
-                            emit self->thumbnailMetadataReady(sourcePath, sourceSize);
+                            const int validBits = result.frame->rawParameters
+                                                      ? result.frame->rawParameters->validBits()
+                                                      : result.frame->descriptor.validBits;
+                            emit self->thumbnailMetadataReady(sourcePath, sourceSize, validBits);
                         }
                     }
                     const auto current = self->inFlight_.constFind(key);

@@ -31,6 +31,10 @@ ApplicationWindow {
     palette.link: Theme.probeBlue
     property bool showingCompare: false
     property bool showingFullScreen: false
+    property bool fullScreenTransitioning: false
+    property bool enteringFullScreen: false
+    property var pendingFullScreenPaths: []
+    property int pendingFullScreenIndex: 0
     property bool forceApplicationClose: false
     property bool applicationExitPending: false
     property int visibilityBeforeFullScreen: Window.Windowed
@@ -47,22 +51,56 @@ ApplicationWindow {
         value: appSettings.canvasBackground
     }
 
-    function openFullScreen(paths, initialIndex) {
-        showingCompare = false
-        showingFullScreen = true
-        if (Qt.platform.os === "osx") {
-            // On macOS, hiding a separate window while Cocoa is still leaving its native
-            // full-screen Space can strand an all-black Space and keep the application alive.
-            // Use the main window there so Cocoa owns one uninterrupted full-screen transition.
-            visibilityBeforeFullScreen = visibility
-            showFullScreen()
-        } else {
-            // Keep the main window's native state untouched on Windows. A separate full-screen
-            // window avoids the Maximize <-> FullScreen transition that makes the QML scene and
-            // image canvas resize twice.
-            fullScreenWindow.showFullScreen()
+    function screenAtWindowCenter() {
+        const centerX = x + width / 2
+        const centerY = y + height / 2
+        const screens = Qt.application.screens
+        for (let i = 0; i < screens.length; ++i) {
+            const candidate = screens[i]
+            if (centerX >= candidate.virtualX && centerX < candidate.virtualX + candidate.width
+                    && centerY >= candidate.virtualY
+                    && centerY < candidate.virtualY + candidate.height)
+                return candidate
         }
-        fullScreenPage.open(paths, initialIndex)
+        return screen
+    }
+
+    function completeFullScreenOpen() {
+        if (!fullScreenTransitioning || !enteringFullScreen
+                || visibility !== Window.FullScreen)
+            return
+
+        // Only create the image canvas after the native window has reached its final size.
+        // Otherwise the first image is visibly fitted twice (windowed, then full-screen).
+        fullScreenPage.open(pendingFullScreenPaths, pendingFullScreenIndex)
+        pendingFullScreenPaths = []
+        showingFullScreen = true
+        enteringFullScreen = false
+        fullScreenTransitioning = false
+    }
+
+    function openFullScreen(paths, initialIndex) {
+        if (showingFullScreen || fullScreenTransitioning)
+            return
+        showingCompare = false
+        // Full-screen the main window itself. This guarantees the viewer uses the exact same
+        // physical display and avoids migrating a second GPU-backed QQuickWindow across screens.
+        const targetScreen = screenAtWindowCenter()
+        if (targetScreen)
+            screen = targetScreen
+        visibilityBeforeFullScreen = visibility
+        pendingFullScreenPaths = paths
+        pendingFullScreenIndex = initialIndex
+        enteringFullScreen = true
+        fullScreenTransitioning = true
+        // Give the platform one event-loop turn to apply the selected screen before changing
+        // window state. The transition cover prevents intermediate geometry from flashing.
+        Qt.callLater(function() {
+            if (!window.enteringFullScreen)
+                return
+            window.showFullScreen()
+            Qt.callLater(function() { window.completeFullScreenOpen() })
+        })
     }
 
     function closeCompare() {
@@ -79,21 +117,34 @@ ApplicationWindow {
             return
 
         fullScreenController.closeSession()
+        fullScreenTransitioning = true
+        enteringFullScreen = false
         showingFullScreen = false
-        if (Qt.platform.os === "osx") {
-            if (visibilityBeforeFullScreen === Window.Maximized)
-                showMaximized()
-            else if (visibilityBeforeFullScreen === Window.FullScreen)
-                showFullScreen()
-            else
-                showNormal()
-        } else {
-            // The main window never changed state, so closing the viewer is just a hide
-            // operation. This keeps the maximized main page at one stable size.
-            fullScreenWindow.hide()
-        }
-        browseController.refreshAll()
-        Qt.callLater(function() { browsePage.forceActiveFocus() })
+        if (visibilityBeforeFullScreen === Window.Maximized)
+            showMaximized()
+        else if (visibilityBeforeFullScreen === Window.FullScreen)
+            showFullScreen()
+        else
+            showNormal()
+        Qt.callLater(function() {
+            window.fullScreenTransitioning = false
+            browseController.refreshAll()
+            browsePage.forceActiveFocus()
+        })
+    }
+
+    function beginApplicationExit() {
+        if (applicationExitPending)
+            return
+        applicationExitPending = true
+        compareController.closeSession()
+        fullScreenController.closeSession()
+        pendingFullScreenPaths = []
+        fullScreenTransitioning = false
+        enteringFullScreen = false
+        showingCompare = false
+        showingFullScreen = false
+        quitApplicationRequested()
     }
 
     onClosing: function(close) {
@@ -112,10 +163,12 @@ ApplicationWindow {
         }
 
         close.accepted = true
-        applicationExitPending = true
-        compareController.closeSession()
-        fullScreenController.closeSession()
-        quitApplicationRequested()
+        beginApplicationExit()
+    }
+    onVisibilityChanged: {
+        if (fullScreenTransitioning && enteringFullScreen
+                && visibility === Window.FullScreen)
+            Qt.callLater(function() { window.completeFullScreenOpen() })
     }
 
     Component.onCompleted: {
@@ -160,28 +213,21 @@ ApplicationWindow {
         onCloseRequested: window.closeCompare()
     }
 
-    Window {
-        id: fullScreenWindow
-        objectName: "qmlFullScreenWindow"
-        visible: false
-        color: Theme.canvasBackground
-        flags: Qt.Window | Qt.FramelessWindowHint
-        transientParent: window
-
-        onClosing: function(close) {
-            close.accepted = false
-            window.closeFullScreen()
-        }
-    }
     FullScreenPage {
         id: fullScreenPage
         controller: fullScreenController
         propertiesController: imagePropertiesController
         settingsController: appSettings
-        parent: Qt.platform.os === "osx" ? window.contentItem : fullScreenWindow.contentItem
+        parent: window.contentItem
         anchors.fill: parent
         visible: window.showingFullScreen
         onCloseRequested: window.closeFullScreen()
+    }
+    Rectangle {
+        anchors.fill: parent
+        visible: window.fullScreenTransitioning
+        color: Theme.canvasBackground
+        z: 10000
     }
     Connections {
         target: fullScreenController

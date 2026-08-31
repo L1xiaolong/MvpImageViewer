@@ -165,6 +165,25 @@ TestCase {
         displayMode: 0
     }
 
+    ThumbnailTile {
+        id: metadataTile
+        visible: false
+        x: 1060
+        y: 620
+        width: 220
+        controller: testCase.mockController
+        workspaceController: mockWorkspace
+        path: "/Images/sample.png"
+        fileName: "sample.png"
+        technicalLabel: "PNG | 1920×1080 | 10 bit | 12.4 MB"
+        fileType: "PNG"
+        dimensions: Qt.size(1920, 1080)
+        bitDepth: 10
+        fileSizeText: "12.4 MB"
+        directory: false
+        displayMode: 0
+    }
+
     function test_folderNavigatorUsesNativePlatformOrganization() {
         const navigator = findChild(browsePage, "folderNavigator")
         const recentHeading = findChild(navigator, "nativeRecentHeading")
@@ -246,6 +265,30 @@ TestCase {
         tryCompare(directoryTile, "pathHoverActive", true, 1000)
         mouseMove(browsePage, browsePage.width / 2, browsePage.height / 2)
         directoryTile.visible = false
+    }
+
+    function test_thumbnailMetadataUsesColoredTypeBadges() {
+        metadataTile.displayMode = 0
+        metadataTile.fileType = "PNG"
+        wait(0)
+        const badge = findChild(metadataTile, "gridTypeBadge")
+        const details = findChild(metadataTile, "gridTechnicalLabel")
+        verify(badge !== null)
+        verify(details !== null)
+        compare(badge.radius, 4)
+        compare(badge.border.width, 1)
+        compare(badge.color, Theme.encodedBadgeSurface)
+        compare(details.text, "| 1920×1080 | 10 bit | 12.4 MB")
+
+        metadataTile.fileType = "YUV"
+        wait(0)
+        compare(badge.color, Theme.yuvBadgeSurface)
+
+        metadataTile.fileType = "RAW"
+        wait(0)
+        compare(badge.color, Theme.rawBadgeSurface)
+        verify(Theme.rawBadgeSurface !== Theme.yuvBadgeSurface)
+        verify(Theme.yuvBadgeSurface !== Theme.encodedBadgeSurface)
     }
 
     function test_propertiesAndRawCardsCanBeDraggedByTheirHeaders() {

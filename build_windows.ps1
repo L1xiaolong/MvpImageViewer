@@ -134,6 +134,17 @@ function Publish-WindowsPackage {
     & $deployQt --release --compiler-runtime --qmldir (Join-Path $ScriptDir "src\qml") $targetExe
     if ($LASTEXITCODE -ne 0) { throw "windeployqt failed with exit code $LASTEXITCODE" }
 
+    # MSYS2's development layout stores QML modules under share\qt6, while
+    # windeployqt copies them to qml\ beside the executable. Pin relocatable
+    # runtime paths so a copied package never uses the build-time Qt prefix.
+    Set-Content -LiteralPath (Join-Path $stageDir "qt.conf") -Encoding Ascii -Value @"
+[Paths]
+Prefix=.
+Plugins=.
+QmlImports=qml
+Translations=translations
+"@
+
     Write-Host "Pruning optional Qt styles, QML modules, and plugins"
     cmake "-DPACKAGE_ROOT=$stageDir" "-DPACKAGE_PLATFORM=windows" `
         -P (Join-Path $ScriptDir "scripts\prune_qt_runtime.cmake")
@@ -171,6 +182,22 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq "Core") {
     throw "build_windows.ps1 must be run on Windows."
 }
 
+# GNU windres uses ComSpec to launch its C preprocessor. Some automation
+# environments omit it even on Windows, which otherwise surfaces as a
+# misleading "can't popen ... Bad file descriptor" error.
+if ([string]::IsNullOrWhiteSpace($env:ComSpec)) {
+    $systemRoot = if ([string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+        $env:windir
+    } else {
+        $env:SystemRoot
+    }
+    $commandProcessor = Join-Path $systemRoot "System32\cmd.exe"
+    if (Test-Path -LiteralPath $commandProcessor) {
+        $env:ComSpec = $commandProcessor
+        $env:Path = "$(Split-Path -Parent $commandProcessor);$env:Path"
+    }
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
@@ -191,7 +218,8 @@ if ($Toolchain -eq "msys2") {
 
     $Msys2Ucrt64 = (Resolve-Path -LiteralPath $Msys2Ucrt64).Path
     $qtBin = Join-Path $Msys2Ucrt64 "bin"
-    $env:Path = "$qtBin;$env:Path"
+    $qtLibExecs = Join-Path $Msys2Ucrt64 "share\qt6\bin"
+    $env:Path = "$qtLibExecs;$qtBin;$env:Path"
     $BuildDir = Join-Path $ScriptDir "build\windows-msys2-$BuildMode"
     if ($Clean -and (Test-Path -LiteralPath $BuildDir)) {
         Write-Host "Removing build directory: $BuildDir"

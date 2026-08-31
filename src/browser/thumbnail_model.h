@@ -23,6 +23,8 @@ class ThumbnailModel final : public QAbstractListModel {
         DirectoryRole,
         TypeRole,
         DimensionsRole,
+        BitDepthRole,
+        FileSizeTextRole,
         ThumbnailUrlRole,
         FileNameRole,
         TechnicalLabelRole,
@@ -55,6 +57,7 @@ class ThumbnailModel final : public QAbstractListModel {
     QVector<ImageFileRecord> files_;
     QHash<QString, int> pathToRow_;
     mutable QHash<QString, QSize> dimensions_;
+    mutable QHash<QString, int> bitDepths_;
     QStringList selectedPaths_;
     QHash<QString, int> selectedOrdinals_;
     QPixmap placeholder_;
