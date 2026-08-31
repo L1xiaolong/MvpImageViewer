@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(ISPImageViewer VERSION 0.2.6 LANGUAGES CXX)
+project(ISPImageViewer VERSION 0.2.7 LANGUAGES CXX)
 
 option(ISPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
 option(ISPVIEW_ENABLE_LIBRAW "Enable camera RAW decoding when LibRaw is available" ON)
