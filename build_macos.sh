@@ -274,11 +274,26 @@ if [[ -n "$dbus_source" && "$dbus_source" == /* ]]; then
     install_name_tool -id "@executable_path/../Frameworks/$dbus_name" "$dbus_target"
 fi
 
+echo "Pruning unused Qt plugins before dependency relocation"
+cmake \
+    -DPACKAGE_ROOT="$staged_app" \
+    -DPACKAGE_PLATFORM=macos \
+    -P "$script_dir/scripts/prune_qt_runtime.cmake"
+
 # macdeployqt cannot rewrite frameworks that were absent during its scan. Relocate every
 # package-manager dependency after completing the QML plugin closure. A local dependency that
 # was not bundled is a packaging error, rather than something an end-user machine can resolve.
 echo "Relocating the completed Qt dependency closure"
-while IFS= read -r -d '' macho_binary; do
+macho_candidates=()
+while IFS= read -r -d '' macho_candidate; do
+    macho_candidates+=("$macho_candidate")
+done < <(find "$staged_app/Contents/MacOS" \
+              "$staged_app/Contents/Frameworks" \
+              "$staged_app/Contents/PlugIns" \
+              "$staged_app/Contents/Resources/qml" \
+              -type f -print0)
+
+for macho_binary in "${macho_candidates[@]}"; do
     if ! file -b "$macho_binary" | grep -q 'Mach-O'; then
         continue
     fi
@@ -311,11 +326,7 @@ while IFS= read -r -d '' macho_binary; do
         fi
         install_name_tool -change "$local_dependency" "$relocated_dependency" "$macho_binary"
     done < <(otool -L "$macho_binary" | awk 'NR > 1 { print $1 }')
-done < <(find "$staged_app/Contents/MacOS" \
-              "$staged_app/Contents/Frameworks" \
-              "$staged_app/Contents/PlugIns" \
-              "$staged_app/Contents/Resources/qml" \
-              -type f -print0)
+done
 
 for framework_path in "$staged_app"/Contents/Frameworks/*.framework; do
     [[ -d "$framework_path" ]] || continue
@@ -333,12 +344,6 @@ for dylib_path in "$staged_app"/Contents/Frameworks/*.dylib; do
         "@executable_path/../Frameworks/$(basename "$dylib_path")" \
         "$dylib_path"
 done
-
-echo "Pruning optional Qt modules and verifying the retained runtime"
-cmake \
-    -DPACKAGE_ROOT="$staged_app" \
-    -DPACKAGE_PLATFORM=macos \
-    -P "$script_dir/scripts/prune_qt_runtime.cmake"
 
 app_binary="$staged_app/Contents/MacOS/MVPImageViewer"
 if ! lipo -archs "$app_binary" | tr ' ' '\n' | grep -Fxq arm64; then

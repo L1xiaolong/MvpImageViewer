@@ -166,11 +166,13 @@ remove_plugins("imageformats"
 remove_paths(
     "PlugIns/networkinformation"
     "PlugIns/platforminputcontexts"
+    "PlugIns/sqldrivers"
 )
 if(PACKAGE_PLATFORM STREQUAL "windows")
     remove_paths(
         "networkinformation"
         "platforminputcontexts"
+        "sqldrivers"
     )
 endif()
 
