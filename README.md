@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/app_icon.png" width="128" alt="MVP Image Viewer 图标">
+  <img src="assets/brand/logo.svg" width="128" alt="MVP Image Viewer 图标">
 </p>
 
 <h1 align="center">MVP Image Viewer</h1>

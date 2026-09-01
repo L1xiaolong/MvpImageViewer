@@ -9,7 +9,7 @@
   <title id="logo-title">Butterfly Compare Logo</title>
   <desc id="logo-description">
     A symmetric abstract butterfly formed by two mirrored folded ribbons in
-    indigo and cyan, presented on a white rounded-square app icon.
+    indigo and cyan on a transparent background.
   </desc>
 
   <defs>
@@ -76,18 +76,8 @@
     </linearGradient>
   </defs>
 
-  <!-- Scale the complete artwork around the canvas center for balanced macOS Dock sizing. -->
-  <g transform="translate(50.16 50.16) scale(0.92)">
-    <!-- Transparent outer margin keeps the rounded plate crisp on macOS and Windows. -->
-    <rect x="68"
-          y="68"
-          width="1118"
-          height="1118"
-          rx="250"
-          fill="#FFFFFF"
-          stroke="#E3E8EF"
-          stroke-width="10"/>
-
+  <!-- Fill the canvas vertically while preserving the butterfly's proportions. -->
+  <g transform="translate(627 627) scale(1.806916) translate(-627 -635)">
     <g shape-rendering="geometricPrecision">
       <use xlink:href="#ribbon-half" fill="url(#indigo-ribbon)"/>
       <use xlink:href="#fold-half" fill="url(#indigo-fold)"/>
