@@ -86,15 +86,36 @@ def prepare_raster_source(source: Path, output_root: Path) -> Path:
 
 def generate_macos_icns(source: Path, output_root: Path) -> None:
     try:
-        from PIL import Image
+        from PIL import Image, ImageDraw
     except ImportError as exc:
         raise RuntimeError("macOS .icns generation requires Pillow: python3 -m pip install Pillow") from exc
 
     macos_dir = output_root / "icons" / "macos"
     macos_dir.mkdir(parents=True, exist_ok=True)
     with Image.open(source) as image:
-        image = image.convert("RGBA")
-        image.save(
+        logo = image.convert("RGBA")
+        canvas_size = 1024
+        canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(canvas)
+
+        # macOS artwork deliberately includes its own rounded white tile and
+        # optical padding. Windows continues to use the transparent source.
+        tile_bounds = (88, 88, 936, 936)
+        draw.rounded_rectangle(
+            tile_bounds,
+            radius=190,
+            fill=(255, 255, 255, 255),
+            outline=(229, 233, 241, 255),
+            width=8,
+        )
+
+        logo.thumbnail((512, 512), Image.Resampling.LANCZOS)
+        logo_position = (
+            (canvas_size - logo.width) // 2,
+            (canvas_size - logo.height) // 2,
+        )
+        canvas.alpha_composite(logo, logo_position)
+        canvas.save(
             macos_dir / "ISPImageViewer.icns",
             format="ICNS",
             sizes=[(size, size) for size in MACOS_ICNS_SIZES],

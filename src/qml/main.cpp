@@ -35,7 +35,12 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
     QCoreApplication::setApplicationVersion(QStringLiteral(ISPVIEW_PROJECT_VERSION));
+#ifndef Q_OS_MACOS
+    // macOS should keep the icon declared by CFBundleIconFile for the whole
+    // application lifetime. Setting the generic runtime PNG here replaces the
+    // padded macOS artwork in the Dock after launch.
     app.setWindowIcon(QIcon(QStringLiteral(":/brand/app_icon.png")));
+#endif
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QSettings settings;
     ispview::AppSettings appSettings(&app);
