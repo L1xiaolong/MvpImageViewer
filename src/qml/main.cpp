@@ -1,4 +1,5 @@
 #include "io/default_image_decoder.h"
+#include "platform/full_screen_presentation_controller.h"
 #include "qml/app_settings.h"
 #include "qml/browse_controller.h"
 #include "qml/browse_workspace_controller.h"
@@ -119,6 +120,7 @@ int main(int argc, char* argv[]) {
     ispview::CompareController compareController(browseController.loader());
     ispview::ImagePropertiesController imagePropertiesController(browseController.loader());
     ispview::FullScreenController fullScreenController(browseController.loader());
+    ispview::FullScreenPresentationController fullScreenPresentationController;
     ispview::RawParametersController rawParametersController(browseController.loader());
     QObject::connect(&appSettings, &ispview::AppSettings::colorDisplayChanged, &app, [&] {
         browseController.loader()->clearCache();
@@ -142,6 +144,8 @@ int main(int argc, char* argv[]) {
                                              &imagePropertiesController);
     engine.rootContext()->setContextProperty(QStringLiteral("fullScreenController"),
                                              &fullScreenController);
+    engine.rootContext()->setContextProperty(QStringLiteral("fullScreenPresentationController"),
+                                             &fullScreenPresentationController);
     engine.rootContext()->setContextProperty(QStringLiteral("rawParametersController"),
                                              &rawParametersController);
     engine.rootContext()->setContextProperty(QStringLiteral("initialComparePaths"), initialComparePaths);

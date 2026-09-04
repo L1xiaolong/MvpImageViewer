@@ -1,6 +1,7 @@
 #include "io/qt_image_decoder.h"
 #include "io/encoded_color_management.h"
 #include "io/image_loader.h"
+#include "platform/full_screen_presentation_controller.h"
 #include "qml/browse_controller.h"
 #include "qml/app_settings.h"
 #include "qml/browse_workspace_controller.h"
@@ -125,6 +126,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void galleryUsesPreviewUntilPixelProbeRequestsFullResolution();
     void browseFileDialogsAreRequestedByQmlAndActionsStayInBackend();
     void imagePropertiesAreExposedWithoutWidgetUi();
+    void fullScreenPresentationLifecycleIsIdempotent();
     void fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml();
     void fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution();
     void fullScreenAutomaticallyPromotesBudgetedImageAfterNavigationSettles();
@@ -691,6 +693,30 @@ void QmlWorkspaceControllerTests::imagePropertiesAreExposedWithoutWidgetUi() {
     QCOMPARE(properties.directory(), true);
     QCOMPARE(properties.basicFields().size(), 3);
     QVERIFY(properties.exifFields().isEmpty());
+}
+
+void QmlWorkspaceControllerTests::fullScreenPresentationLifecycleIsIdempotent() {
+    FullScreenPresentationController controller;
+    QSignalSpy activeSpy(&controller, &FullScreenPresentationController::activeChanged);
+    QWindow window;
+
+    QVERIFY(!controller.active());
+    QVERIFY(!controller.begin(nullptr));
+    QVERIFY(controller.begin(&window));
+    QVERIFY(controller.active());
+    QCOMPARE(activeSpy.size(), 1);
+
+    QVERIFY(controller.begin(&window));
+    QVERIFY(controller.active());
+    QCOMPARE(activeSpy.size(), 1);
+
+    controller.end();
+    QVERIFY(!controller.active());
+    QCOMPARE(activeSpy.size(), 2);
+
+    controller.end();
+    QVERIFY(!controller.active());
+    QCOMPARE(activeSpy.size(), 2);
 }
 
 void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml() {

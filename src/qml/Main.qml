@@ -33,6 +33,7 @@ ApplicationWindow {
     property bool showingFullScreen: false
     property bool fullScreenTransitioning: false
     property bool enteringFullScreen: false
+    property bool instantFullScreenActive: false
     property var pendingFullScreenPaths: []
     property int pendingFullScreenIndex: 0
     property bool forceApplicationClose: false
@@ -67,7 +68,9 @@ ApplicationWindow {
 
     function completeFullScreenOpen() {
         if (!fullScreenTransitioning || !enteringFullScreen
-                || visibility !== Window.FullScreen)
+                || (instantFullScreenActive
+                    ? !fullScreenPresentationController.active
+                    : visibility !== Window.FullScreen))
             return
 
         // Only create the image canvas after the native window has reached its final size.
@@ -83,22 +86,34 @@ ApplicationWindow {
         if (showingFullScreen || fullScreenTransitioning)
             return
         showingCompare = false
-        // Full-screen the main window itself. This guarantees the viewer uses the exact same
-        // physical display and avoids migrating a second GPU-backed QQuickWindow across screens.
         const targetScreen = screenAtWindowCenter()
-        if (targetScreen)
-            screen = targetScreen
         visibilityBeforeFullScreen = visibility
+        // Native macOS full screen always changes Spaces with a long system animation. Turn the
+        // existing Cocoa window into a borderless full-display window instead, so there is no
+        // second white window and no incomplete transient-window coverage. A main window already
+        // in its native full-screen Space keeps the cheaper in-place page switch.
+        instantFullScreenActive = Qt.platform.os === "osx"
+                && visibilityBeforeFullScreen !== Window.FullScreen
         pendingFullScreenPaths = paths
         pendingFullScreenIndex = initialIndex
         enteringFullScreen = true
         fullScreenTransitioning = true
-        // Give the platform one event-loop turn to apply the selected screen before changing
-        // window state. The transition cover prevents intermediate geometry from flashing.
+        // Give the transition cover one event-loop turn before changing the native frame. The
+        // viewer is created only after Cocoa has synchronously applied the final geometry.
         Qt.callLater(function() {
             if (!window.enteringFullScreen)
                 return
-            window.showFullScreen()
+            if (window.instantFullScreenActive
+                    && !fullScreenPresentationController.begin(window)) {
+                window.instantFullScreenActive = false
+            }
+            if (!window.instantFullScreenActive) {
+                // The native path uses the main window itself. Select its current physical
+                // display before changing state so Qt never migrates the image canvas later.
+                if (targetScreen)
+                    window.screen = targetScreen
+                window.showFullScreen()
+            }
             Qt.callLater(function() { window.completeFullScreenOpen() })
         })
     }
@@ -120,13 +135,17 @@ ApplicationWindow {
         fullScreenTransitioning = true
         enteringFullScreen = false
         showingFullScreen = false
-        if (visibilityBeforeFullScreen === Window.Maximized)
+        if (instantFullScreenActive) {
+            fullScreenPresentationController.end()
+        } else if (visibilityBeforeFullScreen === Window.Maximized) {
             showMaximized()
-        else if (visibilityBeforeFullScreen === Window.FullScreen)
+        } else if (visibilityBeforeFullScreen === Window.FullScreen) {
             showFullScreen()
-        else
+        } else {
             showNormal()
+        }
         Qt.callLater(function() {
+            window.instantFullScreenActive = false
             window.fullScreenTransitioning = false
             browseController.refreshAll()
             browsePage.forceActiveFocus()
@@ -139,9 +158,13 @@ ApplicationWindow {
         applicationExitPending = true
         compareController.closeSession()
         fullScreenController.closeSession()
+        if (instantFullScreenActive) {
+            fullScreenPresentationController.end()
+        }
         pendingFullScreenPaths = []
         fullScreenTransitioning = false
         enteringFullScreen = false
+        instantFullScreenActive = false
         showingCompare = false
         showingFullScreen = false
         quitApplicationRequested()
@@ -167,7 +190,7 @@ ApplicationWindow {
     }
     onVisibilityChanged: {
         if (fullScreenTransitioning && enteringFullScreen
-                && visibility === Window.FullScreen)
+                && window.visibility === Window.FullScreen)
             Qt.callLater(function() { window.completeFullScreenOpen() })
     }
 
