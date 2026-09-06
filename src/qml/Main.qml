@@ -88,18 +88,18 @@ ApplicationWindow {
         showingCompare = false
         const targetScreen = screenAtWindowCenter()
         visibilityBeforeFullScreen = visibility
-        // Native macOS full screen always changes Spaces with a long system animation. Turn the
-        // existing Cocoa window into a borderless full-display window instead, so there is no
-        // second white window and no incomplete transient-window coverage. A main window already
-        // in its native full-screen Space keeps the cheaper in-place page switch.
-        instantFullScreenActive = Qt.platform.os === "osx"
+        // Native full screen can add a long system transition. Turn the existing Cocoa window or
+        // Windows HWND into a borderless full-display window instead, so there is no second white
+        // window and no incomplete transient-window coverage. A main window already in its native
+        // full-screen state keeps the cheaper in-place page switch.
+        instantFullScreenActive = (Qt.platform.os === "osx" || Qt.platform.os === "windows")
                 && visibilityBeforeFullScreen !== Window.FullScreen
         pendingFullScreenPaths = paths
         pendingFullScreenIndex = initialIndex
         enteringFullScreen = true
         fullScreenTransitioning = true
         // Give the transition cover one event-loop turn before changing the native frame. The
-        // viewer is created only after Cocoa has synchronously applied the final geometry.
+        // viewer is created only after the platform has synchronously applied the final geometry.
         Qt.callLater(function() {
             if (!window.enteringFullScreen)
                 return

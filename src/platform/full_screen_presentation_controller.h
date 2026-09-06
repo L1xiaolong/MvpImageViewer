@@ -5,10 +5,12 @@
 #include <QRectF>
 #include <QWindow>
 
+#include <memory>
+
 namespace ispview {
 
-// Turns an existing Cocoa window into a borderless full-display window without entering a
-// native full-screen Space, then restores its exact native frame and decoration on exit.
+// Turns an existing native window into a borderless full-display window without entering the
+// platform's animated full-screen state, then restores its exact placement and decoration.
 class FullScreenPresentationController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool active READ active NOTIFY activeChanged)
@@ -37,6 +39,11 @@ class FullScreenPresentationController final : public QObject {
     bool previousHasShadow_ = true;
     bool previousMovable_ = true;
     bool nativeStateCaptured_ = false;
+#endif
+#ifdef Q_OS_WIN
+    struct WindowsState;
+    static void restoreWindowsState(const WindowsState& state);
+    std::unique_ptr<WindowsState> windowsState_;
 #endif
 };
 
