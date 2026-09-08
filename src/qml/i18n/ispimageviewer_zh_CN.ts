@@ -62,236 +62,236 @@
         <translation>类型</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="215"/>
+        <location filename="../Pages/BrowsePage.qml" line="220"/>
         <source>Open folder…</source>
         <translation>打开文件夹…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="219"/>
+        <location filename="../Pages/BrowsePage.qml" line="224"/>
         <source>Back</source>
         <translation>后退</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="224"/>
+        <location filename="../Pages/BrowsePage.qml" line="229"/>
         <source>Forward</source>
         <translation>前进</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="229"/>
+        <location filename="../Pages/BrowsePage.qml" line="234"/>
         <source>Parent folder</source>
         <translation>上级文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="235"/>
+        <location filename="../Pages/BrowsePage.qml" line="240"/>
         <source>Add file manager</source>
         <translation>添加文件管理器</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="694"/>
+        <location filename="../Pages/BrowsePage.qml" line="723"/>
         <source>1:1</source>
         <translation>1:1</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="725"/>
+        <location filename="../Pages/BrowsePage.qml" line="754"/>
         <source>Fit</source>
         <translation>适应窗口</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="752"/>
+        <location filename="../Pages/BrowsePage.qml" line="781"/>
         <source>↗</source>
         <translation>↗</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="759"/>
-        <location filename="../Pages/BrowsePage.qml" line="1294"/>
-        <location filename="../Pages/BrowsePage.qml" line="1344"/>
+        <location filename="../Pages/BrowsePage.qml" line="788"/>
+        <location filename="../Pages/BrowsePage.qml" line="1316"/>
+        <location filename="../Pages/BrowsePage.qml" line="1366"/>
         <source>Open full screen</source>
         <translation>全屏打开</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1237"/>
+        <location filename="../Pages/BrowsePage.qml" line="1259"/>
         <source>Open in Finder</source>
         <translation>在 Finder 中打开</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1238"/>
+        <location filename="../Pages/BrowsePage.qml" line="1260"/>
         <source>Open in File Explorer</source>
         <translation>在文件资源管理器中打开</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1243"/>
+        <location filename="../Pages/BrowsePage.qml" line="1265"/>
         <source>Refresh</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1248"/>
+        <location filename="../Pages/BrowsePage.qml" line="1270"/>
         <source>Select all</source>
         <translation>全选</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1253"/>
+        <location filename="../Pages/BrowsePage.qml" line="1275"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1260"/>
+        <location filename="../Pages/BrowsePage.qml" line="1282"/>
         <source>New folder…</source>
         <translation>新建文件夹…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1266"/>
+        <location filename="../Pages/BrowsePage.qml" line="1288"/>
         <source>Sort by</source>
         <translation>排序方式</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1298"/>
-        <location filename="../Pages/BrowsePage.qml" line="1345"/>
+        <location filename="../Pages/BrowsePage.qml" line="1320"/>
+        <location filename="../Pages/BrowsePage.qml" line="1367"/>
         <source>Compare selected</source>
         <translation>对比所选图片</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1304"/>
-        <location filename="../Pages/BrowsePage.qml" line="1347"/>
+        <location filename="../Pages/BrowsePage.qml" line="1326"/>
+        <location filename="../Pages/BrowsePage.qml" line="1369"/>
         <source>Restore original</source>
         <translation>恢复原图</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1309"/>
-        <location filename="../Pages/BrowsePage.qml" line="1349"/>
-        <location filename="../Pages/BrowsePage.qml" line="1373"/>
+        <location filename="../Pages/BrowsePage.qml" line="1331"/>
+        <location filename="../Pages/BrowsePage.qml" line="1371"/>
+        <location filename="../Pages/BrowsePage.qml" line="1395"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1314"/>
-        <location filename="../Pages/BrowsePage.qml" line="1350"/>
-        <location filename="../Pages/BrowsePage.qml" line="1378"/>
-        <location filename="../Pages/BrowsePage.qml" line="1528"/>
+        <location filename="../Pages/BrowsePage.qml" line="1336"/>
+        <location filename="../Pages/BrowsePage.qml" line="1372"/>
+        <location filename="../Pages/BrowsePage.qml" line="1400"/>
+        <location filename="../Pages/BrowsePage.qml" line="1550"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1319"/>
-        <location filename="../Pages/BrowsePage.qml" line="1351"/>
-        <location filename="../Pages/BrowsePage.qml" line="1383"/>
+        <location filename="../Pages/BrowsePage.qml" line="1341"/>
+        <location filename="../Pages/BrowsePage.qml" line="1373"/>
+        <location filename="../Pages/BrowsePage.qml" line="1405"/>
         <source>Rename…</source>
         <translation>重命名…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1324"/>
-        <location filename="../Pages/BrowsePage.qml" line="1352"/>
-        <location filename="../Pages/BrowsePage.qml" line="1388"/>
+        <location filename="../Pages/BrowsePage.qml" line="1346"/>
+        <location filename="../Pages/BrowsePage.qml" line="1374"/>
+        <location filename="../Pages/BrowsePage.qml" line="1410"/>
         <source>Move to Trash</source>
         <translation>移入回收站</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1330"/>
-        <location filename="../Pages/BrowsePage.qml" line="1354"/>
-        <location filename="../Pages/BrowsePage.qml" line="1394"/>
+        <location filename="../Pages/BrowsePage.qml" line="1352"/>
+        <location filename="../Pages/BrowsePage.qml" line="1376"/>
+        <location filename="../Pages/BrowsePage.qml" line="1416"/>
         <source>Reveal in Finder / Explorer</source>
         <translation>在 Finder / 文件资源管理器中显示</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1335"/>
-        <location filename="../Pages/BrowsePage.qml" line="1355"/>
-        <location filename="../Pages/BrowsePage.qml" line="1399"/>
+        <location filename="../Pages/BrowsePage.qml" line="1357"/>
+        <location filename="../Pages/BrowsePage.qml" line="1377"/>
+        <location filename="../Pages/BrowsePage.qml" line="1421"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1346"/>
+        <location filename="../Pages/BrowsePage.qml" line="1368"/>
         <source>RAW/YUV parameters…</source>
         <translation>RAW/YUV 参数…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1363"/>
-        <location filename="../Pages/BrowsePage.qml" line="1407"/>
+        <location filename="../Pages/BrowsePage.qml" line="1385"/>
+        <location filename="../Pages/BrowsePage.qml" line="1429"/>
         <source>Open folder</source>
         <translation>打开文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1367"/>
+        <location filename="../Pages/BrowsePage.qml" line="1389"/>
         <source>Paste into folder</source>
         <translation>粘贴到文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1415"/>
+        <location filename="../Pages/BrowsePage.qml" line="1437"/>
         <source>New folder</source>
         <translation>新建文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1416"/>
+        <location filename="../Pages/BrowsePage.qml" line="1438"/>
         <source>Create a folder in </source>
         <translation>在此位置创建文件夹：</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1418"/>
+        <location filename="../Pages/BrowsePage.qml" line="1440"/>
         <source>Create</source>
         <translation>创建</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1428"/>
+        <location filename="../Pages/BrowsePage.qml" line="1450"/>
         <source>Rename item</source>
         <translation>重命名项目</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1429"/>
+        <location filename="../Pages/BrowsePage.qml" line="1451"/>
         <source>Enter a new name for the selected item</source>
         <translation>输入所选项目的新名称</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1430"/>
+        <location filename="../Pages/BrowsePage.qml" line="1452"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1440"/>
+        <location filename="../Pages/BrowsePage.qml" line="1462"/>
         <source>Move to Trash?</source>
         <translation>移入回收站？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1441"/>
-        <location filename="../Pages/BrowsePage.qml" line="1528"/>
+        <location filename="../Pages/BrowsePage.qml" line="1463"/>
+        <location filename="../Pages/BrowsePage.qml" line="1550"/>
         <source>Move</source>
         <translation>移动</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1504"/>
+        <location filename="../Pages/BrowsePage.qml" line="1526"/>
         <source>The selected item will be moved to the system Trash.</source>
         <translation>所选项目将被移入系统回收站。</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1505"/>
+        <location filename="../Pages/BrowsePage.qml" line="1527"/>
         <source>%1 selected items will be moved to the system Trash.</source>
         <translation>%1 个所选项目将被移入系统回收站。</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1527"/>
+        <location filename="../Pages/BrowsePage.qml" line="1549"/>
         <source>Move items?</source>
         <translation>移动项目？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1527"/>
+        <location filename="../Pages/BrowsePage.qml" line="1549"/>
         <source>Copy items?</source>
         <translation>复制项目？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1532"/>
+        <location filename="../Pages/BrowsePage.qml" line="1554"/>
         <source>Move 1 item to “%1”?</source>
         <translation>将 1 个项目移动到“%1”？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1533"/>
+        <location filename="../Pages/BrowsePage.qml" line="1555"/>
         <source>Copy 1 item to “%1”?</source>
         <translation>将 1 个项目复制到“%1”？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1536"/>
+        <location filename="../Pages/BrowsePage.qml" line="1558"/>
         <source>Move %1 items to “%2”?</source>
         <translation>将 %1 个项目移动到“%2”？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1537"/>
+        <location filename="../Pages/BrowsePage.qml" line="1559"/>
         <source>Copy %1 items to “%2”?</source>
         <translation>将 %1 个项目复制到“%2”？</translation>
     </message>
@@ -861,355 +861,410 @@ Choose another folder or drop images here</source>
     </message>
     <message>
         <location filename="../Isp/SettingsCard.qml" line="56"/>
+        <source>Downloading version %1… %2%</source>
+        <translation>正在下载版本 %1… %2%</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="60"/>
+        <source>Verifying the downloaded installer…</source>
+        <translation>正在验证下载的安装器…</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="62"/>
+        <source>Version %1 is downloaded and verified.</source>
+        <translation>版本 %1 已下载并通过验证。</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="65"/>
+        <source>Opening the installer…</source>
+        <translation>正在打开安装器…</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="67"/>
         <source>You’re up to date. Version %1 is the latest release.</source>
         <translation>当前已是最新版本 %1。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="59"/>
+        <location filename="../Isp/SettingsCard.qml" line="71"/>
+        <source>Update failed: %1</source>
+        <translation>更新失败：%1</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="72"/>
         <source>Couldn’t check for updates. Check your connection and try again.</source>
         <translation>无法检查更新。请检查网络连接后重试。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="61"/>
+        <location filename="../Isp/SettingsCard.qml" line="74"/>
         <source>Check for a newer published version of MVP Image Viewer.</source>
         <translation>检查是否有更新的 MVP Image Viewer 正式版本。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="239"/>
+        <location filename="../Isp/SettingsCard.qml" line="252"/>
         <source>ISP</source>
         <translation>ISP</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="247"/>
+        <location filename="../Isp/SettingsCard.qml" line="260"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="257"/>
-        <location filename="../Isp/SettingsCard.qml" line="438"/>
+        <location filename="../Isp/SettingsCard.qml" line="270"/>
+        <location filename="../Isp/SettingsCard.qml" line="451"/>
         <source>General</source>
         <translation>通用</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="258"/>
-        <location filename="../Isp/SettingsCard.qml" line="508"/>
+        <location filename="../Isp/SettingsCard.qml" line="271"/>
+        <location filename="../Isp/SettingsCard.qml" line="521"/>
         <source>Appearance</source>
         <translation>外观</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="259"/>
-        <location filename="../Isp/SettingsCard.qml" line="615"/>
+        <location filename="../Isp/SettingsCard.qml" line="272"/>
+        <location filename="../Isp/SettingsCard.qml" line="628"/>
         <source>Color &amp; display</source>
         <translation>色彩与显示</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="260"/>
+        <location filename="../Isp/SettingsCard.qml" line="273"/>
         <source>Shortcuts</source>
         <translation>快捷键</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="261"/>
-        <location filename="../Isp/SettingsCard.qml" line="862"/>
+        <location filename="../Isp/SettingsCard.qml" line="274"/>
+        <location filename="../Isp/SettingsCard.qml" line="875"/>
         <source>Updates</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="262"/>
+        <location filename="../Isp/SettingsCard.qml" line="275"/>
         <source>Help</source>
         <translation>帮助</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="312"/>
+        <location filename="../Isp/SettingsCard.qml" line="325"/>
         <source>Version %1</source>
         <translation>版本 %1</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="388"/>
+        <location filename="../Isp/SettingsCard.qml" line="401"/>
         <source>Restore defaults</source>
         <translation>恢复默认设置</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="414"/>
+        <location filename="../Isp/SettingsCard.qml" line="427"/>
         <source>Done</source>
         <translation>完成</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="448"/>
+        <location filename="../Isp/SettingsCard.qml" line="461"/>
         <source>Choose how the viewer starts and handles everyday file operations.</source>
         <translation>选择查看器的启动方式和常用文件操作行为。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="451"/>
+        <location filename="../Isp/SettingsCard.qml" line="464"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="456"/>
+        <location filename="../Isp/SettingsCard.qml" line="469"/>
         <source>Changes are applied immediately across open windows.</source>
         <translation>更改会立即应用到所有已打开的窗口。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="462"/>
+        <location filename="../Isp/SettingsCard.qml" line="475"/>
         <source>Use system language</source>
         <translation>跟随系统语言</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="479"/>
+        <location filename="../Isp/SettingsCard.qml" line="492"/>
         <source>Startup and file operations</source>
         <translation>启动与文件操作</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="483"/>
+        <location filename="../Isp/SettingsCard.qml" line="496"/>
         <source>Restore the last opened directory</source>
         <translation>恢复上次打开的目录</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="492"/>
+        <location filename="../Isp/SettingsCard.qml" line="505"/>
         <source>Ask before moving files to the Trash</source>
         <translation>将文件移入回收站前询问</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="518"/>
+        <location filename="../Isp/SettingsCard.qml" line="531"/>
         <source>Tune the workspace for bright studios or low-light inspection.</source>
         <translation>为明亮工作室或低照度检查调整工作区。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="520"/>
+        <location filename="../Isp/SettingsCard.qml" line="533"/>
         <source>Theme</source>
         <translation>主题</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="525"/>
+        <location filename="../Isp/SettingsCard.qml" line="538"/>
         <source>The preview uses the same surfaces and signals as the image workspace.</source>
         <translation>预览使用与图片工作区相同的界面层级和状态信号。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="532"/>
+        <location filename="../Isp/SettingsCard.qml" line="545"/>
         <source>System</source>
         <translation>跟随系统</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="533"/>
+        <location filename="../Isp/SettingsCard.qml" line="546"/>
         <source>Light</source>
         <translation>浅色</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="534"/>
+        <location filename="../Isp/SettingsCard.qml" line="547"/>
         <source>Dark</source>
         <translation>深色</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="625"/>
+        <location filename="../Isp/SettingsCard.qml" line="638"/>
         <source>Control how encoded images are interpreted and presented on the canvas.</source>
         <translation>控制编码图片的解析方式及其在画布上的呈现效果。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="656"/>
+        <location filename="../Isp/SettingsCard.qml" line="669"/>
         <source>Display color space: sRGB</source>
         <translation>显示色彩空间：sRGB</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="659"/>
+        <location filename="../Isp/SettingsCard.qml" line="672"/>
         <source>Embedded RGB profiles are converted to the app’s fixed sRGB display space.</source>
         <translation>嵌入的 RGB 配置文件会转换到应用固定的 sRGB 显示空间。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="667"/>
+        <location filename="../Isp/SettingsCard.qml" line="680"/>
         <source>Apply embedded ICC color profiles</source>
         <translation>应用嵌入的 ICC 色彩配置文件</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="683"/>
+        <location filename="../Isp/SettingsCard.qml" line="696"/>
         <source>Color profile conversion is unavailable in this build.</source>
         <translation>当前版本不支持色彩配置文件转换。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="684"/>
+        <location filename="../Isp/SettingsCard.qml" line="697"/>
         <source>Recommended for JPEG and PNG files created in Adobe RGB or other RGB spaces.</source>
         <translation>建议用于以 Adobe RGB 或其他 RGB 色彩空间创建的 JPEG 和 PNG 文件。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="687"/>
+        <location filename="../Isp/SettingsCard.qml" line="700"/>
         <source>Preserve high bit depth when available</source>
         <translation>尽可能保留高位深</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="699"/>
+        <location filename="../Isp/SettingsCard.qml" line="712"/>
         <source>Keeps 16-bit and floating-point samples for GPU display. Disable to convert them to 8-bit sRGB.</source>
         <translation>保留 16 位和浮点采样用于 GPU 显示；关闭后会转换为 8 位 sRGB。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="705"/>
+        <location filename="../Isp/SettingsCard.qml" line="718"/>
         <source>Image presentation</source>
         <translation>图片呈现</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="709"/>
+        <location filename="../Isp/SettingsCard.qml" line="722"/>
         <source>Honor EXIF orientation</source>
         <translation>遵循 EXIF 方向</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="721"/>
+        <location filename="../Isp/SettingsCard.qml" line="734"/>
         <source>Automatically rotates JPEG and PNG images according to their metadata.</source>
         <translation>根据元数据自动旋转 JPEG 和 PNG 图片。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="723"/>
+        <location filename="../Isp/SettingsCard.qml" line="736"/>
         <source>Canvas background</source>
         <translation>画布背景</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="728"/>
+        <location filename="../Isp/SettingsCard.qml" line="741"/>
         <source>Choose a surround that makes exposure, edges, and transparency easier to inspect.</source>
         <translation>选择更便于检查曝光、边缘和透明区域的画布衬底。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="734"/>
+        <location filename="../Isp/SettingsCard.qml" line="747"/>
         <source>Neutral gray</source>
         <translation>中性灰</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="734"/>
+        <location filename="../Isp/SettingsCard.qml" line="747"/>
         <source>Dark gray</source>
         <translation>深灰色</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="735"/>
+        <location filename="../Isp/SettingsCard.qml" line="748"/>
         <source>Black</source>
         <translation>黑色</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="735"/>
+        <location filename="../Isp/SettingsCard.qml" line="748"/>
         <source>White</source>
         <translation>白色</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="757"/>
+        <location filename="../Isp/SettingsCard.qml" line="770"/>
         <source>Keyboard shortcuts</source>
         <translation>键盘快捷键</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="767"/>
+        <location filename="../Isp/SettingsCard.qml" line="780"/>
         <source>Enter shortcuts such as Ctrl+O, Ctrl+Shift+N, F2, or C. Duplicate assignments are rejected.</source>
         <translation>输入 Ctrl+O、Ctrl+Shift+N、F2 或 C 等快捷键。重复的按键分配将被拒绝。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="808"/>
+        <location filename="../Isp/SettingsCard.qml" line="821"/>
         <source>Enter a valid keyboard shortcut.</source>
         <translation>请输入有效的键盘快捷键。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="813"/>
+        <location filename="../Isp/SettingsCard.qml" line="826"/>
         <source>This shortcut is already assigned to “%1”.</source>
         <translation>此快捷键已分配给“%1”。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="816"/>
+        <location filename="../Isp/SettingsCard.qml" line="829"/>
         <source>Shortcut saved.</source>
         <translation>快捷键已保存。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="836"/>
+        <location filename="../Isp/SettingsCard.qml" line="849"/>
         <source>Reset shortcuts</source>
         <translation>重置快捷键</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="840"/>
+        <location filename="../Isp/SettingsCard.qml" line="853"/>
         <source>Default shortcuts restored.</source>
         <translation>已恢复默认快捷键。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="872"/>
+        <location filename="../Isp/SettingsCard.qml" line="885"/>
         <source>Keep the viewer current without interrupting image work.</source>
         <translation>在不打断图片工作的情况下保持查看器为最新版本。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="875"/>
+        <location filename="../Isp/SettingsCard.qml" line="888"/>
         <source>Automatically check for updates</source>
         <translation>自动检查更新</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="886"/>
+        <location filename="../Isp/SettingsCard.qml" line="899"/>
         <source>Checks at most once every 24 hours. Updates are never downloaded or installed without you.</source>
         <translation>最多每 24 小时检查一次。未经你的操作，更新不会被下载或安装。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="903"/>
+        <location filename="../Isp/SettingsCard.qml" line="917"/>
         <source>Installed version %1</source>
         <translation>已安装版本 %1</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="917"/>
+        <location filename="../Isp/SettingsCard.qml" line="940"/>
         <source>Checking…</source>
         <translation>正在检查…</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="917"/>
+        <location filename="../Isp/SettingsCard.qml" line="940"/>
         <source>Check now</source>
         <translation>立即检查</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="926"/>
+        <location filename="../Isp/SettingsCard.qml" line="957"/>
+        <source>Cancel download</source>
+        <translation>取消下载</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="958"/>
+        <source>Install update</source>
+        <translation>安装更新</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="960"/>
+        <source>Download update</source>
+        <translation>下载更新</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="959"/>
         <source>View update</source>
         <translation>查看更新</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="941"/>
+        <location filename="../Isp/SettingsCard.qml" line="986"/>
         <source>Help and guide</source>
         <translation>帮助与指南</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="951"/>
+        <location filename="../Isp/SettingsCard.qml" line="996"/>
         <source>A quick reference for the main image inspection workflows.</source>
         <translation>主要图片检查流程的快速参考。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="957"/>
+        <location filename="../Isp/SettingsCard.qml" line="1002"/>
         <source>Browse</source>
         <translation>浏览</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="958"/>
+        <location filename="../Isp/SettingsCard.qml" line="1003"/>
         <source>Choose a folder in the sidebar, then use grid, list, or gallery view to inspect files.</source>
         <translation>在侧边栏中选择文件夹，然后使用网格、列表或画廊视图检查文件。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="961"/>
+        <location filename="../Isp/SettingsCard.qml" line="1006"/>
         <source>Compare</source>
         <translation>对比</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="962"/>
+        <location filename="../Isp/SettingsCard.qml" line="1007"/>
         <source>Select 2–4 images and press C to open synchronized comparison.</source>
         <translation>选择 2～4 张图片并按 C，打开同步对比。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="965"/>
+        <location filename="../Isp/SettingsCard.qml" line="1010"/>
         <source>Inspect</source>
         <translation>检查</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="966"/>
+        <location filename="../Isp/SettingsCard.qml" line="1011"/>
         <source>Open an image full screen, then use Fit, 100%, EXIF, histogram, and pixel probe tools.</source>
         <translation>全屏打开图片，然后使用适应窗口、100%、EXIF、直方图和像素探针工具。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="993"/>
+        <location filename="../Isp/SettingsCard.qml" line="1038"/>
         <source>Open online guide</source>
         <translation>打开在线指南</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="1005"/>
+        <location filename="../Isp/SettingsCard.qml" line="1050"/>
+        <source>Install this update?</source>
+        <translation>安装此更新？</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="1051"/>
+        <source>The verified installer will open and MVP Image Viewer will close.</source>
+        <translation>即将打开已验证的安装器，MVP Image Viewer 将关闭。</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="1052"/>
+        <source>Open installer</source>
+        <translation>打开安装器</translation>
+    </message>
+    <message>
+        <location filename="../Isp/SettingsCard.qml" line="1063"/>
         <source>Restore default settings?</source>
         <translation>恢复默认设置？</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="1006"/>
+        <location filename="../Isp/SettingsCard.qml" line="1064"/>
         <source>Language, theme, shortcuts, updates, startup, and confirmation preferences will be reset.</source>
         <translation>语言、主题、快捷键、更新、启动和确认偏好将恢复默认值。</translation>
     </message>
     <message>
-        <location filename="../Isp/SettingsCard.qml" line="1007"/>
+        <location filename="../Isp/SettingsCard.qml" line="1065"/>
         <source>Restore</source>
         <translation>恢复</translation>
     </message>
@@ -1360,33 +1415,33 @@ Choose another folder or drop images here</source>
         <translation>按文件类型排序</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="200"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="213"/>
         <source>Rotate 90° counterclockwise</source>
         <translation>逆时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="201"/>
         <location filename="../Isp/TopToolbar.ui.qml" line="214"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="227"/>
         <source>Select one image to rotate</source>
         <translation>选择一张图片以旋转</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="213"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="226"/>
         <source>Rotate 90° clockwise</source>
         <translation>顺时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="226"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="239"/>
         <source>Resize image…</source>
         <translation>调整图片大小…</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="226"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="239"/>
         <source>Select one image to resize</source>
         <translation>选择一张图片以调整大小</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="251"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="201"/>
         <source>Smooth display</source>
         <translation>平滑显示</translation>
     </message>

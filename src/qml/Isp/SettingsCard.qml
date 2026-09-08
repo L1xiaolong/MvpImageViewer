@@ -52,10 +52,23 @@ Popup {
             return qsTr("Checking GitHub Releases…")
         case "available":
             return qsTr("Version %1 is available.").arg(root.settingsController.latestVersion)
+        case "downloading":
+            return qsTr("Downloading version %1… %2%").arg(
+                        root.settingsController.latestVersion).arg(
+                        Math.max(0, root.settingsController.updateDownloadProgress))
+        case "verifying":
+            return qsTr("Verifying the downloaded installer…")
+        case "ready":
+            return qsTr("Version %1 is downloaded and verified.").arg(
+                        root.settingsController.latestVersion)
+        case "installing":
+            return qsTr("Opening the installer…")
         case "latest":
             return qsTr("You’re up to date. Version %1 is the latest release.")
                     .arg(root.settingsController.latestVersion)
         case "error":
+            if (root.settingsController.updateError.length > 0)
+                return qsTr("Update failed: %1").arg(root.settingsController.updateError)
             return qsTr("Couldn’t check for updates. Check your connection and try again.")
         default:
             return qsTr("Check for a newer published version of MVP Image Viewer.")
@@ -888,7 +901,8 @@ Popup {
 
             Rectangle {
                 width: parent.width
-                height: 132
+                height: root.settingsController
+                        && root.settingsController.updateState === "downloading" ? 160 : 144
                 radius: 8
                 color: Theme.paperWhite
                 border.width: 1
@@ -908,6 +922,15 @@ Popup {
                         width: parent.width
                         text: root.updateStatusText()
                     }
+                    ProgressBar {
+                        width: parent.width
+                        height: 6
+                        visible: root.settingsController
+                                 && root.settingsController.updateState === "downloading"
+                        from: 0
+                        to: 100
+                        value: visible ? root.settingsController.updateDownloadProgress : 0
+                    }
                     Row {
                         spacing: 10
                         SettingsActionButton {
@@ -916,15 +939,37 @@ Popup {
                                   && root.settingsController.updateState === "checking"
                                   ? qsTr("Checking…") : qsTr("Check now")
                             enabled: root.settingsController
-                                     && root.settingsController.updateState !== "checking"
+                                     && ["checking", "downloading", "verifying", "installing"]
+                                        .indexOf(root.settingsController.updateState) < 0
                             onClicked: root.settingsController.checkForUpdates()
                         }
                         SettingsActionButton {
                             width: 150
                             visible: root.settingsController
-                                     && root.settingsController.updateState === "available"
-                            text: qsTr("View update")
-                            onClicked: root.settingsController.openReleasePage()
+                                     && (["available", "downloading", "ready"]
+                                        .indexOf(root.settingsController.updateState) >= 0
+                                         || (root.settingsController.updateState === "error"
+                                             && root.settingsController.releaseUrl.toString().length > 0))
+                            text: {
+                                if (!root.settingsController)
+                                    return ""
+                                switch (root.settingsController.updateState) {
+                                case "downloading": return qsTr("Cancel download")
+                                case "ready": return qsTr("Install update")
+                                case "error": return qsTr("View update")
+                                default: return qsTr("Download update")
+                                }
+                            }
+                            onClicked: {
+                                if (root.settingsController.updateState === "downloading")
+                                    root.settingsController.cancelUpdateDownload()
+                                else if (root.settingsController.updateState === "ready")
+                                    updateInstallDialog.showConfirmation()
+                                else if (root.settingsController.updateState === "error")
+                                    root.settingsController.openReleasePage()
+                                else
+                                    root.settingsController.downloadUpdate()
+                            }
                         }
                     }
                 }
@@ -996,6 +1041,19 @@ Popup {
                         root.settingsController.openUserGuide()
                 }
             }
+        }
+    }
+
+    AppConfirmDialog {
+        id: updateInstallDialog
+        parent: root.contentItem
+        dialogTitle: qsTr("Install this update?")
+        message: qsTr("The verified installer will open and MVP Image Viewer will close.")
+        confirmText: qsTr("Open installer")
+        onConfirmed: {
+            close()
+            if (root.settingsController)
+                root.settingsController.installUpdate()
         }
     }
 

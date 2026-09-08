@@ -15,14 +15,21 @@
 #include "qml/thumbnail_image_provider.h"
 
 #include <QDir>
+#include <QCryptographicHash>
 #include <QFile>
 #include <QGuiApplication>
 #include <QHash>
 #include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QSettings>
 #include <QSignalSpy>
+#include <QScopeGuard>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUrl>
@@ -107,6 +114,74 @@ QString createImage(QTemporaryDir& directory, const QString& name) {
     return path;
 }
 
+class UpdateHttpServer final : public QObject {
+  public:
+    explicit UpdateHttpServer(QObject* parent = nullptr) : QObject(parent) {
+        connect(&server_, &QTcpServer::newConnection, this, [this] {
+            while (QTcpSocket* socket = server_.nextPendingConnection()) {
+                socket->setParent(this);
+                connect(socket, &QTcpSocket::readyRead, this, [this, socket] {
+                    QByteArray request = socket->property("request").toByteArray();
+                    request += socket->readAll();
+                    socket->setProperty("request", request);
+                    const qsizetype headerEnd = request.indexOf("\r\n\r\n");
+                    if (headerEnd < 0 || socket->property("handled").toBool())
+                        return;
+                    socket->setProperty("handled", true);
+                    const QList<QByteArray> requestLine = request.left(request.indexOf("\r\n")).split(' ');
+                    const QByteArray path = requestLine.size() >= 2 ? requestLine.at(1) : QByteArray{};
+                    const bool found = responses_.contains(path);
+                    const QByteArray body = responses_.value(path);
+                    QByteArray response = found ? QByteArrayLiteral("HTTP/1.1 200 OK\r\n")
+                                                : QByteArrayLiteral("HTTP/1.1 404 Not Found\r\n");
+                    response += QByteArrayLiteral("Connection: close\r\nContent-Length: ") +
+                                QByteArray::number(body.size()) + QByteArrayLiteral("\r\n\r\n") + body;
+                    socket->write(response);
+                    socket->disconnectFromHost();
+                });
+            }
+        });
+    }
+
+    bool listen() { return server_.listen(QHostAddress::LocalHost, 0); }
+
+    QUrl url(const QByteArray& path) const {
+        return QUrl(QStringLiteral("http://127.0.0.1:%1%2")
+                        .arg(server_.serverPort())
+                        .arg(QString::fromLatin1(path)));
+    }
+
+    void respond(const QByteArray& path, const QByteArray& body) { responses_.insert(path, body); }
+
+  private:
+    QTcpServer server_;
+    QHash<QByteArray, QByteArray> responses_;
+};
+
+QString testInstallerName() {
+#if defined(Q_OS_MACOS)
+    return QStringLiteral("MVPImageViewer-v99.0.0-macos-arm64.dmg");
+#elif defined(Q_OS_WIN)
+    return QStringLiteral("MVPImageViewer-v99.0.0-windows-x64-setup.exe");
+#else
+    return {};
+#endif
+}
+
+QByteArray updateReleaseJson(const UpdateHttpServer& server, const QString& installerName,
+                             qsizetype installerSize, const QByteArray& digest) {
+    const QJsonObject asset{
+        {QStringLiteral("name"), installerName},
+        {QStringLiteral("browser_download_url"), server.url("/installer").toString()},
+        {QStringLiteral("size"), installerSize},
+        {QStringLiteral("digest"), QStringLiteral("sha256:%1").arg(QString::fromLatin1(digest))}};
+    return QJsonDocument(
+               QJsonObject{{QStringLiteral("tag_name"), QStringLiteral("v99.0.0")},
+                           {QStringLiteral("html_url"), server.url("/release-page").toString()},
+                           {QStringLiteral("assets"), QJsonArray{asset}}})
+        .toJson(QJsonDocument::Compact);
+}
+
 } // namespace
 
 class QmlWorkspaceControllerTests final : public QObject {
@@ -142,6 +217,9 @@ class QmlWorkspaceControllerTests final : public QObject {
     void compareDefersOversizedAutomaticFullLoadsButExactToolsStillPromote();
     void compareAutomaticallyPromotesBudgetedImages();
     void applicationSettingsPersistAndRestoreDefaults();
+    void otaDownloadsAndVerifiesPlatformInstaller();
+    void otaRejectsInstallerWithWrongChecksum();
+    void otaDownloadCanBeCancelled();
 };
 
 void QmlWorkspaceControllerTests::initTestCase() {
@@ -149,6 +227,7 @@ void QmlWorkspaceControllerTests::initTestCase() {
     QVERIFY(settingsDirectory_->isValid());
     QCoreApplication::setOrganizationName(QStringLiteral("ISPViewTests"));
     QCoreApplication::setApplicationName(QStringLiteral("QmlWorkspaceControllerTests"));
+    QCoreApplication::setApplicationVersion(QStringLiteral("1.0.0"));
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory_->path());
     QSettings().clear();
@@ -1065,6 +1144,93 @@ void QmlWorkspaceControllerTests::compareViewSyncTemporarilyBypassesWithControl(
     QVERIFY(navigation.value(QStringLiteral("visible")).toBool());
     QVERIFY(navigation.value(QStringLiteral("width")).toInt() <= 96);
     QVERIFY(navigation.value(QStringLiteral("height")).toInt() <= 71);
+}
+
+void QmlWorkspaceControllerTests::otaDownloadsAndVerifiesPlatformInstaller() {
+    const QString installerName = testInstallerName();
+    if (installerName.isEmpty())
+        QSKIP("OTA installers are currently supported on macOS and Windows only");
+
+    UpdateHttpServer server;
+    QVERIFY(server.listen());
+    const QByteArray installerData("verified installer fixture\n");
+    const QByteArray digest =
+        QCryptographicHash::hash(installerData, QCryptographicHash::Sha256).toHex();
+    server.respond("/release",
+                   updateReleaseJson(server, installerName, installerData.size(), digest));
+    server.respond("/installer", installerData);
+
+    qputenv("ISPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
+    const auto resetEnvironment = qScopeGuard([] { qunsetenv("ISPVIEW_UPDATE_API_URL"); });
+    auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
+    QVERIFY(application);
+    AppSettings settings(application);
+    settings.checkForUpdates();
+    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("available"), 3000);
+    QCOMPARE(settings.latestVersion(), QStringLiteral("99.0.0"));
+
+    settings.downloadUpdate();
+    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("ready"), 3000);
+    QCOMPARE(settings.updateDownloadProgress(), 100);
+    QVERIFY(!settings.downloadedUpdatePath().isEmpty());
+    QFile downloaded(settings.downloadedUpdatePath());
+    QVERIFY(downloaded.open(QIODevice::ReadOnly));
+    QCOMPARE(downloaded.readAll(), installerData);
+    downloaded.close();
+    QVERIFY(QFile::remove(settings.downloadedUpdatePath()));
+}
+
+void QmlWorkspaceControllerTests::otaRejectsInstallerWithWrongChecksum() {
+    const QString installerName = testInstallerName();
+    if (installerName.isEmpty())
+        QSKIP("OTA installers are currently supported on macOS and Windows only");
+
+    UpdateHttpServer server;
+    QVERIFY(server.listen());
+    const QByteArray installerData("tampered installer fixture\n");
+    server.respond("/release", updateReleaseJson(server, installerName, installerData.size(),
+                                                  QByteArray(64, '0')));
+    server.respond("/installer", installerData);
+
+    qputenv("ISPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
+    const auto resetEnvironment = qScopeGuard([] { qunsetenv("ISPVIEW_UPDATE_API_URL"); });
+    auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
+    QVERIFY(application);
+    AppSettings settings(application);
+    settings.checkForUpdates();
+    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("available"), 3000);
+    settings.downloadUpdate();
+    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("error"), 3000);
+    QVERIFY(settings.downloadedUpdatePath().isEmpty());
+    QVERIFY(settings.updateError().contains(QStringLiteral("SHA-256")));
+}
+
+void QmlWorkspaceControllerTests::otaDownloadCanBeCancelled() {
+    const QString installerName = testInstallerName();
+    if (installerName.isEmpty())
+        QSKIP("OTA installers are currently supported on macOS and Windows only");
+
+    UpdateHttpServer server;
+    QVERIFY(server.listen());
+    const QByteArray installerData("installer fixture\n");
+    const QByteArray digest =
+        QCryptographicHash::hash(installerData, QCryptographicHash::Sha256).toHex();
+    server.respond("/release",
+                   updateReleaseJson(server, installerName, installerData.size(), digest));
+
+    qputenv("ISPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
+    const auto resetEnvironment = qScopeGuard([] { qunsetenv("ISPVIEW_UPDATE_API_URL"); });
+    auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
+    QVERIFY(application);
+    AppSettings settings(application);
+    settings.checkForUpdates();
+    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("available"), 3000);
+    settings.downloadUpdate();
+    QCOMPARE(settings.updateState(), QStringLiteral("downloading"));
+    settings.cancelUpdateDownload();
+    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("available"), 3000);
+    QCOMPARE(settings.updateDownloadProgress(), -1);
+    QVERIFY(settings.downloadedUpdatePath().isEmpty());
 }
 
 } // namespace ispview

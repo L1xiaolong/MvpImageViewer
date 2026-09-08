@@ -99,6 +99,8 @@ MVPImageViewer /path/to/images
 
 Current macOS installers may not be Apple-notarized, and Windows installers may not yet be code-signed. The operating system may show a security warning on first launch; on macOS, Control-click the application in Finder and choose **Open**.
 
+The app checks GitHub Releases at most once every 24 hours when automatic checks are enabled. When a newer version is available, Settings → Updates can download the installer for the current platform. The app verifies it against the installer asset's SHA-256 digest from the GitHub Release API before enabling installation. Downloads and installation always require an explicit user action, and an in-progress download can be cancelled.
+
 ## Supported formats
 
 | Type | Support | Notes |

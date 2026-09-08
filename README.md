@@ -99,6 +99,8 @@ MVPImageViewer /path/to/images
 
 当前 macOS 安装器可能没有 Apple notarization，Windows 安装器也可能尚未进行代码签名。首次运行时，系统可能显示安全提示；macOS 可在 Finder 中右键应用并选择“打开”。
 
+应用会按设置最多每 24 小时检查一次 GitHub Releases。发现新版本后，用户可在“设置 → 更新”中下载当前平台的安装器；应用依据 GitHub Release API 中安装资产自带的 SHA-256 digest 完成校验，校验通过后才会允许打开安装器。下载和安装均需用户主动操作，下载过程中也可以取消。
+
 ## 支持的格式
 
 | 类型 | 支持情况 | 说明 |

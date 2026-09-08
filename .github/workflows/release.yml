@@ -273,10 +273,6 @@ jobs:
           windows_installer="release-assets/MVPImageViewer-${RELEASE_TAG}-windows-x64-setup.exe"
           test -s "$mac_installer"
           test -s "$windows_installer"
-          (
-            cd release-assets
-            sha256sum *.dmg *-setup.exe > SHA256SUMS.txt
-          )
 
       - name: Create release and upload packages
         env:
@@ -285,13 +281,11 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" release-assets/*.dmg \
               release-assets/*-setup.exe \
-              release-assets/SHA256SUMS.txt \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
           else
             gh release create "$RELEASE_TAG" release-assets/*.dmg \
               release-assets/*-setup.exe \
-              release-assets/SHA256SUMS.txt \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "MVP Image Viewer $RELEASE_TAG" \
