@@ -16,6 +16,9 @@ Rectangle {
     property var propertiesController: null
     property var rawController: null
     property var settingsController: null
+    property bool smoothDisplay: (!settingsController ||
+                                  settingsController.smoothDisplay === undefined)
+                                 ? true : settingsController.smoothDisplay
     property bool navigatorVisible: true
     property real navigatorWidth: Theme.sidebarWidth
     property real galleryStripWidth: 280
@@ -61,6 +64,12 @@ Rectangle {
         return root.settingsController
                 ? root.settingsController.shortcutFor(action) : fallback
     }
+    function setSmoothDisplay(enabled) {
+        if (root.settingsController && root.settingsController.smoothDisplay !== undefined)
+            root.settingsController.smoothDisplay = enabled
+        else
+            root.smoothDisplay = enabled
+    }
 
 
     TopToolbar {
@@ -84,6 +93,7 @@ Rectangle {
         galleryEnabled: root.workspaceController.paneCount === undefined ||
                         root.workspaceController.paneCount === 1
         transformEnabled: root.controller.canTransform
+        smoothDisplay: root.smoothDisplay
         navigationWidth: root.navigatorWidth
     }
 
@@ -134,6 +144,10 @@ Rectangle {
     Connections {
         target: toolbar.compareControl
         function onClicked() { root.workspaceController.compareSelected(); }
+    }
+    Connections {
+        target: toolbar.smoothDisplayControl
+        function onClicked() { root.setSmoothDisplay(toolbar.smoothDisplayControl.checked); }
     }
     Connections {
         target: toolbar.rotateClockwiseControl
@@ -316,6 +330,7 @@ Rectangle {
         BrowserPane {
             controller: root.paneController(0)
             workspaceController: root.workspaceController
+            settingsController: root.settingsController
             paneIndex: 0
             iconPrefix: root.iconPrefix
             contentInteractionEnabled: root.contentInteractionEnabled
@@ -376,6 +391,7 @@ Rectangle {
                     required property int index
                     controller: modelData || root.controller
                     workspaceController: root.workspaceController
+                    settingsController: root.settingsController
                     paneIndex: index
                     iconPrefix: root.iconPrefix
                     contentInteractionEnabled: root.contentInteractionEnabled
@@ -472,6 +488,7 @@ Rectangle {
                     id: topLeft
                     controller: root.paneController(0)
                     workspaceController: root.workspaceController
+                    settingsController: root.settingsController
                     paneIndex: 0
                     iconPrefix: root.iconPrefix
                     contentInteractionEnabled: root.contentInteractionEnabled
@@ -484,6 +501,7 @@ Rectangle {
                     id: topRight
                     controller: root.paneController(1)
                     workspaceController: root.workspaceController
+                    settingsController: root.settingsController
                     paneIndex: 1
                     iconPrefix: root.iconPrefix
                     contentInteractionEnabled: root.contentInteractionEnabled
@@ -534,6 +552,7 @@ Rectangle {
                     id: bottomLeft
                     controller: root.paneController(2)
                     workspaceController: root.workspaceController
+                    settingsController: root.settingsController
                     paneIndex: 2
                     iconPrefix: root.iconPrefix
                     contentInteractionEnabled: root.contentInteractionEnabled
@@ -546,6 +565,7 @@ Rectangle {
                     id: bottomRight
                     controller: root.paneController(3)
                     workspaceController: root.workspaceController
+                    settingsController: root.settingsController
                     paneIndex: 3
                     iconPrefix: root.iconPrefix
                     contentInteractionEnabled: root.contentInteractionEnabled
@@ -781,6 +801,7 @@ Rectangle {
 
                     Image {
                         id: galleryImage
+                        objectName: "galleryImage"
                         x: galleryWorkspace.actualPixels
                            ? Math.max(18, (galleryFlick.width - width) / 2) : 18
                         y: galleryWorkspace.actualPixels
@@ -803,8 +824,8 @@ Rectangle {
                         asynchronous: true
                         cache: true
                         retainWhileLoading: true
-                        smooth: true
-                        mipmap: true
+                        smooth: root.smoothDisplay
+                        mipmap: root.smoothDisplay
                         fillMode: galleryWorkspace.actualPixels ? Image.Stretch : Image.PreserveAspectFit
                     }
 
@@ -1022,6 +1043,7 @@ Rectangle {
                         ToolTip.text: galleryDelegate.path
 
                         Image {
+                            objectName: "galleryStripPreview-" + galleryDelegate.index
                             id: galleryPreview
                             anchors.left: parent.left
                             anchors.right: parent.right
@@ -1034,6 +1056,8 @@ Rectangle {
                             asynchronous: true
                             cache: true
                             fillMode: Image.PreserveAspectCrop
+                            smooth: root.smoothDisplay
+                            mipmap: root.smoothDisplay
                         }
                         Image {
                             objectName: "galleryFolderIcon-" + galleryDelegate.index

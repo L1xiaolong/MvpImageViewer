@@ -21,6 +21,7 @@ Rectangle {
     property bool gridEnabled: true
     property bool galleryEnabled: true
     property bool transformEnabled: false
+    property bool smoothDisplay: true
     property real navigationWidth: Theme.sidebarWidth
 
     property alias openFolderControl: openFolderButton
@@ -34,6 +35,7 @@ Rectangle {
     property alias rotateClockwiseControl: rotateClockwiseButton
     property alias rotateCounterClockwiseControl: rotateCounterClockwiseButton
     property alias resizeImageControl: resizeImageButton
+    property alias smoothDisplayControl: smoothDisplayButton
     property alias searchControl: fileSearch
     property alias clearSearchControl: clearMouse
     property alias settingsControl: settingsButton
@@ -187,9 +189,22 @@ Rectangle {
     }
 
     AppIconButton {
+        id: smoothDisplayButton
+        objectName: "smoothDisplayButton"
+        x: brandDivider.x + 276
+        anchors.verticalCenter: parent.verticalCenter
+        controlSize: root.toolbarButtonSize
+        renderedIconSize: root.toolbarIconSize
+        checkable: true
+        checked: root.smoothDisplay
+        iconSource: root.iconPrefix + "smooth-display.svg"
+        toolTipText: qsTr("Smooth display")
+    }
+
+    AppIconButton {
         id: rotateCounterClockwiseButton
         objectName: "rotateCounterClockwiseButton"
-        x: brandDivider.x + 276
+        x: brandDivider.x + 306
         anchors.verticalCenter: parent.verticalCenter
         controlSize: root.toolbarButtonSize
         renderedIconSize: root.toolbarIconSize
@@ -202,7 +217,7 @@ Rectangle {
     AppIconButton {
         id: rotateClockwiseButton
         objectName: "rotateClockwiseButton"
-        x: brandDivider.x + 306
+        x: brandDivider.x + 336
         anchors.verticalCenter: parent.verticalCenter
         controlSize: root.toolbarButtonSize
         renderedIconSize: root.toolbarIconSize
@@ -215,7 +230,7 @@ Rectangle {
     AppIconButton {
         id: resizeImageButton
         objectName: "resizeImageButton"
-        x: brandDivider.x + 336
+        x: brandDivider.x + 366
         anchors.verticalCenter: parent.verticalCenter
         controlSize: root.toolbarButtonSize
         renderedIconSize: root.toolbarIconSize
@@ -227,7 +242,7 @@ Rectangle {
     AppIconButton {
         id: compareButton
         objectName: "compareButton"
-        x: brandDivider.x + 366
+        x: brandDivider.x + 396
         anchors.verticalCenter: parent.verticalCenter
         controlSize: root.toolbarButtonSize
         renderedIconSize: root.toolbarIconSize

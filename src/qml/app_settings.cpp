@@ -34,11 +34,10 @@ constexpr auto kApplyEmbeddedColorProfilesKey = "color/applyEmbeddedProfiles";
 constexpr auto kPreserveHighBitDepthKey = "color/preserveHighBitDepth";
 constexpr auto kHonorExifOrientationKey = "display/honorExifOrientation";
 constexpr auto kCanvasBackgroundKey = "display/canvasBackground";
+constexpr auto kSmoothDisplayKey = "display/smoothDisplay";
 constexpr auto kLastUpdateCheckKey = "updates/lastCheckUtc";
 
-QString repositorySlug() {
-    return QString::fromUtf8(ISPVIEW_GITHUB_REPOSITORY).trimmed();
-}
+QString repositorySlug() { return QString::fromUtf8(ISPVIEW_GITHUB_REPOSITORY).trimmed(); }
 
 QUrl repositoryUrl(const QString& suffix = {}) {
     const QString slug = repositorySlug();
@@ -60,12 +59,8 @@ struct ShortcutDefinition {
 };
 
 constexpr ShortcutDefinition kShortcutDefinitions[] = {
-    {"openFolder", "Ctrl+O"},
-    {"find", "Ctrl+F"},
-    {"settings", "Ctrl+,"},
-    {"toggleNavigator", "Ctrl+B"},
-    {"compare", "C"},
-    {"rename", "F2"},
+    {"openFolder", "Ctrl+O"},      {"find", "Ctrl+F"}, {"settings", "Ctrl+,"},
+    {"toggleNavigator", "Ctrl+B"}, {"compare", "C"},   {"rename", "F2"},
     {"newFolder", "Ctrl+Shift+N"},
 };
 
@@ -76,53 +71,52 @@ const ShortcutDefinition* shortcutDefinition(const QString& action) {
     }
     return nullptr;
 }
-}
+} // namespace
 
 AppSettings::AppSettings(QGuiApplication* application, QObject* parent)
     : QObject(parent), application_(application) {
     const QSettings settings;
-    language_ = normalizedLanguage(settings.value(QLatin1String(kLanguageKey),
-                                                  QStringLiteral("system")).toString());
-    theme_ = normalizedTheme(settings.value(QLatin1String(kThemeKey),
-                                            QStringLiteral("system")).toString());
+    language_ = normalizedLanguage(
+        settings.value(QLatin1String(kLanguageKey), QStringLiteral("system")).toString());
+    theme_ = normalizedTheme(
+        settings.value(QLatin1String(kThemeKey), QStringLiteral("system")).toString());
     if (qEnvironmentVariableIsSet("ISPVIEW_LANGUAGE_OVERRIDE")) {
         language_ = normalizedLanguage(qEnvironmentVariable("ISPVIEW_LANGUAGE_OVERRIDE"));
     }
     if (qEnvironmentVariableIsSet("ISPVIEW_THEME_OVERRIDE")) {
         theme_ = normalizedTheme(qEnvironmentVariable("ISPVIEW_THEME_OVERRIDE"));
     }
-    restoreLastDirectory_ =
-        settings.value(QLatin1String(kRestoreLastDirectoryKey), true).toBool();
+    restoreLastDirectory_ = settings.value(QLatin1String(kRestoreLastDirectoryKey), true).toBool();
     confirmTrash_ = settings.value(QLatin1String(kConfirmTrashKey), true).toBool();
     automaticUpdateChecks_ =
         settings.value(QLatin1String(kAutomaticUpdateChecksKey), true).toBool();
     applyEmbeddedColorProfiles_ =
         settings.value(QLatin1String(kApplyEmbeddedColorProfilesKey), true).toBool();
-    preserveHighBitDepth_ =
-        settings.value(QLatin1String(kPreserveHighBitDepthKey), true).toBool();
-    honorExifOrientation_ =
-        settings.value(QLatin1String(kHonorExifOrientationKey), true).toBool();
+    preserveHighBitDepth_ = settings.value(QLatin1String(kPreserveHighBitDepthKey), true).toBool();
+    honorExifOrientation_ = settings.value(QLatin1String(kHonorExifOrientationKey), true).toBool();
     canvasBackground_ = normalizedCanvasBackground(
         settings.value(QLatin1String(kCanvasBackgroundKey), QStringLiteral("neutral")).toString());
+    smoothDisplay_ = settings.value(QLatin1String(kSmoothDisplayKey), true).toBool();
     EncodedColorManagement::setEnabled(applyEmbeddedColorProfiles_);
     QtImageDecoder::setPreserveHighBitDepth(preserveHighBitDepth_);
     QtImageDecoder::setAutoOrientationEnabled(honorExifOrientation_);
     for (const auto& definition : kShortcutDefinitions) {
         const QString action = QLatin1String(definition.id);
-        const QString stored = settings.value(QStringLiteral("shortcuts/") + action,
-                                              QLatin1String(definition.defaultSequence)).toString();
+        const QString stored = settings
+                                   .value(QStringLiteral("shortcuts/") + action,
+                                          QLatin1String(definition.defaultSequence))
+                                   .toString();
         const QString normalized = normalizedShortcut(stored);
-        shortcuts_.insert(action, normalized.isEmpty()
-                                      ? QLatin1String(definition.defaultSequence) : normalized);
+        shortcuts_.insert(action, normalized.isEmpty() ? QLatin1String(definition.defaultSequence)
+                                                       : normalized);
     }
 
     applyLanguage();
     if (application_ && application_->styleHints()) {
-        connect(application_->styleHints(), &QStyleHints::colorSchemeChanged, this,
-                [this] {
-                    if (theme_ == QStringLiteral("system"))
-                        emit themeChanged();
-                });
+        connect(application_->styleHints(), &QStyleHints::colorSchemeChanged, this, [this] {
+            if (theme_ == QStringLiteral("system"))
+                emit themeChanged();
+        });
     }
 }
 
@@ -131,9 +125,8 @@ QString AppSettings::language() const { return language_; }
 QString AppSettings::effectiveLanguage() const {
     if (language_ != QStringLiteral("system"))
         return language_;
-    return QLocale::system().language() == QLocale::Chinese
-               ? QStringLiteral("zh_CN")
-               : QStringLiteral("en");
+    return QLocale::system().language() == QLocale::Chinese ? QStringLiteral("zh_CN")
+                                                            : QStringLiteral("en");
 }
 
 QString AppSettings::theme() const { return theme_; }
@@ -155,9 +148,8 @@ bool AppSettings::applyEmbeddedColorProfiles() const { return applyEmbeddedColor
 bool AppSettings::preserveHighBitDepth() const { return preserveHighBitDepth_; }
 bool AppSettings::honorExifOrientation() const { return honorExifOrientation_; }
 QString AppSettings::canvasBackground() const { return canvasBackground_; }
-bool AppSettings::colorManagementAvailable() const {
-    return EncodedColorManagement::isAvailable();
-}
+bool AppSettings::smoothDisplay() const { return smoothDisplay_; }
+bool AppSettings::colorManagementAvailable() const { return EncodedColorManagement::isAvailable(); }
 
 QString AppSettings::updateState() const { return updateState_; }
 
@@ -183,9 +175,7 @@ QVariantList AppSettings::shortcutEntries() const {
 
 int AppSettings::shortcutsRevision() const { return shortcutsRevision_; }
 
-QString AppSettings::applicationVersion() const {
-    return QCoreApplication::applicationVersion();
-}
+QString AppSettings::applicationVersion() const { return QCoreApplication::applicationVersion(); }
 
 void AppSettings::setLanguage(const QString& language) {
     const QString normalized = normalizedLanguage(language);
@@ -266,6 +256,14 @@ void AppSettings::setCanvasBackground(const QString& background) {
     emit colorDisplayChanged();
 }
 
+void AppSettings::setSmoothDisplay(bool enabled) {
+    if (smoothDisplay_ == enabled)
+        return;
+    smoothDisplay_ = enabled;
+    QSettings().setValue(QLatin1String(kSmoothDisplayKey), enabled);
+    emit smoothDisplayChanged();
+}
+
 QString AppSettings::shortcutFor(const QString& action) const {
     if (const auto it = shortcuts_.constFind(action); it != shortcuts_.cend())
         return it.value();
@@ -320,8 +318,7 @@ void AppSettings::startAutomaticUpdateCheck() {
 #endif
     if (repositorySlug().isEmpty())
         return;
-    const QDateTime lastCheck =
-        QSettings().value(QLatin1String(kLastUpdateCheckKey)).toDateTime();
+    const QDateTime lastCheck = QSettings().value(QLatin1String(kLastUpdateCheckKey)).toDateTime();
     if (lastCheck.isValid() && lastCheck.secsTo(QDateTime::currentDateTimeUtc()) < 24 * 60 * 60)
         return;
     QTimer::singleShot(1500, this, &AppSettings::checkForUpdates);
@@ -351,8 +348,7 @@ void AppSettings::checkForUpdates() {
                          QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply* reply = networkManager_->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
-        QSettings().setValue(QLatin1String(kLastUpdateCheckKey),
-                             QDateTime::currentDateTimeUtc());
+        QSettings().setValue(QLatin1String(kLastUpdateCheckKey), QDateTime::currentDateTimeUtc());
         const auto deleteReply = qScopeGuard([reply] { reply->deleteLater(); });
         if (reply->error() != QNetworkReply::NoError) {
             setUpdateState(QStringLiteral("error"));
@@ -370,13 +366,14 @@ void AppSettings::checkForUpdates() {
         const bool available =
             QVersionNumber::compare(QVersionNumber::fromString(version),
                                     QVersionNumber::fromString(applicationVersion())) > 0;
-        setUpdateState(available ? QStringLiteral("available") : QStringLiteral("latest"),
-                       version, url);
+        setUpdateState(available ? QStringLiteral("available") : QStringLiteral("latest"), version,
+                       url);
     });
 }
 
 void AppSettings::openReleasePage() const {
-    const QUrl url = releaseUrl_.isValid() ? releaseUrl_ : repositoryUrl(QStringLiteral("/releases"));
+    const QUrl url =
+        releaseUrl_.isValid() ? releaseUrl_ : repositoryUrl(QStringLiteral("/releases"));
     if (url.isValid())
         QDesktopServices::openUrl(url);
 }
@@ -398,6 +395,7 @@ void AppSettings::restoreDefaults() {
     setPreserveHighBitDepth(true);
     setHonorExifOrientation(true);
     setCanvasBackground(QStringLiteral("neutral"));
+    setSmoothDisplay(true);
     resetShortcuts();
 }
 
@@ -405,8 +403,8 @@ void AppSettings::applyLanguage() {
     if (!application_)
         return;
     application_->removeTranslator(&translator_);
-    if (effectiveLanguage() == QStringLiteral("zh_CN")
-        && translator_.load(QStringLiteral(":/i18n/ispimageviewer_zh_CN.qm"))) {
+    if (effectiveLanguage() == QStringLiteral("zh_CN") &&
+        translator_.load(QStringLiteral(":/i18n/ispimageviewer_zh_CN.qm"))) {
         application_->installTranslator(&translator_);
     }
 }

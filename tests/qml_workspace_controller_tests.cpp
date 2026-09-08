@@ -1,35 +1,35 @@
-#include "io/qt_image_decoder.h"
-#include "io/encoded_color_management.h"
-#include "io/image_loader.h"
-#include "platform/full_screen_presentation_controller.h"
-#include "qml/browse_controller.h"
-#include "qml/app_settings.h"
-#include "qml/browse_workspace_controller.h"
-#include "qml/compare_controller.h"
-#include "qml/image_properties_controller.h"
-#include "qml/full_screen_controller.h"
-#include "qml/raw_parameters_controller.h"
-#include "qml/qml_image_canvas.h"
-#include "qml/thumbnail_image_provider.h"
 #include "browser/file_clipboard.h"
 #include "browser/thumbnail_model.h"
+#include "io/encoded_color_management.h"
+#include "io/image_loader.h"
+#include "io/qt_image_decoder.h"
+#include "platform/full_screen_presentation_controller.h"
+#include "qml/app_settings.h"
+#include "qml/browse_controller.h"
+#include "qml/browse_workspace_controller.h"
+#include "qml/compare_controller.h"
+#include "qml/full_screen_controller.h"
+#include "qml/image_properties_controller.h"
+#include "qml/qml_image_canvas.h"
+#include "qml/raw_parameters_controller.h"
+#include "qml/thumbnail_image_provider.h"
 
-#include <QImage>
-#include <QGuiApplication>
-#include <QHash>
 #include <QDir>
 #include <QFile>
-#include <QUrl>
-#include <QWheelEvent>
-#include <QSettings>
-#include <QSignalSpy>
+#include <QGuiApplication>
+#include <QHash>
+#include <QImage>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QSettings>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QUrl>
+#include <QWheelEvent>
 
-#include <cmath>
 #include <atomic>
+#include <cmath>
 #include <memory>
 
 namespace ispview {
@@ -43,12 +43,13 @@ class RawParameterColorDecoder final : public IImageDecoder {
         calls.fetch_add(1, std::memory_order_relaxed);
         QImage image(8, 8, QImage::Format_RGBA8888);
         image.fill(request.rawParameters && request.rawParameters->size.width() == 4
-                       ? QColor(Qt::red) : QColor(Qt::green));
+                       ? QColor(Qt::red)
+                       : QColor(Qt::green));
         auto frame = std::make_shared<ImageFrame>();
         frame->descriptor.size = image.size();
         frame->metadata.path = request.path;
-        frame->metadata.sourceSize = request.rawParameters
-                                         ? request.rawParameters->size : image.size();
+        frame->metadata.sourceSize =
+            request.rawParameters ? request.rawParameters->size : image.size();
         frame->storage = std::move(image);
         return {std::move(frame), {}};
     }
@@ -99,7 +100,8 @@ QString createImage(QTemporaryDir& directory, const QString& name) {
     const QString path = directory.filePath(name);
     QImage image(4, 4, QImage::Format_RGBA8888);
     image.fill(Qt::black);
-    if (!image.save(path)) return {};
+    if (!image.save(path))
+        return {};
     return path;
 }
 
@@ -127,6 +129,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void browseFileDialogsAreRequestedByQmlAndActionsStayInBackend();
     void imagePropertiesAreExposedWithoutWidgetUi();
     void fullScreenPresentationLifecycleIsIdempotent();
+    void imageCanvasSmoothDisplayCanBeToggled();
     void fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml();
     void fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution();
     void fullScreenAutomaticallyPromotesBudgetedImageAfterNavigationSettles();
@@ -217,6 +220,7 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QVERIFY(settings.preserveHighBitDepth());
     QVERIFY(settings.honorExifOrientation());
     QCOMPARE(settings.canvasBackground(), QStringLiteral("neutral"));
+    QVERIFY(settings.smoothDisplay());
     QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("C"));
     QCOMPARE(settings.shortcutEntries().size(), 7);
 
@@ -224,6 +228,7 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QSignalSpy themeSpy(&settings, &AppSettings::themeChanged);
     QSignalSpy shortcutsSpy(&settings, &AppSettings::shortcutsChanged);
     QSignalSpy colorDisplaySpy(&settings, &AppSettings::colorDisplayChanged);
+    QSignalSpy smoothDisplaySpy(&settings, &AppSettings::smoothDisplayChanged);
     settings.setLanguage(QStringLiteral("en"));
     settings.setTheme(QStringLiteral("dark"));
     settings.setRestoreLastDirectory(false);
@@ -233,19 +238,19 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     settings.setPreserveHighBitDepth(false);
     settings.setHonorExifOrientation(false);
     settings.setCanvasBackground(QStringLiteral("black"));
-    QCOMPARE(settings.setShortcut(QStringLiteral("compare"),
-                                  QStringLiteral("Ctrl+Shift+C")), QString{});
-    QCOMPARE(settings.setShortcut(QStringLiteral("rename"),
-                                  QStringLiteral("Ctrl+Shift+C")),
+    settings.setSmoothDisplay(false);
+    QCOMPARE(settings.setShortcut(QStringLiteral("compare"), QStringLiteral("Ctrl+Shift+C")),
+             QString{});
+    QCOMPARE(settings.setShortcut(QStringLiteral("rename"), QStringLiteral("Ctrl+Shift+C")),
              QStringLiteral("compare"));
-    QCOMPARE(settings.setShortcut(QStringLiteral("rename"),
-                                  QStringLiteral("not a shortcut")),
+    QCOMPARE(settings.setShortcut(QStringLiteral("rename"), QStringLiteral("not a shortcut")),
              QStringLiteral("invalid"));
 
     QCOMPARE(languageSpy.count(), 1);
     QCOMPARE(themeSpy.count(), 1);
     QCOMPARE(shortcutsSpy.count(), 1);
     QCOMPARE(colorDisplaySpy.count(), 4);
+    QCOMPARE(smoothDisplaySpy.count(), 1);
     QCOMPARE(QSettings().value(QStringLiteral("general/language")).toString(),
              QStringLiteral("en"));
     QCOMPARE(QSettings().value(QStringLiteral("appearance/theme")).toString(),
@@ -258,11 +263,14 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QVERIFY(!settings.preserveHighBitDepth());
     QVERIFY(!settings.honorExifOrientation());
     QCOMPARE(settings.canvasBackground(), QStringLiteral("black"));
+    QVERIFY(!settings.smoothDisplay());
+    QVERIFY(!QSettings().value(QStringLiteral("display/smoothDisplay")).toBool());
+    AppSettings reloadedSettings(application);
+    QVERIFY(!reloadedSettings.smoothDisplay());
     QVERIFY(!EncodedColorManagement::isEnabled());
     QVERIFY(!QtImageDecoder::preserveHighBitDepth());
     QVERIFY(!QtImageDecoder::autoOrientationEnabled());
-    QCOMPARE(settings.shortcutFor(QStringLiteral("compare")),
-             QStringLiteral("Ctrl+Shift+C"));
+    QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("Ctrl+Shift+C"));
     QCOMPARE(QSettings().value(QStringLiteral("shortcuts/compare")).toString(),
              QStringLiteral("Ctrl+Shift+C"));
 
@@ -276,6 +284,7 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QVERIFY(settings.preserveHighBitDepth());
     QVERIFY(settings.honorExifOrientation());
     QCOMPARE(settings.canvasBackground(), QStringLiteral("neutral"));
+    QVERIFY(settings.smoothDisplay());
     QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("C"));
 }
 
@@ -314,8 +323,9 @@ void QmlWorkspaceControllerTests::exposesNativeFolderNavigationStructure() {
         QVERIFY(!paths.contains(path));
         paths.insert(path);
 #ifdef Q_OS_WIN
-        QVERIFY(place.value(QStringLiteral("icon")).toString().startsWith(
-            QStringLiteral("image://system-folder/")));
+        QVERIFY(place.value(QStringLiteral("icon"))
+                    .toString()
+                    .startsWith(QStringLiteral("image://system-folder/")));
 #else
         QVERIFY(!place.contains(QStringLiteral("icon")));
 #endif
@@ -332,7 +342,8 @@ void QmlWorkspaceControllerTests::exposesNativeFolderNavigationStructure() {
     // URL wiring remains testable there; pixel conversion is validated only on a native QPA.
     if (QGuiApplication::platformName() != QStringLiteral("offscreen"))
         QVERIFY(!nativeIcon.isNull());
-    if (!nativeIcon.isNull()) QCOMPARE(iconSize, nativeIcon.size());
+    if (!nativeIcon.isNull())
+        QCOMPARE(iconSize, nativeIcon.size());
 #endif
 
     auto* folderModel = qobject_cast<QFileSystemModel*>(controller.folderTree());
@@ -471,10 +482,9 @@ void QmlWorkspaceControllerTests::copiesDropsIntoSubfoldersAndAcrossPanes() {
     const QString child = sourceDirectory.filePath(QStringLiteral("child"));
     QVERIFY(QDir().mkdir(child));
 
-    BrowseWorkspaceController workspace(std::make_shared<QtImageDecoder>(),
-                                        sourceDirectory.path());
-    QSignalSpy transferConfirmation(
-        &workspace, &BrowseWorkspaceController::transferConfirmationRequested);
+    BrowseWorkspaceController workspace(std::make_shared<QtImageDecoder>(), sourceDirectory.path());
+    QSignalSpy transferConfirmation(&workspace,
+                                    &BrowseWorkspaceController::transferConfirmationRequested);
     BrowseController* first = paneAt(workspace, 0);
     first->copyDroppedUrlsInto({QUrl::fromLocalFile(source)}, child);
     QCOMPARE(transferConfirmation.size(), 1);
@@ -553,7 +563,8 @@ void QmlWorkspaceControllerTests::rawParametersRefreshEveryPaneAndQmlProvider() 
         QAbstractItemModel* model = pane->thumbnails();
         for (int row = 0; row < model->rowCount(); ++row) {
             const QModelIndex index = model->index(row, 0);
-            if (index.data(ThumbnailModel::PathRole).toString() == rawPath) return index;
+            if (index.data(ThumbnailModel::PathRole).toString() == rawPath)
+                return index;
         }
         return QModelIndex{};
     };
@@ -581,8 +592,8 @@ void QmlWorkspaceControllerTests::rawParametersRefreshEveryPaneAndQmlProvider() 
 
     ThumbnailImageProvider provider(decoder, workspace.loader());
     const QString encodedPath = QString::fromLatin1(QUrl::toPercentEncoding(rawPath));
-    QImage firstImage = provider.requestImage(encodedPath + QStringLiteral("?v=first"), nullptr,
-                                              QSize(16, 16));
+    QImage firstImage =
+        provider.requestImage(encodedPath + QStringLiteral("?v=first"), nullptr, QSize(16, 16));
     QCOMPARE(firstImage.pixelColor(0, 0), QColor(Qt::red));
     QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 1);
 
@@ -592,8 +603,8 @@ void QmlWorkspaceControllerTests::rawParametersRefreshEveryPaneAndQmlProvider() 
     const QString refreshedUrl =
         indexForPath(paneAt(workspace, 1)).data(ThumbnailModel::ThumbnailUrlRole).toString();
     QVERIFY(refreshedUrl != secondUrl);
-    QImage refreshedImage = provider.requestImage(encodedPath + QStringLiteral("?v=second"),
-                                                  nullptr, QSize(16, 16));
+    QImage refreshedImage =
+        provider.requestImage(encodedPath + QStringLiteral("?v=second"), nullptr, QSize(16, 16));
     QCOMPARE(refreshedImage.pixelColor(0, 0), QColor(Qt::green));
     QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 2);
 }
@@ -616,8 +627,7 @@ void QmlWorkspaceControllerTests::galleryUsesPreviewUntilPixelProbeRequestsFullR
     QVERIFY(!controller.probeGalleryPixel(0, 0).isEmpty());
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
     QTRY_VERIFY_WITH_TIMEOUT(
-        controller.probeGalleryPixel(0, 0).contains(QStringLiteral("RGBA(0, 255, 0, 255)")),
-        2000);
+        controller.probeGalleryPixel(0, 0).contains(QStringLiteral("RGBA(0, 255, 0, 255)")), 2000);
 }
 
 void QmlWorkspaceControllerTests::browseFileDialogsAreRequestedByQmlAndActionsStayInBackend() {
@@ -719,6 +729,23 @@ void QmlWorkspaceControllerTests::fullScreenPresentationLifecycleIsIdempotent() 
     QCOMPARE(activeSpy.size(), 2);
 }
 
+void QmlWorkspaceControllerTests::imageCanvasSmoothDisplayCanBeToggled() {
+    QmlImageCanvas canvas;
+    QSignalSpy smoothDisplaySpy(&canvas, &QmlImageCanvas::smoothDisplayChanged);
+
+    QVERIFY(canvas.smoothDisplay());
+    canvas.setSmoothDisplay(false);
+    QVERIFY(!canvas.smoothDisplay());
+    QCOMPARE(smoothDisplaySpy.size(), 1);
+
+    canvas.setSmoothDisplay(false);
+    QCOMPARE(smoothDisplaySpy.size(), 1);
+
+    canvas.setSmoothDisplay(true);
+    QVERIFY(canvas.smoothDisplay());
+    QCOMPARE(smoothDisplaySpy.size(), 2);
+}
+
 void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml() {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -755,8 +782,7 @@ void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperati
     // intentionally not assumed to be trash-capable on every CI host.
 }
 
-void QmlWorkspaceControllerTests::
-    fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution() {
+void QmlWorkspaceControllerTests::fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution() {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("large.png"));
@@ -830,10 +856,10 @@ void QmlWorkspaceControllerTests::
     controller.setPixelValueVisible(true);
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 2, 3000);
     QTRY_VERIFY_WITH_TIMEOUT(controller.frame(0) && controller.frame(1), 2000);
-    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(0)->qImage()->pixelColor(0, 0),
-                              QColor(Qt::green), 2000);
-    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(1)->qImage()->pixelColor(0, 0),
-                              QColor(Qt::green), 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(0)->qImage()->pixelColor(0, 0), QColor(Qt::green),
+                              2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(1)->qImage()->pixelColor(0, 0), QColor(Qt::green),
+                              2000);
 }
 
 void QmlWorkspaceControllerTests::compareAutomaticallyPromotesBudgetedImages() {
@@ -858,10 +884,10 @@ void QmlWorkspaceControllerTests::compareAutomaticallyPromotesBudgetedImages() {
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 2, 2000);
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 2, 3000);
     QTRY_VERIFY_WITH_TIMEOUT(controller.frame(0) && controller.frame(1), 2000);
-    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(0)->qImage()->pixelColor(0, 0),
-                              QColor(Qt::green), 2000);
-    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(1)->qImage()->pixelColor(0, 0),
-                              QColor(Qt::green), 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(0)->qImage()->pixelColor(0, 0), QColor(Qt::green),
+                              2000);
+    QTRY_COMPARE_WITH_TIMEOUT(controller.frame(1)->qImage()->pixelColor(0, 0), QColor(Qt::green),
+                              2000);
 }
 
 void QmlWorkspaceControllerTests::rawParameterEditorAppliesValuesAndManagesPresetsWithoutWidgets() {
@@ -949,8 +975,7 @@ void QmlWorkspaceControllerTests::compareUsesCompactRgbaPixelTextAndLumaOnlyHist
     QSignalSpy histogramSpy(&compare, &CompareController::histogramChanged);
     compare.requestHistogram(0);
     QTRY_VERIFY_WITH_TIMEOUT(!histogramSpy.isEmpty(), 5000);
-    QTRY_VERIFY_WITH_TIMEOUT(
-        compare.histogram(0).value(QStringLiteral("valid")).toBool(), 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(compare.histogram(0).value(QStringLiteral("valid")).toBool(), 5000);
     const QVariantMap histogram = compare.histogram(0);
     const QVariantList channels = histogram.value(QStringLiteral("channels")).toList();
     QCOMPARE(channels.size(), 1);
@@ -1003,8 +1028,7 @@ void QmlWorkspaceControllerTests::compareViewSyncTemporarilyBypassesWithControl(
     QWheelEvent independentWheel(QPointF(50, 100), QPointF(50, 100), {}, QPoint(0, 120),
                                  Qt::NoButton, independentModifier, Qt::NoScrollPhase, false);
     QCoreApplication::sendEvent(&canvas, &independentWheel);
-    const double independentlyAdjustedScale =
-        canvas.effectiveViewState(0).pixelsPerImagePixel;
+    const double independentlyAdjustedScale = canvas.effectiveViewState(0).pixelsPerImagePixel;
     const double unchangedScale = canvas.effectiveViewState(1).pixelsPerImagePixel;
     QVERIFY(independentlyAdjustedScale > initialScale);
     QCOMPARE(unchangedScale, initialScale);
@@ -1012,17 +1036,16 @@ void QmlWorkspaceControllerTests::compareViewSyncTemporarilyBypassesWithControl(
 
     // Releasing Ctrl does not reconcile either view. The next ordinary input
     // applies the same scale delta to both independent baselines.
-    QCOMPARE(canvas.effectiveViewState(0).pixelsPerImagePixel,
-             independentlyAdjustedScale);
+    QCOMPARE(canvas.effectiveViewState(0).pixelsPerImagePixel, independentlyAdjustedScale);
     QCOMPARE(canvas.effectiveViewState(1).pixelsPerImagePixel, unchangedScale);
 
-    QWheelEvent resumedWheel(QPointF(250, 100), QPointF(250, 100), {}, QPoint(0, 120),
-                             Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QWheelEvent resumedWheel(QPointF(250, 100), QPointF(250, 100), {}, QPoint(0, 120), Qt::NoButton,
+                             Qt::NoModifier, Qt::NoScrollPhase, false);
     QCoreApplication::sendEvent(&canvas, &resumedWheel);
     QVERIFY(canvas.effectiveViewState(0).pixelsPerImagePixel > independentlyAdjustedScale);
     QVERIFY(canvas.effectiveViewState(1).pixelsPerImagePixel > unchangedScale);
-    const double resumedRatio = canvas.effectiveViewState(0).pixelsPerImagePixel
-                                / canvas.effectiveViewState(1).pixelsPerImagePixel;
+    const double resumedRatio = canvas.effectiveViewState(0).pixelsPerImagePixel /
+                                canvas.effectiveViewState(1).pixelsPerImagePixel;
     QVERIFY(std::abs(resumedRatio - independentRatio) < 0.000001);
     const QVariantMap navigation = canvas.navigationState(0);
     QVERIFY(navigation.value(QStringLiteral("visible")).toBool());

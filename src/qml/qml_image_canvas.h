@@ -17,17 +17,19 @@ namespace ispview {
 class QmlImageCanvas : public QQuickRhiItem {
     Q_OBJECT
     QML_NAMED_ELEMENT(ImageCanvas)
-    Q_PROPERTY(int presentationMode READ presentationMode WRITE setPresentationMode
-                   NOTIFY presentationModeChanged)
-    Q_PROPERTY(qreal compareAmount READ compareAmount WRITE setCompareAmount
-                   NOTIFY compareAmountChanged)
+    Q_PROPERTY(int presentationMode READ presentationMode WRITE setPresentationMode NOTIFY
+                   presentationModeChanged)
+    Q_PROPERTY(
+        qreal compareAmount READ compareAmount WRITE setCompareAmount NOTIFY compareAmountChanged)
     Q_PROPERTY(qreal dividerPosition READ dividerPosition NOTIFY dividerPositionChanged)
-    Q_PROPERTY(bool viewSynchronized READ synchronized WRITE setSynchronized
-                   NOTIFY synchronizedChanged)
+    Q_PROPERTY(
+        bool viewSynchronized READ synchronized WRITE setSynchronized NOTIFY synchronizedChanged)
     Q_PROPERTY(int imageCount READ imageCount NOTIFY imageCountChanged)
     Q_PROPERTY(int navigationRevision READ navigationRevision NOTIFY navigationRevisionChanged)
-    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor
-                   NOTIFY backgroundColorChanged)
+    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor NOTIFY
+                   backgroundColorChanged)
+    Q_PROPERTY(
+        bool smoothDisplay READ smoothDisplay WRITE setSmoothDisplay NOTIFY smoothDisplayChanged)
 
   public:
     explicit QmlImageCanvas(QQuickItem* parent = nullptr);
@@ -39,12 +41,14 @@ class QmlImageCanvas : public QQuickRhiItem {
     int imageCount() const { return static_cast<int>(frames_.size()); }
     int navigationRevision() const { return navigationRevision_; }
     QColor backgroundColor() const { return backgroundColor_; }
+    bool smoothDisplay() const { return smoothDisplay_; }
     const QVector<ImageFramePtr>& frames() const { return frames_; }
 
     void setPresentationMode(int mode);
     void setCompareAmount(qreal amount);
     void setSynchronized(bool enabled);
     void setBackgroundColor(const QColor& color);
+    void setSmoothDisplay(bool enabled);
     void setFrames(const QVector<ImageFramePtr>& frames, int changedSlot = -1,
                    bool resetChangedView = false);
 
@@ -67,6 +71,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     void imageCountChanged();
     void navigationRevisionChanged();
     void backgroundColorChanged();
+    void smoothDisplayChanged();
     void viewStateChanged(int slot, const ispview::ViewState& state);
     void pixelHovered(int sourceSlot, const QPoint& pixel, const QColor& color, bool valid);
     void slotActivated(int slot);
@@ -94,6 +99,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     QPointF lastMousePosition_;
     int navigationRevision_ = 0;
     QColor backgroundColor_{160, 160, 160};
+    bool smoothDisplay_ = true;
 
     QRectF cellRect(int slot) const;
     int slotAt(const QPointF& position) const;

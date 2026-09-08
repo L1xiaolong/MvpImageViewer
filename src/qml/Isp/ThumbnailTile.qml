@@ -9,6 +9,7 @@ Item {
     id: root
     required property var controller
     property var workspaceController: controller
+    property var settingsController: null
     property string path
     property string fileName
     property string technicalLabel
@@ -159,6 +160,7 @@ Item {
                 clip: true
                 Image {
                     id: gridPreview
+                    objectName: "gridImagePreview"
                     anchors.fill: parent
                     // Keep both URL and requested size stable while the GridView moves. Changing
                     // either one cancels the current async response and briefly clears the texture,
@@ -169,6 +171,8 @@ Item {
                     cache: true
                     sourceSize: Qt.size(384, 384)
                     fillMode: Image.PreserveAspectCrop
+                    smooth: !root.settingsController || root.settingsController.smoothDisplay
+                    mipmap: !root.settingsController || root.settingsController.smoothDisplay
                 }
                 Image {
                     id: gridFolderIcon
@@ -241,6 +245,7 @@ Item {
                 clip: true
                 Image {
                     id: listPreview
+                    objectName: "listImagePreview"
                     anchors.fill: parent
                     source: root.thumbnailUrl
                     visible: !root.directory
@@ -248,6 +253,8 @@ Item {
                     cache: true
                     sourceSize: Qt.size(256, 256)
                     fillMode: Image.PreserveAspectCrop
+                    smooth: !root.settingsController || root.settingsController.smoothDisplay
+                    mipmap: !root.settingsController || root.settingsController.smoothDisplay
                 }
                 Image {
                     id: listFolderIcon
@@ -476,4 +483,5 @@ Item {
         AppMenuItem { text: qsTr("Reveal in Finder / Explorer"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.revealSelected() }
         AppMenuItem { text: qsTr("Properties"); enabled: root.controller.selectionCount === 1; onTriggered: root.controller.showSelectedProperties() }
     }
+
 }

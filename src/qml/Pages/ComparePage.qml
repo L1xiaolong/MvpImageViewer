@@ -12,6 +12,10 @@ Item {
     objectName: "comparePage"
 
     required property var controller
+    property var settingsController: null
+    property bool smoothDisplay: (!settingsController ||
+                                  settingsController.smoothDisplay === undefined)
+                                 ? true : settingsController.smoothDisplay
     property bool designMode: false
     property var paths: []
     property var pixelValues: []
@@ -23,6 +27,13 @@ Item {
 
     signal closeRequested()
     signal screenshotFinished(bool success, url destination)
+
+    function setSmoothDisplay(enabled) {
+        if (root.settingsController && root.settingsController.smoothDisplay !== undefined)
+            root.settingsController.smoothDisplay = enabled
+        else
+            root.smoothDisplay = enabled
+    }
 
     function open(selectedPaths) {
         paths = selectedPaths
@@ -266,6 +277,16 @@ Item {
                 onClicked: root.controller.actualPixelsAll()
             }
             AppIconButton {
+                objectName: "compareSmoothDisplayButton"
+                controlSize: 28
+                renderedIconSize: 16
+                checkable: true
+                checked: root.smoothDisplay
+                iconSource: root.iconPrefix + "smooth-display.svg"
+                toolTipText: qsTr("Smooth display")
+                onClicked: root.setSmoothDisplay(checked)
+            }
+            AppIconButton {
                 objectName: "compareRotateCounterClockwiseButton"
                 controlSize: 28
                 renderedIconSize: 16
@@ -372,8 +393,10 @@ Item {
                     ? Qt.resolvedUrl("../Isp/DesignCompareCanvas.qml")
                     : Qt.resolvedUrl("../Isp/ProductionCompareCanvas.qml")
             onLoaded: {
-                if (item)
+                if (item) {
                     item.controller = root.controller
+                    item.settingsController = root.settingsController
+                }
             }
         }
 
@@ -472,6 +495,8 @@ Item {
                                 + encodeURIComponent(root.paths[comparisonCell.index])
                         sourceSize: Qt.size(90, 65)
                         fillMode: Image.Stretch
+                        smooth: root.smoothDisplay
+                        mipmap: root.smoothDisplay
                         opacity: 0.72
                     }
                     Rectangle {

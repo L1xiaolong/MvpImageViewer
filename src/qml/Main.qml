@@ -231,6 +231,7 @@ ApplicationWindow {
         id: comparePage
         objectName: "comparePage"
         controller: compareController
+        settingsController: appSettings
         anchors.fill: parent
         visible: window.showingCompare && !window.showingFullScreen
         onCloseRequested: window.closeCompare()

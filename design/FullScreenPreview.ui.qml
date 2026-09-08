@@ -8,12 +8,18 @@ Item {
 
     MockFullScreenController { id: mockFullScreen }
     MockImagePropertiesController { id: mockProperties }
+    QtObject {
+        id: mockSettings
+        property bool smoothDisplay: true
+        property bool confirmTrash: true
+    }
 
     FullScreenPage {
         id: productionFullScreenPage
         anchors.fill: parent
         controller: mockFullScreen
         propertiesController: mockProperties
+        settingsController: mockSettings
         designMode: true
         iconPrefix: Qt.resolvedUrl("../assets/icons/ui/").toString()
         Component.onCompleted: {

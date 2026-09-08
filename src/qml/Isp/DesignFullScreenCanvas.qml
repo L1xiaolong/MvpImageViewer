@@ -5,6 +5,10 @@ Rectangle {
     objectName: "designFullScreenCanvas"
 
     property var controller: null
+    property var settingsController: null
+    property bool smoothDisplay: !settingsController ||
+                                 settingsController.smoothDisplay === undefined
+                                 ? true : settingsController.smoothDisplay
     property int navigationRevision: 1
     signal pixelHovered(int sourceSlot, point pixel, color colorValue, bool valid)
     signal contextMenuRequested(point position)

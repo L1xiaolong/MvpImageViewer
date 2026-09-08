@@ -10,6 +10,7 @@ Rectangle {
     required property var controller
     required property var workspaceController
     required property int paneIndex
+    property var settingsController: null
     property bool active: workspaceController.activePaneIndex === paneIndex
     property bool contentInteractionEnabled: true
     property string iconPrefix: Theme.iconPrefix
@@ -256,6 +257,7 @@ Rectangle {
                 displayMode: root.displayMode
                 controller: root.controller
                 workspaceController: root.workspaceController
+                settingsController: root.settingsController
                 path: parent.path
                 fileName: parent.fileName
                 technicalLabel: parent.technicalLabel
@@ -333,4 +335,5 @@ Rectangle {
         AppMenuSeparator {}
         AppMenuItem { text: qsTr("New folder…"); onTriggered: root.newFolderRequested() }
     }
+
 }

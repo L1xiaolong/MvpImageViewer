@@ -11,6 +11,9 @@ Item {
     required property var controller
     property var propertiesController: null
     property var settingsController: null
+    property bool smoothDisplay: (!settingsController ||
+                                  settingsController.smoothDisplay === undefined)
+                                 ? true : settingsController.smoothDisplay
     property bool designMode: false
     property string iconPrefix: Theme.iconPrefix
     property string pixelText: qsTr("Move over the image")
@@ -24,6 +27,13 @@ Item {
     }
 
     signal closeRequested()
+
+    function setSmoothDisplay(enabled) {
+        if (root.settingsController && root.settingsController.smoothDisplay !== undefined)
+            root.settingsController.smoothDisplay = enabled
+        else
+            root.smoothDisplay = enabled
+    }
 
     function requestMoveCurrentToTrash() {
         if (!root.settingsController || root.settingsController.confirmTrash) {
@@ -73,7 +83,10 @@ Item {
         source: root.designMode
                 ? Qt.resolvedUrl("../Isp/DesignFullScreenCanvas.qml")
                 : Qt.resolvedUrl("../Isp/ProductionFullScreenCanvas.qml")
-        onLoaded: if (item) item.controller = root.controller
+        onLoaded: if (item) {
+            item.controller = root.controller
+            item.settingsController = root.settingsController
+        }
     }
 
     Connections {
@@ -194,6 +207,8 @@ Item {
                     : ""
             sourceSize: Qt.size(90, 65)
             fillMode: Image.Stretch
+            smooth: root.smoothDisplay
+            mipmap: root.smoothDisplay
             opacity: 0.72
         }
         Rectangle {

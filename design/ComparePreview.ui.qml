@@ -9,11 +9,16 @@ Item {
     MockCompareController {
         id: mockCompareController
     }
+    QtObject {
+        id: mockSettings
+        property bool smoothDisplay: true
+    }
 
     ComparePage {
         id: productionComparePage
         anchors.fill: parent
         controller: mockCompareController
+        settingsController: mockSettings
         designMode: true
     }
 

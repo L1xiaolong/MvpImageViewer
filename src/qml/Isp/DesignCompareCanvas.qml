@@ -6,6 +6,10 @@ Item {
     objectName: "designCompareCanvas"
 
     property var controller: null
+    property var settingsController: null
+    property bool smoothDisplay: !settingsController ||
+                                 settingsController.smoothDisplay === undefined
+                                 ? true : settingsController.smoothDisplay
     property real dividerPosition: width * 0.5
     property int navigationRevision: 0
     property real compareAmount: controller ? controller.splitAmount : 0.5
@@ -42,6 +46,8 @@ Item {
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 cache: true
+                smooth: root.smoothDisplay
+                mipmap: root.smoothDisplay
             }
         }
     }

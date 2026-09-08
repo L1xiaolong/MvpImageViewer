@@ -98,6 +98,21 @@ TestCase {
         page.closeRequested.disconnect(countClose)
     }
 
+    function test_fullScreenCanvasInheritsGlobalSmoothDisplaySetting() {
+        const page = findChild(preview, "fullScreenPage")
+        const canvas = findChild(page, "designFullScreenCanvas")
+        const action = findChild(page, "fullScreenSmoothDisplayAction")
+        verify(canvas !== null)
+        compare(action, null)
+        verify(canvas.smoothDisplay)
+
+        page.setSmoothDisplay(false)
+        compare(page.smoothDisplay, false)
+        compare(canvas.smoothDisplay, false)
+
+        page.setSmoothDisplay(true)
+    }
+
     function test_propertiesOpenExplicitlyAndCardCanBeDragged() {
         const page = findChild(preview, "fullScreenPage")
         const dialog = findChild(page, "imagePropertiesDialog")

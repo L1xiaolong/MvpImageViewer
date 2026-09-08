@@ -42,256 +42,256 @@
 <context>
     <name>BrowsePage</name>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="25"/>
+        <location filename="../Pages/BrowsePage.qml" line="28"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="25"/>
+        <location filename="../Pages/BrowsePage.qml" line="28"/>
         <source>Modified</source>
         <translation>修改时间</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="26"/>
+        <location filename="../Pages/BrowsePage.qml" line="29"/>
         <source>Size</source>
         <translation>大小</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="26"/>
+        <location filename="../Pages/BrowsePage.qml" line="29"/>
         <source>Type</source>
         <translation>类型</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="201"/>
+        <location filename="../Pages/BrowsePage.qml" line="215"/>
         <source>Open folder…</source>
         <translation>打开文件夹…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="205"/>
+        <location filename="../Pages/BrowsePage.qml" line="219"/>
         <source>Back</source>
         <translation>后退</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="210"/>
+        <location filename="../Pages/BrowsePage.qml" line="224"/>
         <source>Forward</source>
         <translation>前进</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="215"/>
+        <location filename="../Pages/BrowsePage.qml" line="229"/>
         <source>Parent folder</source>
         <translation>上级文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="221"/>
+        <location filename="../Pages/BrowsePage.qml" line="235"/>
         <source>Add file manager</source>
         <translation>添加文件管理器</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="674"/>
+        <location filename="../Pages/BrowsePage.qml" line="694"/>
         <source>1:1</source>
         <translation>1:1</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="705"/>
+        <location filename="../Pages/BrowsePage.qml" line="725"/>
         <source>Fit</source>
         <translation>适应窗口</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="732"/>
+        <location filename="../Pages/BrowsePage.qml" line="752"/>
         <source>↗</source>
         <translation>↗</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="739"/>
-        <location filename="../Pages/BrowsePage.qml" line="1270"/>
-        <location filename="../Pages/BrowsePage.qml" line="1320"/>
+        <location filename="../Pages/BrowsePage.qml" line="759"/>
+        <location filename="../Pages/BrowsePage.qml" line="1294"/>
+        <location filename="../Pages/BrowsePage.qml" line="1344"/>
         <source>Open full screen</source>
         <translation>全屏打开</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1213"/>
+        <location filename="../Pages/BrowsePage.qml" line="1237"/>
         <source>Open in Finder</source>
         <translation>在 Finder 中打开</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1214"/>
+        <location filename="../Pages/BrowsePage.qml" line="1238"/>
         <source>Open in File Explorer</source>
         <translation>在文件资源管理器中打开</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1219"/>
+        <location filename="../Pages/BrowsePage.qml" line="1243"/>
         <source>Refresh</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1224"/>
+        <location filename="../Pages/BrowsePage.qml" line="1248"/>
         <source>Select all</source>
         <translation>全选</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1229"/>
+        <location filename="../Pages/BrowsePage.qml" line="1253"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1236"/>
+        <location filename="../Pages/BrowsePage.qml" line="1260"/>
         <source>New folder…</source>
         <translation>新建文件夹…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1242"/>
+        <location filename="../Pages/BrowsePage.qml" line="1266"/>
         <source>Sort by</source>
         <translation>排序方式</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1274"/>
-        <location filename="../Pages/BrowsePage.qml" line="1321"/>
+        <location filename="../Pages/BrowsePage.qml" line="1298"/>
+        <location filename="../Pages/BrowsePage.qml" line="1345"/>
         <source>Compare selected</source>
         <translation>对比所选图片</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1280"/>
-        <location filename="../Pages/BrowsePage.qml" line="1323"/>
+        <location filename="../Pages/BrowsePage.qml" line="1304"/>
+        <location filename="../Pages/BrowsePage.qml" line="1347"/>
         <source>Restore original</source>
         <translation>恢复原图</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1285"/>
-        <location filename="../Pages/BrowsePage.qml" line="1325"/>
+        <location filename="../Pages/BrowsePage.qml" line="1309"/>
         <location filename="../Pages/BrowsePage.qml" line="1349"/>
+        <location filename="../Pages/BrowsePage.qml" line="1373"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1290"/>
-        <location filename="../Pages/BrowsePage.qml" line="1326"/>
-        <location filename="../Pages/BrowsePage.qml" line="1354"/>
-        <location filename="../Pages/BrowsePage.qml" line="1504"/>
+        <location filename="../Pages/BrowsePage.qml" line="1314"/>
+        <location filename="../Pages/BrowsePage.qml" line="1350"/>
+        <location filename="../Pages/BrowsePage.qml" line="1378"/>
+        <location filename="../Pages/BrowsePage.qml" line="1528"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1295"/>
-        <location filename="../Pages/BrowsePage.qml" line="1327"/>
-        <location filename="../Pages/BrowsePage.qml" line="1359"/>
+        <location filename="../Pages/BrowsePage.qml" line="1319"/>
+        <location filename="../Pages/BrowsePage.qml" line="1351"/>
+        <location filename="../Pages/BrowsePage.qml" line="1383"/>
         <source>Rename…</source>
         <translation>重命名…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1300"/>
-        <location filename="../Pages/BrowsePage.qml" line="1328"/>
-        <location filename="../Pages/BrowsePage.qml" line="1364"/>
+        <location filename="../Pages/BrowsePage.qml" line="1324"/>
+        <location filename="../Pages/BrowsePage.qml" line="1352"/>
+        <location filename="../Pages/BrowsePage.qml" line="1388"/>
         <source>Move to Trash</source>
         <translation>移入回收站</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1306"/>
         <location filename="../Pages/BrowsePage.qml" line="1330"/>
-        <location filename="../Pages/BrowsePage.qml" line="1370"/>
+        <location filename="../Pages/BrowsePage.qml" line="1354"/>
+        <location filename="../Pages/BrowsePage.qml" line="1394"/>
         <source>Reveal in Finder / Explorer</source>
         <translation>在 Finder / 文件资源管理器中显示</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1311"/>
-        <location filename="../Pages/BrowsePage.qml" line="1331"/>
-        <location filename="../Pages/BrowsePage.qml" line="1375"/>
+        <location filename="../Pages/BrowsePage.qml" line="1335"/>
+        <location filename="../Pages/BrowsePage.qml" line="1355"/>
+        <location filename="../Pages/BrowsePage.qml" line="1399"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1322"/>
+        <location filename="../Pages/BrowsePage.qml" line="1346"/>
         <source>RAW/YUV parameters…</source>
         <translation>RAW/YUV 参数…</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1339"/>
-        <location filename="../Pages/BrowsePage.qml" line="1383"/>
+        <location filename="../Pages/BrowsePage.qml" line="1363"/>
+        <location filename="../Pages/BrowsePage.qml" line="1407"/>
         <source>Open folder</source>
         <translation>打开文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1343"/>
+        <location filename="../Pages/BrowsePage.qml" line="1367"/>
         <source>Paste into folder</source>
         <translation>粘贴到文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1391"/>
+        <location filename="../Pages/BrowsePage.qml" line="1415"/>
         <source>New folder</source>
         <translation>新建文件夹</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1392"/>
+        <location filename="../Pages/BrowsePage.qml" line="1416"/>
         <source>Create a folder in </source>
         <translation>在此位置创建文件夹：</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1394"/>
+        <location filename="../Pages/BrowsePage.qml" line="1418"/>
         <source>Create</source>
         <translation>创建</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1404"/>
+        <location filename="../Pages/BrowsePage.qml" line="1428"/>
         <source>Rename item</source>
         <translation>重命名项目</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1405"/>
+        <location filename="../Pages/BrowsePage.qml" line="1429"/>
         <source>Enter a new name for the selected item</source>
         <translation>输入所选项目的新名称</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1406"/>
+        <location filename="../Pages/BrowsePage.qml" line="1430"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1416"/>
+        <location filename="../Pages/BrowsePage.qml" line="1440"/>
         <source>Move to Trash?</source>
         <translation>移入回收站？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1417"/>
-        <location filename="../Pages/BrowsePage.qml" line="1504"/>
+        <location filename="../Pages/BrowsePage.qml" line="1441"/>
+        <location filename="../Pages/BrowsePage.qml" line="1528"/>
         <source>Move</source>
         <translation>移动</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1480"/>
+        <location filename="../Pages/BrowsePage.qml" line="1504"/>
         <source>The selected item will be moved to the system Trash.</source>
         <translation>所选项目将被移入系统回收站。</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1481"/>
+        <location filename="../Pages/BrowsePage.qml" line="1505"/>
         <source>%1 selected items will be moved to the system Trash.</source>
         <translation>%1 个所选项目将被移入系统回收站。</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1503"/>
+        <location filename="../Pages/BrowsePage.qml" line="1527"/>
         <source>Move items?</source>
         <translation>移动项目？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1503"/>
+        <location filename="../Pages/BrowsePage.qml" line="1527"/>
         <source>Copy items?</source>
         <translation>复制项目？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1508"/>
+        <location filename="../Pages/BrowsePage.qml" line="1532"/>
         <source>Move 1 item to “%1”?</source>
         <translation>将 1 个项目移动到“%1”？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1509"/>
+        <location filename="../Pages/BrowsePage.qml" line="1533"/>
         <source>Copy 1 item to “%1”?</source>
         <translation>将 1 个项目复制到“%1”？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1512"/>
+        <location filename="../Pages/BrowsePage.qml" line="1536"/>
         <source>Move %1 items to “%2”?</source>
         <translation>将 %1 个项目移动到“%2”？</translation>
     </message>
     <message>
-        <location filename="../Pages/BrowsePage.qml" line="1513"/>
+        <location filename="../Pages/BrowsePage.qml" line="1537"/>
         <source>Copy %1 items to “%2”?</source>
         <translation>将 %1 个项目复制到“%2”？</translation>
     </message>
@@ -299,129 +299,190 @@
 <context>
     <name>BrowserPane</name>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="95"/>
+        <location filename="../Isp/BrowserPane.qml" line="96"/>
         <source>Close file manager</source>
         <translation>关闭文件管理器</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="129"/>
+        <location filename="../Isp/BrowserPane.qml" line="130"/>
         <source>Drop to open here</source>
         <translation>拖放到这里打开</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="130"/>
+        <location filename="../Isp/BrowserPane.qml" line="131"/>
         <source>Choose a folder from the sidebar</source>
         <translation>从侧边栏选择文件夹</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="131"/>
+        <location filename="../Isp/BrowserPane.qml" line="132"/>
         <source>Select this area to choose a folder</source>
         <translation>选择此区域以选择文件夹</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="277"/>
+        <location filename="../Isp/BrowserPane.qml" line="287"/>
         <source>No supported images in this folder
 Choose another folder or drop images here</source>
         <translation>此文件夹中没有支持的图片
 请选择其他文件夹或将图片拖到这里</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="317"/>
+        <location filename="../Isp/BrowserPane.qml" line="327"/>
         <source>Open in Finder</source>
         <translation>在 Finder 中打开</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="318"/>
+        <location filename="../Isp/BrowserPane.qml" line="328"/>
         <source>Open in File Explorer</source>
         <translation>在文件资源管理器中打开</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="322"/>
+        <location filename="../Isp/BrowserPane.qml" line="332"/>
         <source>Refresh</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="323"/>
+        <location filename="../Isp/BrowserPane.qml" line="333"/>
         <source>Select all</source>
         <translation>全选</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="324"/>
+        <location filename="../Isp/BrowserPane.qml" line="334"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../Isp/BrowserPane.qml" line="326"/>
+        <location filename="../Isp/BrowserPane.qml" line="336"/>
         <source>New folder…</source>
         <translation>新建文件夹…</translation>
+    </message>
+    <message>
+        <source>Open full screen</source>
+        <translation type="vanished">全屏打开</translation>
+    </message>
+    <message>
+        <source>Compare selected</source>
+        <translation type="vanished">对比所选图片</translation>
+    </message>
+    <message>
+        <source>Restore original</source>
+        <translation type="vanished">恢复原图</translation>
+    </message>
+    <message>
+        <source>Cut</source>
+        <translation type="vanished">剪切</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="vanished">复制</translation>
+    </message>
+    <message>
+        <source>Rename…</source>
+        <translation type="vanished">重命名…</translation>
+    </message>
+    <message>
+        <source>Move to Trash</source>
+        <translation type="vanished">移入回收站</translation>
+    </message>
+    <message>
+        <source>Reveal in Finder / Explorer</source>
+        <translation type="vanished">在 Finder / 文件资源管理器中显示</translation>
+    </message>
+    <message>
+        <source>Properties</source>
+        <translation type="vanished">属性</translation>
+    </message>
+    <message>
+        <source>RAW/YUV parameters…</source>
+        <translation type="vanished">RAW/YUV 参数…</translation>
+    </message>
+    <message>
+        <source>Open folder</source>
+        <translation type="vanished">打开文件夹</translation>
+    </message>
+    <message>
+        <source>Paste into folder</source>
+        <translation type="vanished">粘贴到文件夹</translation>
     </message>
 </context>
 <context>
     <name>ComparePage</name>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="135"/>
+        <location filename="../Pages/ComparePage.qml" line="146"/>
         <source>Save comparison screenshot</source>
         <translation>保存对比截图</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="221"/>
+        <location filename="../Pages/ComparePage.qml" line="232"/>
         <source>Side by side · Hold Ctrl while zooming or panning to adjust one image</source>
         <translation>并排显示 · 缩放或平移时按住 Ctrl 可单独调整一张图片</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="231"/>
+        <location filename="../Pages/ComparePage.qml" line="242"/>
         <source>Vertical split</source>
         <translation>垂直分割</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="241"/>
+        <location filename="../Pages/ComparePage.qml" line="252"/>
         <source>Hold B to inspect the candidate</source>
         <translation>按住 B 检查候选图</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="258"/>
+        <location filename="../Pages/ComparePage.qml" line="269"/>
         <source>Fit all images</source>
         <translation>适应全部图片</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="265"/>
+        <location filename="../Pages/ComparePage.qml" line="276"/>
         <source>Actual pixels (1:1)</source>
         <translation>实际像素（1:1）</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="274"/>
+        <location filename="../Pages/ComparePage.qml" line="286"/>
+        <source>Smooth display</source>
+        <translation>平滑显示</translation>
+    </message>
+    <message>
+        <location filename="../Pages/ComparePage.qml" line="295"/>
         <source>Rotate selected image 90° counterclockwise</source>
         <translation>将所选图片逆时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="287"/>
+        <location filename="../Pages/ComparePage.qml" line="308"/>
         <source>Rotate selected image 90° clockwise</source>
         <translation>将所选图片顺时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="309"/>
+        <location filename="../Pages/ComparePage.qml" line="330"/>
         <source>File information</source>
         <translation>文件信息</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="318"/>
+        <location filename="../Pages/ComparePage.qml" line="339"/>
         <source>EXIF information</source>
         <translation>EXIF 信息</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="327"/>
+        <location filename="../Pages/ComparePage.qml" line="348"/>
         <source>Luma histogram</source>
         <translation>亮度直方图</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="336"/>
+        <location filename="../Pages/ComparePage.qml" line="357"/>
         <source>Pixel values</source>
         <translation>像素值</translation>
     </message>
     <message>
-        <location filename="../Pages/ComparePage.qml" line="353"/>
+        <location filename="../Pages/ComparePage.qml" line="374"/>
         <source>Save screenshot</source>
         <translation>保存截图</translation>
+    </message>
+</context>
+<context>
+    <name>DesignFullScreenCanvas</name>
+    <message>
+        <location filename="../Isp/DesignFullScreenCanvas.qml" line="30"/>
+        <source>Demo image</source>
+        <translation>示例图片</translation>
     </message>
 </context>
 <context>
@@ -445,78 +506,78 @@ Choose another folder or drop images here</source>
 <context>
     <name>FullScreenPage</name>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="16"/>
-        <location filename="../Pages/FullScreenPage.qml" line="42"/>
+        <location filename="../Pages/FullScreenPage.qml" line="19"/>
+        <location filename="../Pages/FullScreenPage.qml" line="52"/>
         <source>Move over the image</source>
         <translation>将指针移到图片上</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="256"/>
+        <location filename="../Pages/FullScreenPage.qml" line="275"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="257"/>
+        <location filename="../Pages/FullScreenPage.qml" line="276"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="258"/>
+        <location filename="../Pages/FullScreenPage.qml" line="277"/>
         <source>Rename…</source>
         <translation>重命名…</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="259"/>
+        <location filename="../Pages/FullScreenPage.qml" line="278"/>
         <source>Move to Trash</source>
         <translation>移入回收站</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="264"/>
+        <location filename="../Pages/FullScreenPage.qml" line="283"/>
         <source>Display</source>
         <translation>显示</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="265"/>
+        <location filename="../Pages/FullScreenPage.qml" line="284"/>
         <source>1:1</source>
         <translation>1:1</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="266"/>
+        <location filename="../Pages/FullScreenPage.qml" line="285"/>
         <source>Fit</source>
         <translation>适应窗口</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="271"/>
+        <location filename="../Pages/FullScreenPage.qml" line="290"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="279"/>
+        <location filename="../Pages/FullScreenPage.qml" line="298"/>
         <source>Rename image</source>
         <translation>重命名图片</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="280"/>
+        <location filename="../Pages/FullScreenPage.qml" line="299"/>
         <source>Enter a new name for the current image</source>
         <translation>输入当前图片的新名称</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="281"/>
+        <location filename="../Pages/FullScreenPage.qml" line="300"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="288"/>
+        <location filename="../Pages/FullScreenPage.qml" line="307"/>
         <source>Move to Trash?</source>
         <translation>移入回收站？</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="289"/>
+        <location filename="../Pages/FullScreenPage.qml" line="308"/>
         <source>The current image will be moved to the system Trash.</source>
         <translation>当前图片将被移入系统回收站。</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="290"/>
+        <location filename="../Pages/FullScreenPage.qml" line="309"/>
         <source>Move</source>
         <translation>移动</translation>
     </message>
@@ -1156,176 +1217,196 @@ Choose another folder or drop images here</source>
 <context>
     <name>ThumbnailTile</name>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="304"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="353"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="398"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="447"/>
         <source>Open full screen</source>
         <translation>全屏打开</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="308"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="355"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="402"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="449"/>
         <source>Compare selected</source>
         <translation>对比所选图片</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="314"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="366"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="408"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="460"/>
         <source>Restore original</source>
         <translation>恢复原图</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="319"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="370"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="384"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="413"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="464"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="478"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="324"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="371"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="385"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="418"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="465"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="479"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="329"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="372"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="386"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="423"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="466"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="480"/>
         <source>Rename…</source>
         <translation>重命名…</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="334"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="373"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="387"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="428"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="467"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="481"/>
         <source>Move to Trash</source>
         <translation>移入回收站</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="340"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="375"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="389"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="434"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="469"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="483"/>
         <source>Reveal in Finder / Explorer</source>
         <translation>在 Finder / 文件资源管理器中显示</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="345"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="376"/>
-        <location filename="../Isp/ThumbnailTile.qml" line="390"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="439"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="470"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="484"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="360"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="454"/>
         <source>RAW/YUV parameters…</source>
         <translation>RAW/YUV 参数…</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="381"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="475"/>
         <source>Open folder</source>
         <translation>打开文件夹</translation>
     </message>
     <message>
-        <location filename="../Isp/ThumbnailTile.qml" line="382"/>
+        <location filename="../Isp/ThumbnailTile.qml" line="476"/>
         <source>Paste into folder</source>
         <translation>粘贴到文件夹</translation>
+    </message>
+    <message>
+        <location filename="../Isp/ThumbnailTile.qml" line="67"/>
+        <source>Reading size…</source>
+        <translation>正在读取尺寸…</translation>
+    </message>
+    <message>
+        <location filename="../Isp/ThumbnailTile.qml" line="70"/>
+        <source>Reading…</source>
+        <translation>正在读取…</translation>
+    </message>
+    <message>
+        <location filename="../Isp/ThumbnailTile.qml" line="105"/>
+        <source>Folder</source>
+        <translation>文件夹</translation>
     </message>
 </context>
 <context>
     <name>TopToolbar.ui</name>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="43"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="48"/>
         <source>MVP Image Viewer</source>
         <translation>MVP Image Viewer</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="69"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="74"/>
         <source>Open folder</source>
         <translation>打开文件夹</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="81"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="86"/>
         <source>New folder</source>
         <translation>新建文件夹</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="93"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="98"/>
         <source>Add file manager</source>
         <translation>添加文件管理器</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="93"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="98"/>
         <source>Maximum 4 file managers</source>
         <translation>最多可打开 4 个文件管理器</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="130"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="135"/>
         <source>List view</source>
         <translation>列表视图</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="182"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="187"/>
         <source>Sort by name</source>
         <translation>按名称排序</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="182"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="187"/>
         <source>Sort by modified time</source>
         <translation>按修改时间排序</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="183"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="188"/>
         <source>Sort by file size</source>
         <translation>按文件大小排序</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="183"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="188"/>
         <source>Sort by file type</source>
         <translation>按文件类型排序</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="195"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="200"/>
         <source>Rotate 90° counterclockwise</source>
         <translation>逆时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="196"/>
-        <location filename="../Isp/TopToolbar.ui.qml" line="209"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="201"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="214"/>
         <source>Select one image to rotate</source>
         <translation>选择一张图片以旋转</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="208"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="213"/>
         <source>Rotate 90° clockwise</source>
         <translation>顺时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="221"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="226"/>
         <source>Resize image…</source>
         <translation>调整图片大小…</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="221"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="226"/>
         <source>Select one image to resize</source>
         <translation>选择一张图片以调整大小</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="243"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="251"/>
+        <source>Smooth display</source>
+        <translation>平滑显示</translation>
+    </message>
+    <message>
+        <location filename="../Isp/TopToolbar.ui.qml" line="261"/>
         <source>Search files</source>
         <translation>搜索文件</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="276"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="295"/>
         <source>⌘F</source>
         <translation>⌘F</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="288"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="307"/>
         <source>×</source>
         <translation>×</translation>
     </message>
     <message>
-        <location filename="../Isp/TopToolbar.ui.qml" line="308"/>
+        <location filename="../Isp/TopToolbar.ui.qml" line="327"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>

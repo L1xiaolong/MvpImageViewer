@@ -50,6 +50,7 @@ const translations = new Map(Object.entries({
   "Dark gray": "深灰色",
   "Default shortcuts restored.": "已恢复默认快捷键。",
   "Delete preset": "删除预设",
+  "Demo image": "示例图片",
   "Demosaic": "去马赛克",
   "Display": "显示",
   "Display color space: sRGB": "显示色彩空间：sRGB",
@@ -66,6 +67,7 @@ const translations = new Map(Object.entries({
   "Fit all images": "适应全部图片",
   "Format": "格式",
   "Forward": "前进",
+  "Folder": "文件夹",
   "General": "通用",
   "Header offset": "文件头偏移",
   "Help": "帮助",
@@ -125,6 +127,8 @@ const translations = new Map(Object.entries({
   "RAW / YUV DECODER": "RAW / YUV 解码器",
   "RAW/YUV parameters…": "RAW/YUV 参数…",
   "Reading full-resolution metadata…": "正在读取全分辨率元数据…",
+  "Reading size…": "正在读取尺寸…",
+  "Reading…": "正在读取…",
   "Recent": "最近使用",
   "Refresh": "刷新",
   "Rename": "重命名",
@@ -161,6 +165,7 @@ const translations = new Map(Object.entries({
   "Show or hide sidebar": "显示或隐藏侧边栏",
   "Size": "大小",
   "Side by side · Hold Ctrl while zooming or panning to adjust one image": "并排显示 · 缩放或平移时按住 Ctrl 可单独调整一张图片",
+  "Smooth display": "平滑显示",
   "Sort by": "排序方式",
   "Sort by file size": "按文件大小排序",
   "Sort by file type": "按文件类型排序",
@@ -222,7 +227,7 @@ const encodeXml = value => value
 
 let xml = fs.readFileSync(path, "utf8");
 xml = xml.replace(
-  /<source>([\s\S]*?)<\/source>\s*<translation(?: type="unfinished")?>[\s\S]*?<\/translation>/g,
+  /<source>([^<]*)<\/source>\s*<translation(?: type="unfinished")?>[\s\S]*?<\/translation>/g,
   (match, encodedSource) => {
     const source = decodeXml(encodedSource);
     if (!translations.has(source)) {

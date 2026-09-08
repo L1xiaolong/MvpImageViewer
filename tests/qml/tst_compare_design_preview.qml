@@ -29,6 +29,24 @@ TestCase {
         compare(saveButton.toolTipText, "Save screenshot")
     }
 
+    function test_smoothDisplayButtonFollowsAndChangesTheSharedSetting() {
+        const page = findChild(preview, "comparePage")
+        const canvas = findChild(preview, "designCompareCanvas")
+        const button = findChild(preview, "compareSmoothDisplayButton")
+        verify(page !== null)
+        verify(canvas !== null)
+        verify(button !== null)
+        verify(button.checked)
+        verify(canvas.smoothDisplay)
+
+        mouseClick(button, button.width / 2, button.height / 2, Qt.LeftButton)
+        compare(page.smoothDisplay, false)
+        compare(button.checked, false)
+        compare(canvas.smoothDisplay, false)
+
+        page.setSmoothDisplay(true)
+    }
+
     function test_screenshotButtonOpensSaveDialog() {
         const saveButton = findChild(preview, "saveComparisonScreenshotButton")
         const saveDialog = findChild(preview, "comparisonScreenshotSaveDialog")

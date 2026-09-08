@@ -19,6 +19,14 @@ TestCase {
 
     readonly property var mockController: mockWorkspace.pane0
 
+    QtObject {
+        id: mockSettings
+        property bool smoothDisplay: true
+        property bool confirmTrash: true
+        property int shortcutsRevision: 0
+        function shortcutFor(action) { return "" }
+    }
+
     AppMenuItem {
         id: conditionalMenuItem
         visible: false
@@ -30,6 +38,7 @@ TestCase {
         anchors.fill: parent
         controller: testCase.mockController
         workspaceController: mockWorkspace
+        settingsController: mockSettings
         designMode: true
         iconPrefix: Qt.resolvedUrl("../../assets/icons/ui/").toString()
     }
@@ -48,17 +57,30 @@ TestCase {
     function test_topToolbarMatchesComparisonToolbarMetrics() {
         const toolbar = findChild(browsePage, "topToolbar")
         const openFolderButton = findChild(toolbar, "openFolderButton")
+        const compareButton = findChild(toolbar, "compareButton")
+        const sortButton = findChild(toolbar, "sortButton")
+        const rotateCounterClockwiseButton = findChild(toolbar, "rotateCounterClockwiseButton")
         const searchField = findChild(toolbar, "browserSearchField")
+        const smoothDisplayButton = findChild(toolbar, "smoothDisplayButton")
         const settingsButton = findChild(toolbar, "settingsButton")
         verify(toolbar !== null)
         verify(openFolderButton !== null)
+        verify(compareButton !== null)
+        verify(sortButton !== null)
+        verify(rotateCounterClockwiseButton !== null)
         verify(searchField !== null)
+        verify(smoothDisplayButton !== null)
         verify(settingsButton !== null)
         compare(toolbar.height, 38)
         compare(openFolderButton.width, 28)
         compare(openFolderButton.height, 28)
         compare(openFolderButton.renderedIconSize, 16)
         compare(searchField.height, 28)
+        compare(smoothDisplayButton.width, 28)
+        compare(smoothDisplayButton.renderedIconSize, 16)
+        verify(smoothDisplayButton.x > sortButton.x)
+        verify(smoothDisplayButton.x < rotateCounterClockwiseButton.x)
+        verify(compareButton.x + compareButton.width < searchField.x)
         compare(settingsButton.width, 28)
         compare(settingsButton.renderedIconSize, 16)
     }
@@ -79,6 +101,40 @@ TestCase {
         tryCompare(imageMenu, "opened", true);
         compare(mockController.selectedPaths[0], mockController.thumbnails.get(2).path);
         imageMenu.close();
+    }
+
+    function test_topToolbarSmoothDisplaySettingUpdatesGalleryAndThumbnails() {
+        const galleryImage = findChild(browsePage, "galleryImage")
+        const toolbarButton = findChild(browsePage, "smoothDisplayButton")
+        verify(galleryImage !== null)
+        verify(toolbarButton !== null)
+        verify(mockSettings.smoothDisplay)
+        verify(toolbarButton.checked)
+        verify(galleryImage.smooth)
+        verify(galleryImage.mipmap)
+
+        mouseClick(toolbarButton, toolbarButton.width / 2, toolbarButton.height / 2,
+                   Qt.LeftButton)
+        compare(mockSettings.smoothDisplay, false)
+        compare(toolbarButton.checked, false)
+        compare(galleryImage.smooth, false)
+        compare(galleryImage.mipmap, false)
+
+        metadataTile.displayMode = 0
+        const gridPreview = findChild(metadataTile, "gridImagePreview")
+        verify(gridPreview !== null)
+        compare(gridPreview.smooth, false)
+        compare(gridPreview.mipmap, false)
+
+        metadataTile.displayMode = 1
+        wait(0)
+        const listPreview = findChild(metadataTile, "listImagePreview")
+        verify(listPreview !== null)
+        compare(listPreview.smooth, false)
+        compare(listPreview.mipmap, false)
+
+        mockSettings.smoothDisplay = true
+        tryCompare(toolbarButton, "checked", true)
     }
 
     function test_hiddenMenuItemDoesNotReserveSpace() {
@@ -173,6 +229,7 @@ TestCase {
         width: 196
         controller: testCase.mockController
         workspaceController: mockWorkspace
+        settingsController: mockSettings
         path: "/Images/Folder"
         fileName: "Folder"
         technicalLabel: "Folder"
@@ -191,6 +248,7 @@ TestCase {
         width: 220
         controller: testCase.mockController
         workspaceController: mockWorkspace
+        settingsController: mockSettings
         path: "/Images/sample.png"
         fileName: "sample.png"
         technicalLabel: "PNG | 1920×1080 | 10 bit | 12.4 MB"

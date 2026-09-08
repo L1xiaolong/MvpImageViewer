@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QObject>
 #include <QHash>
+#include <QObject>
 #include <QTranslator>
 #include <QUrl>
 #include <QVariantList>
@@ -17,20 +17,21 @@ class AppSettings final : public QObject {
     Q_PROPERTY(QString effectiveLanguage READ effectiveLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY themeChanged)
     Q_PROPERTY(bool darkTheme READ darkTheme NOTIFY themeChanged)
-    Q_PROPERTY(bool restoreLastDirectory READ restoreLastDirectory
-                   WRITE setRestoreLastDirectory NOTIFY restoreLastDirectoryChanged)
-    Q_PROPERTY(bool confirmTrash READ confirmTrash WRITE setConfirmTrash
-                   NOTIFY confirmTrashChanged)
-    Q_PROPERTY(bool automaticUpdateChecks READ automaticUpdateChecks
-                   WRITE setAutomaticUpdateChecks NOTIFY automaticUpdateChecksChanged)
-    Q_PROPERTY(bool applyEmbeddedColorProfiles READ applyEmbeddedColorProfiles
-                   WRITE setApplyEmbeddedColorProfiles NOTIFY colorDisplayChanged)
-    Q_PROPERTY(bool preserveHighBitDepth READ preserveHighBitDepth
-                   WRITE setPreserveHighBitDepth NOTIFY colorDisplayChanged)
-    Q_PROPERTY(bool honorExifOrientation READ honorExifOrientation
-                   WRITE setHonorExifOrientation NOTIFY colorDisplayChanged)
-    Q_PROPERTY(QString canvasBackground READ canvasBackground
-                   WRITE setCanvasBackground NOTIFY colorDisplayChanged)
+    Q_PROPERTY(bool restoreLastDirectory READ restoreLastDirectory WRITE setRestoreLastDirectory
+                   NOTIFY restoreLastDirectoryChanged)
+    Q_PROPERTY(bool confirmTrash READ confirmTrash WRITE setConfirmTrash NOTIFY confirmTrashChanged)
+    Q_PROPERTY(bool automaticUpdateChecks READ automaticUpdateChecks WRITE setAutomaticUpdateChecks
+                   NOTIFY automaticUpdateChecksChanged)
+    Q_PROPERTY(bool applyEmbeddedColorProfiles READ applyEmbeddedColorProfiles WRITE
+                   setApplyEmbeddedColorProfiles NOTIFY colorDisplayChanged)
+    Q_PROPERTY(bool preserveHighBitDepth READ preserveHighBitDepth WRITE setPreserveHighBitDepth
+                   NOTIFY colorDisplayChanged)
+    Q_PROPERTY(bool honorExifOrientation READ honorExifOrientation WRITE setHonorExifOrientation
+                   NOTIFY colorDisplayChanged)
+    Q_PROPERTY(QString canvasBackground READ canvasBackground WRITE setCanvasBackground NOTIFY
+                   colorDisplayChanged)
+    Q_PROPERTY(
+        bool smoothDisplay READ smoothDisplay WRITE setSmoothDisplay NOTIFY smoothDisplayChanged)
     Q_PROPERTY(bool colorManagementAvailable READ colorManagementAvailable CONSTANT)
     Q_PROPERTY(QString updateState READ updateState NOTIFY updateStateChanged)
     Q_PROPERTY(QString latestVersion READ latestVersion NOTIFY updateStateChanged)
@@ -39,7 +40,7 @@ class AppSettings final : public QObject {
     Q_PROPERTY(int shortcutsRevision READ shortcutsRevision NOTIFY shortcutsChanged)
     Q_PROPERTY(QString applicationVersion READ applicationVersion CONSTANT)
 
-public:
+  public:
     explicit AppSettings(QGuiApplication* application, QObject* parent = nullptr);
 
     [[nodiscard]] QString language() const;
@@ -53,6 +54,7 @@ public:
     [[nodiscard]] bool preserveHighBitDepth() const;
     [[nodiscard]] bool honorExifOrientation() const;
     [[nodiscard]] QString canvasBackground() const;
+    [[nodiscard]] bool smoothDisplay() const;
     [[nodiscard]] bool colorManagementAvailable() const;
     [[nodiscard]] QString updateState() const;
     [[nodiscard]] QString latestVersion() const;
@@ -70,6 +72,7 @@ public:
     void setPreserveHighBitDepth(bool enabled);
     void setHonorExifOrientation(bool enabled);
     void setCanvasBackground(const QString& background);
+    void setSmoothDisplay(bool enabled);
 
     Q_INVOKABLE QString shortcutFor(const QString& action) const;
     Q_INVOKABLE QString setShortcut(const QString& action, const QString& sequence);
@@ -80,7 +83,7 @@ public:
     Q_INVOKABLE void openUserGuide() const;
     Q_INVOKABLE void restoreDefaults();
 
-signals:
+  signals:
     void languageChanged();
     void themeChanged();
     void restoreLastDirectoryChanged();
@@ -89,8 +92,9 @@ signals:
     void updateStateChanged();
     void shortcutsChanged();
     void colorDisplayChanged();
+    void smoothDisplayChanged();
 
-private:
+  private:
     void applyLanguage();
     void setUpdateState(const QString& state, const QString& latestVersion = {},
                         const QUrl& releaseUrl = {});
@@ -110,6 +114,7 @@ private:
     bool preserveHighBitDepth_ = true;
     bool honorExifOrientation_ = true;
     QString canvasBackground_ = QStringLiteral("neutral");
+    bool smoothDisplay_ = true;
     QString updateState_ = QStringLiteral("idle");
     QString latestVersion_;
     QUrl releaseUrl_;
