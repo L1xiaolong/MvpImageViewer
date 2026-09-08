@@ -6,6 +6,7 @@
 #include <QRectF>
 #include <QSize>
 #include <QVector>
+#include <limits>
 
 namespace ispview {
 
@@ -34,8 +35,7 @@ struct RawPlaneHistogram {
     QRect logicalRegion;
     QRect sourceRegion;
     int validBits = 0;
-    // The visible histogram domain. Bayer data honors an explicit sensor white level;
-    // samples above it are accumulated into the last (saturated) bin.
+    // Full engineering code domain, independent of display black/white levels.
     int maximumValue = 0;
     QVector<RawHistogramChannel> channels;
 
@@ -49,7 +49,7 @@ class RawPlaneHistogramAnalyzer final {
   public:
     // The cap is applied independently to each engineering channel. Chroma and Bayer channels
     // have different native sample grids, so a single total-pixel count would hide that fact.
-    static constexpr qint64 kDefaultMaximumSamplesPerChannel = 262'144;
+    static constexpr qint64 kDefaultMaximumSamplesPerChannel = std::numeric_limits<qint64>::max();
 
     [[nodiscard]] static RawPlaneHistogram
     analyze(const ImageFrame& frame,

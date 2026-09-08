@@ -6,12 +6,13 @@
 #include <QRect>
 #include <QRectF>
 
-#include <array>
+#include <QVector>
+#include <limits>
 
 namespace ispview {
 
 struct HistogramChannel {
-    std::array<quint64, 256> bins{};
+    QVector<quint64> bins;
     int minimum = 0;
     int maximum = 0;
     double mean = 0.0;
@@ -29,6 +30,7 @@ struct DisplayHistogram {
     QRect logicalRegion;
     qint64 availablePixelCount = 0;
     qint64 sampledPixelCount = 0;
+    int maximumValue = 255;
 
     [[nodiscard]] bool isValid() const { return sampledPixelCount > 0; }
     [[nodiscard]] bool usesDisplayProxy() const { return analyzedSize != logicalSize; }
@@ -42,7 +44,11 @@ struct DisplayHistogram {
 
 class DisplayHistogramAnalyzer final {
   public:
-    static constexpr qint64 kDefaultMaximumSamples = 262'144;
+    // UI statistics are exact. A caller may explicitly request approximate sampling.
+    static constexpr qint64 kDefaultMaximumSamples = std::numeric_limits<qint64>::max();
+
+    // Decoded RGB code values, preserving 16-bit precision (before histogram normalization).
+    [[nodiscard]] static DisplayHistogram analyzeNativeRgb(const ImageFrame& frame);
 
     [[nodiscard]] static DisplayHistogram analyze(
         const ImageFrame& frame, qint64 maximumSamples = kDefaultMaximumSamples);

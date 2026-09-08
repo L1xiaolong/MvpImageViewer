@@ -188,7 +188,8 @@ QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
         summary += QStringLiteral(" · source %1 × %2")
                        .arg(histogram.logicalSize.width()).arg(histogram.logicalSize.height());
     return {{QStringLiteral("valid"), true}, {QStringLiteral("loading"), false},
-            {QStringLiteral("maximumValue"), 255}, {QStringLiteral("channels"), channels},
+            {QStringLiteral("maximumValue"), histogram.maximumValue},
+            {QStringLiteral("channels"), channels},
             {QStringLiteral("summary"), summary}};
 }
 
@@ -354,13 +355,20 @@ void ImagePropertiesController::setFrame(ImageFramePtr frame) {
     for (const int source : requested) requestHistogram(source);
 }
 
+bool ImagePropertiesController::hasHistogramSource() const {
+    return frame_ &&
+           (RawPlaneAccessor(*frame_).isValid() ||
+            (frame_->descriptor.validBits > 8 &&
+             std::holds_alternative<QImage>(frame_->storage)));
+}
+
 void ImagePropertiesController::requestHistogram(int source) {
     source = source == 1 ? 1 : 0;
     if (!frame_) {
         pendingHistogramSources_.insert(source);
         return;
     }
-    if (source == 1 && !RawPlaneAccessor(*frame_).isValid()) {
+    if (source == 1 && !hasHistogramSource()) {
         sourceHistogram_ = {{QStringLiteral("valid"), false}, {QStringLiteral("loading"), false},
                             {QStringLiteral("message"),
                              QStringLiteral("Source planes are unavailable for this image")}};
@@ -369,6 +377,9 @@ void ImagePropertiesController::requestHistogram(int source) {
         emit histogramRevisionChanged();
         return;
     }
+    const QVariantMap& existing = source == 0 ? displayHistogram_ : sourceHistogram_;
+    if (existing.value(QStringLiteral("valid")).toBool() ||
+        existing.value(QStringLiteral("loading")).toBool()) return;
     quint64& generation = source == 0 ? displayHistogramGeneration_ : sourceHistogramGeneration_;
     ++generation;
     const quint64 requestedGeneration = generation;
@@ -384,7 +395,9 @@ void ImagePropertiesController::requestHistogram(int source) {
     QThreadPool::globalInstance()->start([self, frame, source, requestedGeneration] {
         const QVariantMap result = source == 0
             ? displayHistogramMap(DisplayHistogramAnalyzer::analyze(*frame))
-            : rawHistogramMap(RawPlaneHistogramAnalyzer::analyze(*frame));
+            : RawPlaneAccessor(*frame).isValid()
+                ? rawHistogramMap(RawPlaneHistogramAnalyzer::analyze(*frame))
+                : displayHistogramMap(DisplayHistogramAnalyzer::analyzeNativeRgb(*frame));
         if (!self) return;
         QMetaObject::invokeMethod(self.data(), [self, source, requestedGeneration, result] {
             if (self) self->setHistogram(source, requestedGeneration, result);

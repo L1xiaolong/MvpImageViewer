@@ -13,6 +13,7 @@
 #include "io/single_file_rename.h"
 #include "io/supported_image_formats.h"
 #include "io/thumbnail_disk_cache.h"
+#include "core/display_histogram.h"
 
 #include <QColorSpace>
 #include <QCollator>
@@ -1384,6 +1385,19 @@ void IoTests::rawPreviewDirectlySamplesYuvAndBayerSources() {
     QCOMPARE(yuvPreview.frame->descriptor.size, QSize(2, 1));
     QCOMPARE(yuvPreview.frame->qImage()->pixelColor(0, 0), QColor(32, 32, 32, 255));
     QCOMPARE(yuvPreview.frame->qImage()->pixelColor(1, 0), QColor(192, 192, 192, 255));
+    const DecodeResult yuvFull = decoder.decode({yuvPath, DecodePurpose::Full, {}, yuv});
+    QVERIFY2(yuvFull.succeeded(), qPrintable(yuvFull.error));
+    ImageFrame decodedYuvRgb;
+    decodedYuvRgb.descriptor.size = yuvFull.frame->qImage()->size();
+    decodedYuvRgb.storage = *yuvFull.frame->qImage();
+    const DisplayHistogram yuvSourceHistogram =
+        DisplayHistogramAnalyzer::analyze(*yuvFull.frame);
+    const DisplayHistogram yuvDecodedHistogram =
+        DisplayHistogramAnalyzer::analyze(decodedYuvRgb);
+    QCOMPARE(yuvSourceHistogram.red.bins, yuvDecodedHistogram.red.bins);
+    QCOMPARE(yuvSourceHistogram.green.bins, yuvDecodedHistogram.green.bins);
+    QCOMPARE(yuvSourceHistogram.blue.bins, yuvDecodedHistogram.blue.bins);
+    QCOMPARE(yuvSourceHistogram.luma.bins, yuvDecodedHistogram.luma.bins);
 
     const QString rawPath = directory.filePath(QStringLiteral("white_raw16.raw"));
     QFile rawFile(rawPath);
@@ -1393,11 +1407,25 @@ void IoTests::rawPreviewDirectlySamplesYuvAndBayerSources() {
     RawImageParameters raw;
     raw.size = {4, 4};
     raw.format = RawPixelFormat::Raw16;
+    raw.demosaic = true;
     const DecodeResult rawPreview =
         decoder.decode({rawPath, DecodePurpose::Preview, QSize(2, 2), raw});
     QVERIFY2(rawPreview.succeeded(), qPrintable(rawPreview.error));
     QCOMPARE(rawPreview.frame->descriptor.size, QSize(2, 2));
     QCOMPARE(rawPreview.frame->qImage()->pixelColor(0, 0), QColor(255, 255, 255, 255));
+    const DecodeResult rawFull = decoder.decode({rawPath, DecodePurpose::Full, {}, raw});
+    QVERIFY2(rawFull.succeeded(), qPrintable(rawFull.error));
+    ImageFrame decodedRawRgb;
+    decodedRawRgb.descriptor.size = rawFull.frame->qImage()->size();
+    decodedRawRgb.storage = *rawFull.frame->qImage();
+    const DisplayHistogram rawSourceHistogram =
+        DisplayHistogramAnalyzer::analyze(*rawFull.frame);
+    const DisplayHistogram rawDecodedHistogram =
+        DisplayHistogramAnalyzer::analyze(decodedRawRgb);
+    QCOMPARE(rawSourceHistogram.red.bins, rawDecodedHistogram.red.bins);
+    QCOMPARE(rawSourceHistogram.green.bins, rawDecodedHistogram.green.bins);
+    QCOMPARE(rawSourceHistogram.blue.bins, rawDecodedHistogram.blue.bins);
+    QCOMPARE(rawSourceHistogram.luma.bins, rawDecodedHistogram.luma.bins);
 }
 
 void IoTests::fullRawFrameUsesBoundedFallbackWithoutChangingLogicalSize() {

@@ -98,27 +98,56 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     };
 
     const qsizetype sampleBytes = bits == 8 ? 1 : 2;
-    auto rgbAt = [&](int x, int y) {
-        const qsizetype yOffsetBytes = y * yStride + x * sampleBytes;
-        const int yValue = sample(yOffsetBytes);
+    const int chromaWidth = (width + 1) / 2;
+    const int chromaHeight = (height + 1) / 2;
+    auto chromaAt = [&](int chromaX, int chromaY) {
+        chromaX = std::clamp(chromaX, 0, chromaWidth - 1);
+        chromaY = std::clamp(chromaY, 0, chromaHeight - 1);
         int uValue = 0;
         int vValue = 0;
-        const qsizetype chromaX = x / 2;
-        const qsizetype chromaY = y / 2;
         if (parameters.format == RawPixelFormat::I420) {
             uValue = sample(yBytes + chromaY * uvStride + chromaX);
             vValue = sample(yBytes + chromaPlaneBytes + chromaY * uvStride + chromaX);
         } else {
-            const qsizetype pair = yBytes + chromaY * uvStride + chromaX * sampleBytes * 2;
+            const qsizetype pair =
+                yBytes + chromaY * uvStride + chromaX * sampleBytes * 2;
             const int first = sample(pair);
             const int second = sample(pair + sampleBytes);
             const bool vu = parameters.format == RawPixelFormat::NV21;
             uValue = vu ? second : first;
             vValue = vu ? first : second;
         }
+        return std::array<double, 2>{static_cast<double>(uValue),
+                                     static_cast<double>(vValue)};
+    };
+    auto rgbAt = [&](int x, int y) {
+        const qsizetype yOffsetBytes = y * yStride + x * sampleBytes;
+        const int yValue = sample(yOffsetBytes);
+        const double chromaX = std::clamp(
+            (x + 0.5) * chromaWidth / width - 0.5, 0.0,
+            static_cast<double>(chromaWidth - 1));
+        const double chromaY = std::clamp(
+            (y + 0.5) * chromaHeight / height - 0.5, 0.0,
+            static_cast<double>(chromaHeight - 1));
+        const int x0 = static_cast<int>(std::floor(chromaX));
+        const int y0 = static_cast<int>(std::floor(chromaY));
+        const int x1 = std::min(x0 + 1, chromaWidth - 1);
+        const int y1 = std::min(y0 + 1, chromaHeight - 1);
+        const double fx = chromaX - x0;
+        const double fy = chromaY - y0;
+        const auto topLeft = chromaAt(x0, y0);
+        const auto topRight = chromaAt(x1, y0);
+        const auto bottomLeft = chromaAt(x0, y1);
+        const auto bottomRight = chromaAt(x1, y1);
+        std::array<double, 2> chroma{};
+        for (std::size_t channel = 0; channel < chroma.size(); ++channel) {
+            const double top = topLeft[channel] * (1.0 - fx) + topRight[channel] * fx;
+            const double bottom = bottomLeft[channel] * (1.0 - fx) + bottomRight[channel] * fx;
+            chroma[channel] = top * (1.0 - fy) + bottom * fy;
+        }
         const double luma = (yValue - yOffset) / yScale;
-        const double u = (uValue - cCenter) / cScale;
-        const double v = (vValue - cCenter) / cScale;
+        const double u = (chroma[0] - cCenter) / cScale;
+        const double v = (chroma[1] - cCenter) / cScale;
         return std::array<double, 3>{luma + matrix.redV * v,
                                      luma - matrix.greenU * u - matrix.greenV * v,
                                      luma + matrix.blueU * u};

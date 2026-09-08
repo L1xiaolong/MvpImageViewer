@@ -32,7 +32,43 @@ int toByte(double value) {
     return std::clamp(static_cast<int>(std::lround(value * 255.0)), 0, 255);
 }
 
-QColor yuvDisplayColor(const RawImageParameters& parameters, const YuvPlaneSample& sample) {
+std::array<double, 2> interpolatedChromaAt(const RawPlaneAccessor& accessor,
+                                           const QPoint& sourcePixel) {
+    const QSize sourceSize = accessor.sourceSize();
+    const QSize chromaSize((sourceSize.width() + 1) / 2, (sourceSize.height() + 1) / 2);
+    const double chromaX = std::clamp(
+        (sourcePixel.x() + 0.5) * chromaSize.width() / sourceSize.width() - 0.5,
+        0.0, static_cast<double>(chromaSize.width() - 1));
+    const double chromaY = std::clamp(
+        (sourcePixel.y() + 0.5) * chromaSize.height() / sourceSize.height() - 0.5,
+        0.0, static_cast<double>(chromaSize.height() - 1));
+    const int x0 = static_cast<int>(std::floor(chromaX));
+    const int y0 = static_cast<int>(std::floor(chromaY));
+    const int x1 = std::min(x0 + 1, chromaSize.width() - 1);
+    const int y1 = std::min(y0 + 1, chromaSize.height() - 1);
+    const double fx = chromaX - x0;
+    const double fy = chromaY - y0;
+    const auto at = [&](int x, int y) {
+        const auto value = accessor.yuvAtSourcePixel({x * 2, y * 2});
+        return value ? std::array<double, 2>{static_cast<double>(value->u),
+                                             static_cast<double>(value->v)}
+                     : std::array<double, 2>{};
+    };
+    const auto topLeft = at(x0, y0);
+    const auto topRight = at(x1, y0);
+    const auto bottomLeft = at(x0, y1);
+    const auto bottomRight = at(x1, y1);
+    std::array<double, 2> result{};
+    for (std::size_t channel = 0; channel < result.size(); ++channel) {
+        const double top = topLeft[channel] * (1.0 - fx) + topRight[channel] * fx;
+        const double bottom = bottomLeft[channel] * (1.0 - fx) + bottomRight[channel] * fx;
+        result[channel] = top * (1.0 - fy) + bottom * fy;
+    }
+    return result;
+}
+
+QColor yuvDisplayColor(const RawImageParameters& parameters, const RawPlaneAccessor& accessor,
+                       const YuvPlaneSample& sample) {
     std::array<double, 4> coefficients{};
     switch (parameters.yuvMatrix) {
     case YuvMatrix::BT601:
@@ -56,8 +92,9 @@ QColor yuvDisplayColor(const RawImageParameters& parameters, const YuvPlaneSampl
     const double chromaScale =
         parameters.range == QuantizationRange::Limited ? 224.0 * levelScale : maximum;
     const double y = (sample.y - yOffset) / yScale;
-    const double u = (sample.u - chromaCenter) / chromaScale;
-    const double v = (sample.v - chromaCenter) / chromaScale;
+    const auto chroma = interpolatedChromaAt(accessor, sample.sourcePixel);
+    const double u = (chroma[0] - chromaCenter) / chromaScale;
+    const double v = (chroma[1] - chromaCenter) / chromaScale;
     return QColor::fromRgb(toByte(y + coefficients[0] * v),
                            toByte(y - coefficients[1] * u - coefficients[2] * v),
                            toByte(y + coefficients[3] * u));
@@ -161,7 +198,8 @@ ComparisonPixelSample ComparisonPixelProbe::sample(const ImageFrame& frame,
             result.yuv = rawAccessor.yuvAtDisplayPixel(displayPixel);
             if (result.yuv) {
                 result.sourcePixel = result.yuv->sourcePixel;
-                result.displayColor = yuvDisplayColor(*frame.rawParameters, *result.yuv);
+                result.displayColor =
+                    yuvDisplayColor(*frame.rawParameters, rawAccessor, *result.yuv);
             }
         } else {
             result.bayer = rawAccessor.bayerAtDisplayPixel(displayPixel);

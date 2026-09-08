@@ -708,9 +708,10 @@ void QmlWorkspaceControllerTests::imagePropertiesAreExposedWithoutWidgetUi() {
 
     QSignalSpy histogramSpy(&properties, &ImagePropertiesController::histogramChanged);
     properties.requestHistogram(0);
-    QTRY_VERIFY_WITH_TIMEOUT(!histogramSpy.isEmpty(), 5000);
     QTRY_VERIFY_WITH_TIMEOUT(properties.histogram(0).value(QStringLiteral("valid")).toBool(), 5000);
     QCOMPARE(properties.histogram(0).value(QStringLiteral("channels")).toList().size(), 4);
+    QCOMPARE(properties.histogram(0).value(QStringLiteral("maximumValue")).toInt(), 255);
+    QVERIFY(!properties.hasHistogramSource());
 
     properties.loadPath(directory.path());
     QCOMPARE(properties.directory(), true);

@@ -61,7 +61,7 @@ QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
                                  histogram.luma.standardDeviation, histogram.luma.minimum,
                                  histogram.luma.maximum);
     return {{QStringLiteral("valid"), true},
-            {QStringLiteral("maximumValue"), 255},
+            {QStringLiteral("maximumValue"), histogram.maximumValue},
             {QStringLiteral("channels"), channels}};
 }
 
@@ -405,6 +405,12 @@ void CompareController::requestHistogram(int slot) {
     histogramRequested_[slot] = true;
     if (!frames_.value(slot)) return;
     requestFullFrame(slot, LoadCategory::Interactive);
+    // A preview has already changed the pixel distribution. Wait for the full decode.
+    if (!fullResolution_.value(slot)) return;
+    const QVariantMap& existing = displayHistograms_.at(slot);
+    if (existing.value(QStringLiteral("valid")).toBool() ||
+        existing.value(QStringLiteral("loading")).toBool()) return;
+    displayHistograms_[slot] = {{QStringLiteral("loading"), true}};
     const quint64 generation = ++histogramGenerations_[slot];
     const ImageFramePtr frame = frames_.at(slot);
     const QPointer<CompareController> self(this);

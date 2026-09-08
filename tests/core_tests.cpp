@@ -32,6 +32,7 @@ class CoreTests final : public QObject {
     void rawOrientationMapsCoordinatesAndCacheIdentity();
     void displayHistogramComputesChannelsAndBoundedSampling();
     void displayHistogramRestrictsNormalizedRegion();
+    void unifiedHistogramUsesExactPixelsAndBayerColors();
     void rawPlaneAccessorAndHistogramPreserveEngineeringSamples();
     void comparisonPixelProbeMapsDifferentSizesAndRawOrientation();
 };
@@ -367,7 +368,7 @@ void CoreTests::displayHistogramComputesChannelsAndBoundedSampling() {
     QCOMPARE(exact.red.maximum, 255);
     QCOMPARE(exact.red.mean, 127.5);
     QCOMPARE(exact.red.standardDeviation, 127.5);
-    QCOMPARE(exact.luma.bins[19], 1);
+    QCOMPARE(exact.luma.bins[18], 1);
     QCOMPARE(exact.luma.bins[54], 1);
     QCOMPARE(exact.luma.bins[182], 1);
     QCOMPARE(exact.luma.bins[255], 1);
@@ -391,6 +392,27 @@ void CoreTests::displayHistogramComputesChannelsAndBoundedSampling() {
     QCOMPARE(tallBounded.sampledPixelCount, 3);
 
     QCOMPARE(DisplayHistogramAnalyzer::analyze(frame, 0).sampledPixelCount, 0);
+
+    QImage highDepth(2, 1, QImage::Format_RGBA64);
+    highDepth.setPixelColor(0, 0, QColor::fromRgba64(0x1234, 0x5678, 0x9ABC, 0xFFFF));
+    highDepth.setPixelColor(1, 0, QColor::fromRgba64(0xFFFF, 0x0000, 0x8000, 0xFFFF));
+    frame.descriptor.size = highDepth.size();
+    frame.descriptor.storageBits = 16;
+    frame.descriptor.validBits = 16;
+    frame.storage = highDepth;
+    const DisplayHistogram normalized = DisplayHistogramAnalyzer::analyze(frame);
+    QCOMPARE(normalized.maximumValue, 255);
+    QCOMPARE(normalized.red.bins.at(18), quint64{1});
+    QCOMPARE(normalized.red.bins.at(255), quint64{1});
+    QCOMPARE(normalized.red.mean, 136.5);
+    const DisplayHistogram highDepthHistogram = DisplayHistogramAnalyzer::analyzeNativeRgb(frame);
+    QCOMPARE(highDepthHistogram.maximumValue, 65535);
+    QCOMPARE(highDepthHistogram.red.bins.size(), 65536);
+    QCOMPARE(highDepthHistogram.red.bins.at(0x1234), quint64{1});
+    QCOMPARE(highDepthHistogram.green.bins.at(0x5678), quint64{1});
+    QCOMPARE(highDepthHistogram.blue.bins.at(0x9ABC), quint64{1});
+    QCOMPARE(highDepthHistogram.red.mean, 35097.5);
+    QCOMPARE(highDepthHistogram.red.standardDeviation, 30437.5);
 }
 
 void CoreTests::displayHistogramRestrictsNormalizedRegion() {
@@ -434,6 +456,8 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
     yuvStorage->storage =
         QByteArray::fromRawData("\x0A\x14\x1E\x28\x32\x3C\x46\x50\x64\x96\x6E\xA0", 12);
     yuvStorage->planes = {{0, 4, 8}, {8, 4, 4}};
+    yuvStorage->displayImage = QImage(1, 1, QImage::Format_RGBA8888);
+    yuvStorage->displayImage.fill(Qt::red);
     ImageFrame yuvFrame;
     yuvFrame.descriptor.size = yuvParameters.size;
     yuvFrame.rawParameters = yuvParameters;
@@ -447,6 +471,11 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
     QCOMPARE(lastYuv->u, quint16{110});
     QCOMPARE(lastYuv->v, quint16{160});
     QCOMPARE(yuvAccessor.pixelDescriptionAtDisplayPixel({3, 1}), QStringLiteral("YUV(80,110,160)"));
+
+    const DisplayHistogram yuvDisplayHistogram = DisplayHistogramAnalyzer::analyze(yuvFrame);
+    QCOMPARE(yuvDisplayHistogram.analyzedSize, QSize(4, 2));
+    QCOMPARE(yuvDisplayHistogram.sampledPixelCount, 8);
+    QVERIFY(!yuvDisplayHistogram.usesDisplayProxy());
 
     const RawPlaneHistogram yuvHistogram = RawPlaneHistogramAnalyzer::analyze(yuvFrame);
     QVERIFY(yuvHistogram.isValid());
@@ -514,6 +543,8 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
             reinterpret_cast<uchar*>(bayerStorage->storage.data() + index * 2));
     }
     bayerStorage->planes = {{0, 8, 16}};
+    bayerStorage->displayImage = QImage(1, 1, QImage::Format_RGBA8888);
+    bayerStorage->displayImage.fill(Qt::red);
     ImageFrame bayerFrame;
     bayerFrame.descriptor.size = bayerParameters.size;
     bayerFrame.rawParameters = bayerParameters;
@@ -526,6 +557,10 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
     QCOMPARE(greenBlue->value, quint16{7});
     QCOMPARE(greenBlue->channel, BayerSampleChannel::GreenBlueRow);
     QCOMPARE(bayerAccessor.pixelDescriptionAtDisplayPixel({2, 1}), QStringLiteral("RAW(7, Gb)"));
+    const DisplayHistogram bayerDisplayHistogram = DisplayHistogramAnalyzer::analyze(bayerFrame);
+    QCOMPARE(bayerDisplayHistogram.analyzedSize, QSize(4, 2));
+    QCOMPARE(bayerDisplayHistogram.sampledPixelCount, 8);
+    QVERIFY(!bayerDisplayHistogram.usesDisplayProxy());
     const RawPlaneHistogram bayerHistogram = RawPlaneHistogramAnalyzer::analyze(bayerFrame);
     QVERIFY(bayerHistogram.isValid());
     QCOMPARE(bayerHistogram.channels.size(), 4);
@@ -539,9 +574,11 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
     bayerParameters.whiteLevel = 6;
     bayerFrame.rawParameters = bayerParameters;
     const RawPlaneHistogram whiteLevelHistogram = RawPlaneHistogramAnalyzer::analyze(bayerFrame);
-    QCOMPARE(whiteLevelHistogram.maximumValue, 6);
-    QCOMPARE(whiteLevelHistogram.channels.at(3).bins.size(), 7);
-    QCOMPARE(whiteLevelHistogram.channels.at(3).bins.at(6), quint64{2});
+    QCOMPARE(whiteLevelHistogram.maximumValue, 4095);
+    QCOMPARE(whiteLevelHistogram.channels.at(3).bins.size(), 4096);
+    QCOMPARE(whiteLevelHistogram.channels.at(3).bins.at(6), quint64{1});
+    QCOMPARE(whiteLevelHistogram.channels.at(3).bins.at(8), quint64{1});
+    QCOMPARE(whiteLevelHistogram.channels.at(3).mean, 7.0);
     bayerParameters.whiteLevel = 0;
     bayerFrame.rawParameters = bayerParameters;
     const RawPlaneHistogram boundedBayer = RawPlaneHistogramAnalyzer::analyze(bayerFrame, 1);
@@ -566,6 +603,142 @@ void CoreTests::rawPlaneAccessorAndHistogramPreserveEngineeringSamples() {
     QVERIFY(!RawPlaneHistogramAnalyzer::analyze(bayerFrame).isValid());
     QVERIFY(
         !RawPlaneHistogramAnalyzer::analyzeRegion(yuvFrame, QRectF(2.0, 2.0, 1.0, 1.0)).isValid());
+}
+
+void CoreTests::unifiedHistogramUsesExactPixelsAndBayerColors() {
+    QImage stripes(1024, 1024, QImage::Format_RGBA8888);
+    for (int y = 0; y < stripes.height(); ++y)
+        for (int x = 0; x < stripes.width(); ++x)
+            stripes.setPixelColor(x, y, x % 2 ? Qt::white : Qt::black);
+    ImageFrame rgb;
+    rgb.storage = stripes;
+    rgb.descriptor.size = stripes.size();
+    const auto exact = DisplayHistogramAnalyzer::analyze(rgb);
+    QCOMPARE(exact.sampledPixelCount, qint64{1048576});
+    QCOMPARE(exact.red.bins.at(0), quint64{524288});
+    QCOMPARE(exact.red.bins.at(255), quint64{524288});
+    QCOMPARE(exact.red.mean, 127.5);
+    QCOMPARE(exact.red.standardDeviation, 127.5);
+
+    for (BayerPattern pattern : {BayerPattern::RGGB, BayerPattern::GRBG,
+                                 BayerPattern::GBRG, BayerPattern::BGGR}) {
+        RawImageParameters parameters;
+        parameters.size = {4, 4};
+        parameters.format = RawPixelFormat::Raw16;
+        parameters.bayerPattern = pattern;
+        parameters.blackLevel = 16;
+        parameters.whiteLevel = 271;
+        parameters.displayGamma = 1.0;
+        parameters.demosaic = false; // Histogram still reconstructs RGB.
+        parameters.whiteBalanceGains = {2.0, 1.0, 1.0};
+        parameters.colorCorrectionMatrix = {0, 0, 1, 0, 1, 0, 1, 0, 0};
+        auto planes = std::make_shared<PlaneBufferSet>();
+        planes->storage.resize(32);
+        planes->planes = {{0, 8, 32}};
+        planes->displayImage = QImage(1, 1, QImage::Format_RGBA8888);
+        planes->displayImage.fill(Qt::white);
+        for (int y = 0; y < 4; ++y) {
+            for (int x = 0; x < 4; ++x) {
+                const auto channel = RawPlaneAccessor::channelAtSourcePixel(pattern, {x, y});
+                const quint16 value = channel == BayerSampleChannel::Red ? 48
+                                    : channel == BayerSampleChannel::Blue ? 144 : 80;
+                qToLittleEndian(value, reinterpret_cast<uchar*>(planes->storage.data() + y * 8 + x * 2));
+            }
+        }
+        ImageFrame frame;
+        frame.storage = std::shared_ptr<const PlaneBufferSet>(planes);
+        for (ImageOrientation orientation : {ImageOrientation::Normal, ImageOrientation::Rotate90Clockwise,
+                                             ImageOrientation::Rotate180, ImageOrientation::Rotate270Clockwise}) {
+            parameters.orientation = orientation;
+            frame.rawParameters = parameters;
+            const auto histogram = DisplayHistogramAnalyzer::analyze(frame);
+            QCOMPARE(histogram.sampledPixelCount, 16);
+            QCOMPARE(histogram.red.bins.at(128), quint64{16});
+            QCOMPARE(histogram.green.bins.at(64), quint64{16});
+            QCOMPARE(histogram.blue.bins.at(64), quint64{16});
+            QCOMPARE(histogram.luma.bins.at(78), quint64{16});
+            QCOMPARE(histogram.red.standardDeviation, 0.0);
+        }
+    }
+
+    for (RawPixelFormat format : {RawPixelFormat::NV12, RawPixelFormat::NV21,
+                                  RawPixelFormat::I420, RawPixelFormat::P010}) {
+        for (QuantizationRange range : {QuantizationRange::Full, QuantizationRange::Limited}) {
+            RawImageParameters parameters;
+            parameters.size = {2, 2};
+            parameters.format = format;
+            parameters.range = range;
+            parameters.msbAligned = true;
+            const bool tenBit = format == RawPixelFormat::P010;
+            const int low = range == QuantizationRange::Full ? 0 : tenBit ? 64 : 16;
+            const int high = range == QuantizationRange::Full ? tenBit ? 1023 : 255 : tenBit ? 940 : 235;
+            const int center = tenBit ? 512 : 128;
+            auto planes = std::make_shared<PlaneBufferSet>();
+            const int samples[]{low, high, low, high, center, center};
+            for (int value : samples) {
+                if (tenBit) {
+                    const quint16 stored = static_cast<quint16>(value << 6);
+                    planes->storage.append(static_cast<char>(stored & 255));
+                    planes->storage.append(static_cast<char>(stored >> 8));
+                } else planes->storage.append(static_cast<char>(value));
+            }
+            planes->planes = tenBit ? QVector<PlaneBuffer>{{0, 4, 8}, {8, 4, 4}}
+                : format == RawPixelFormat::I420 ? QVector<PlaneBuffer>{{0, 2, 4}, {4, 1, 1}, {5, 1, 1}}
+                : QVector<PlaneBuffer>{{0, 2, 4}, {4, 2, 2}};
+            ImageFrame frame;
+            frame.storage = std::shared_ptr<const PlaneBufferSet>(planes);
+            for (YuvMatrix matrix : {YuvMatrix::BT601, YuvMatrix::BT709, YuvMatrix::BT2020}) {
+                parameters.yuvMatrix = matrix;
+                frame.rawParameters = parameters;
+                const auto histogram = DisplayHistogramAnalyzer::analyze(frame);
+                QCOMPARE(histogram.sampledPixelCount, 4);
+                for (const HistogramChannel* channel : {&histogram.red, &histogram.green,
+                                                        &histogram.blue, &histogram.luma}) {
+                    QCOMPARE(channel->bins.at(0), quint64{2});
+                    QCOMPARE(channel->bins.at(255), quint64{2});
+                    QCOMPARE(channel->mean, 127.5);
+                }
+            }
+            if (!tenBit && range == QuantizationRange::Full) {
+                // Asymmetric chroma catches swapped UV and verifies the BT.601 coefficients.
+                for (int i = 0; i < 4; ++i) planes->storage[i] = static_cast<char>(128);
+                planes->storage[4] = static_cast<char>(format == RawPixelFormat::NV21 ? 255 : 0);
+                planes->storage[5] = static_cast<char>(format == RawPixelFormat::NV21 ? 0 : 255);
+                parameters.yuvMatrix = YuvMatrix::BT601;
+                frame.rawParameters = parameters;
+                const auto colored = DisplayHistogramAnalyzer::analyze(frame);
+                QCOMPARE(colored.red.bins.at(255), quint64{4});
+                QCOMPARE(colored.green.bins.at(81), quint64{4});
+                QCOMPARE(colored.blue.bins.at(0), quint64{4});
+            }
+        }
+    }
+
+    RawImageParameters interpolatedParameters;
+    interpolatedParameters.size = {4, 2};
+    interpolatedParameters.format = RawPixelFormat::NV12;
+    interpolatedParameters.range = QuantizationRange::Full;
+    interpolatedParameters.yuvMatrix = YuvMatrix::BT601;
+    auto interpolatedPlanes = std::make_shared<PlaneBufferSet>();
+    interpolatedPlanes->storage = QByteArray(8, static_cast<char>(128));
+    interpolatedPlanes->storage.append(QByteArray::fromRawData("\x80\x80\x80\xFF", 4));
+    interpolatedPlanes->planes = {{0, 4, 8}, {8, 4, 4}};
+    ImageFrame interpolatedFrame;
+    interpolatedFrame.rawParameters = interpolatedParameters;
+    interpolatedFrame.storage = std::shared_ptr<const PlaneBufferSet>(interpolatedPlanes);
+    const auto interpolated = DisplayHistogramAnalyzer::analyze(interpolatedFrame);
+    QCOMPARE(interpolated.red.bins.at(128), quint64{2});
+    QCOMPARE(interpolated.red.bins.at(173), quint64{2});
+    QCOMPARE(interpolated.red.bins.at(255), quint64{4});
+    QCOMPARE(interpolated.green.bins.at(128), quint64{2});
+    QCOMPARE(interpolated.green.bins.at(105), quint64{2});
+    QCOMPARE(interpolated.green.bins.at(60), quint64{2});
+    QCOMPARE(interpolated.green.bins.at(37), quint64{2});
+    QCOMPARE(interpolated.blue.bins.at(128), quint64{8});
+    QCOMPARE(interpolated.luma.bins.at(128), quint64{2});
+    QCOMPARE(interpolated.luma.bins.at(121), quint64{2});
+    QCOMPARE(interpolated.luma.bins.at(106), quint64{2});
+    QCOMPARE(interpolated.luma.bins.at(90), quint64{2});
 }
 
 } // namespace ispview

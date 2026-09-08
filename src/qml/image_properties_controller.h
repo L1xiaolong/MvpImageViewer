@@ -24,6 +24,7 @@ class ImagePropertiesController final : public QObject {
     Q_PROPERTY(QVariantList exifFields READ exifFields NOTIFY stateChanged)
     Q_PROPERTY(QVariantList rawFields READ rawFields NOTIFY stateChanged)
     Q_PROPERTY(bool hasRawParameters READ hasRawParameters NOTIFY stateChanged)
+    Q_PROPERTY(bool hasHistogramSource READ hasHistogramSource NOTIFY stateChanged)
     Q_PROPERTY(int histogramRevision READ histogramRevision NOTIFY histogramRevisionChanged)
 
   public:
@@ -38,6 +39,7 @@ class ImagePropertiesController final : public QObject {
     [[nodiscard]] QVariantList exifFields() const { return exifFields_; }
     [[nodiscard]] QVariantList rawFields() const { return rawFields_; }
     [[nodiscard]] bool hasRawParameters() const { return !rawFields_.isEmpty(); }
+    [[nodiscard]] bool hasHistogramSource() const;
     [[nodiscard]] int histogramRevision() const { return histogramRevision_; }
 
     Q_INVOKABLE void loadPath(const QString& path);

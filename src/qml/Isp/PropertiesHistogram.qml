@@ -46,7 +46,7 @@ Item {
             spacing: 6
 
             Repeater {
-                model: ["Display RGB", "Source planes"]
+                model: ["RGB (0–255)", "Source data"]
                 delegate: Button {
                     id: sourceButton
                     required property int index
@@ -54,7 +54,7 @@ Item {
                     width: index === 0 ? 104 : 116
                     height: 26
                     text: modelData
-                    enabled: index === 0 || (root.controller && root.controller.hasRawParameters)
+                    enabled: index === 0 || (root.controller && root.controller.hasHistogramSource)
                     onClicked: root.source = index
                     contentItem: Text {
                         text: sourceButton.text

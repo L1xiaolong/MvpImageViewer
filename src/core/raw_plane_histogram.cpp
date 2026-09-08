@@ -169,9 +169,8 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
     if (result.logicalRegion.isEmpty() || result.sourceRegion.isEmpty()) {
         return {};
     }
-    const int maximumValue = !parameters.isYuv() && parameters.whiteLevel > 0
-                                 ? parameters.whiteLevel
-                                 : accessor.maximumSampleValue();
+    // White level controls rendering, not the engineering sample domain.
+    const int maximumValue = accessor.maximumSampleValue();
     result.maximumValue = maximumValue;
 
     if (parameters.isYuv()) {
