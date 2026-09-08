@@ -168,9 +168,14 @@ Rectangle {
     Connections {
         target: root.controller
         function onGalleryImageChanged() {
-            if (root.controller.galleryImageReady &&
-                    galleryWorkspace.pixelProbeText === "Loading pixel data…")
-                galleryWorkspace.pixelProbeText = "";
+            if (root.controller.galleryImageReady && galleryProbeArea.containsMouse) {
+                Qt.callLater(function() {
+                    galleryWorkspace.updatePixelProbe(galleryProbeArea.mouseX,
+                                                      galleryProbeArea.mouseY)
+                })
+            } else if (galleryWorkspace.pixelProbeText === "Loading pixel data…") {
+                galleryWorkspace.pixelProbeText = ""
+            }
         }
     }
     Connections {
@@ -592,6 +597,30 @@ Rectangle {
         property string pixelProbeText: ""
         property bool actualPixels: false
         property real manualZoom: 1.0
+        readonly property bool fullResolutionAvailable:
+            root.controller.galleryFullResolution === undefined
+                ? false : root.controller.galleryFullResolution
+        readonly property bool useFullResolutionTexture:
+            fullResolutionAvailable && actualPixels && manualZoom >= 1.0 &&
+            !root.smoothDisplay
+        function updatePixelProbe(mouseX, mouseY) {
+            if (!root.controller.galleryImageReady || galleryImage.paintedWidth <= 0 ||
+                    galleryImage.paintedHeight <= 0 ||
+                    (useFullResolutionTexture && galleryImage.status !== Image.Ready)) {
+                pixelProbeText = "Loading pixel data…"
+                return
+            }
+            const point = galleryProbeArea.mapToItem(galleryImage, mouseX, mouseY)
+            const left = (galleryImage.width - galleryImage.paintedWidth) / 2
+            const top = (galleryImage.height - galleryImage.paintedHeight) / 2
+            const sourceSize = root.controller.galleryImageSize
+            const px = Math.floor((point.x - left) * sourceSize.width /
+                                  galleryImage.paintedWidth)
+            const py = Math.floor((point.y - top) * sourceSize.height /
+                                  galleryImage.paintedHeight)
+            const value = root.controller.probeGalleryPixel(px, py)
+            pixelProbeText = value.length > 0 ? value : "Outside image"
+        }
         function showPreview(path, previewUrl, fileName, technicalLabel, directory) {
             if (directory)
                 return;
@@ -813,13 +842,14 @@ Rectangle {
                                 ? root.controller.galleryImageSize.height * galleryWorkspace.manualZoom
                                 : Math.max(1, galleryFlick.height - 36)
                         source: galleryWorkspace.currentPreviewUrl.toString().length > 0
-                                ? galleryWorkspace.currentPreviewUrl.toString() + "&purpose=gallery"
+                                ? galleryWorkspace.currentPreviewUrl.toString() +
+                                  (galleryWorkspace.useFullResolutionTexture
+                                   ? "&purpose=gallery-full" : "&purpose=gallery")
                                 : ""
-                        // Do not change the requested source size for each wheel step.
-                        // A source reload was the brief white flash seen during zooming.
-                        // Keep a stable, high-quality preview texture through the zoom gesture.
-                        // Asking the provider for the complete sensor frame on every large image
-                        // can allocate an extra 100+ MiB texture and cause a visible blank frame.
+                        // Keep the bounded preview while fitting or smoothly scaling. Pixel
+                        // inspection switches to the already requested full frame only when a
+                        // nearest-neighbor view reaches 1:1, avoiding both false pixel readings
+                        // and repeated source reloads during ordinary zoom gestures.
                         sourceSize: Qt.size(2048, 2048)
                         asynchronous: true
                         cache: true
@@ -827,6 +857,11 @@ Rectangle {
                         smooth: root.smoothDisplay
                         mipmap: root.smoothDisplay
                         fillMode: galleryWorkspace.actualPixels ? Image.Stretch : Image.PreserveAspectFit
+                        onStatusChanged: {
+                            if (status === Image.Ready && galleryProbeArea.containsMouse)
+                                galleryWorkspace.updatePixelProbe(galleryProbeArea.mouseX,
+                                                                  galleryProbeArea.mouseY)
+                        }
                     }
 
                     MouseArea {
@@ -836,20 +871,7 @@ Rectangle {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.BackButton | Qt.ForwardButton
                         preventStealing: false
                         onPositionChanged: function (mouse) {
-                            if (!root.controller.galleryImageReady || galleryImage.paintedWidth <= 0 ||
-                                    galleryImage.paintedHeight <= 0) {
-                                galleryWorkspace.pixelProbeText = "Loading pixel data…";
-                                return;
-                            }
-                            const point = mapToItem(galleryImage, mouse.x, mouse.y);
-                            const left = (galleryImage.width - galleryImage.paintedWidth) / 2;
-                            const top = (galleryImage.height - galleryImage.paintedHeight) / 2;
-                            const sourceSize = root.controller.galleryImageSize;
-                            const px = Math.floor((point.x - left) * sourceSize.width / galleryImage.paintedWidth);
-                            const py = Math.floor((point.y - top) * sourceSize.height / galleryImage.paintedHeight);
-                            const value = root.controller.probeGalleryPixel(px, py);
-                            galleryWorkspace.pixelProbeText = value.length > 0
-                                                             ? value : "Outside image";
+                            galleryWorkspace.updatePixelProbe(mouse.x, mouse.y)
                         }
                         onExited: galleryWorkspace.pixelProbeText = ""
                         onWheel: function (wheel) {

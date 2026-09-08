@@ -70,6 +70,8 @@ class PurposeTrackingDecoder final : public IImageDecoder {
         QImage image(request.purpose == DecodePurpose::Full ? QSize(32, 24) : QSize(16, 12),
                      QImage::Format_RGBA8888);
         image.fill(request.purpose == DecodePurpose::Full ? Qt::green : Qt::blue);
+        if (request.purpose == DecodePurpose::Full)
+            image.setPixelColor(1, 0, Qt::red);
         auto frame = std::make_shared<ImageFrame>();
         frame->descriptor.size = image.size();
         frame->descriptor.storageBits = 8;
@@ -624,10 +626,21 @@ void QmlWorkspaceControllerTests::galleryUsesPreviewUntilPixelProbeRequestsFullR
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 1, 2000);
     QTRY_VERIFY_WITH_TIMEOUT(controller.galleryImageReady(), 2000);
     QCOMPARE(decoder->count(DecodePurpose::Full), 0);
-    QVERIFY(!controller.probeGalleryPixel(0, 0).isEmpty());
+    QCOMPARE(controller.probeGalleryPixel(0, 0), QStringLiteral("Loading pixel data…"));
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(controller.galleryFullResolution(), 2000);
     QTRY_VERIFY_WITH_TIMEOUT(
         controller.probeGalleryPixel(0, 0).contains(QStringLiteral("RGBA(0, 255, 0, 255)")), 2000);
+    QVERIFY(controller.probeGalleryPixel(1, 0).contains(QStringLiteral("RGBA(255, 0, 0, 255)")));
+
+    ThumbnailImageProvider provider(decoder, controller.loader());
+    const QString encodedPath = QString::fromLatin1(QUrl::toPercentEncoding(path));
+    const QImage fullTexture = provider.requestImage(
+        encodedPath + QStringLiteral("?purpose=gallery-full"), nullptr, QSize(8, 8));
+    QCOMPARE(fullTexture.size(), QSize(32, 24));
+    QCOMPARE(fullTexture.pixelColor(0, 0), QColor(Qt::green));
+    QCOMPARE(fullTexture.pixelColor(1, 0), QColor(Qt::red));
+    QCOMPARE(decoder->count(DecodePurpose::Full), 1);
 }
 
 void QmlWorkspaceControllerTests::browseFileDialogsAreRequestedByQmlAndActionsStayInBackend() {

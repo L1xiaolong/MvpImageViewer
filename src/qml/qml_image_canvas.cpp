@@ -1,5 +1,6 @@
 #include "qml/qml_image_canvas.h"
 
+#include "core/comparison_pixel_probe.h"
 #include "render/bayer_render_parameters.h"
 #include "render/yuv_render_parameters.h"
 
@@ -8,6 +9,7 @@
 #include <QHoverEvent>
 #include <QMatrix4x4>
 #include <QMouseEvent>
+#include <QQuickWindow>
 #include <QWheelEvent>
 #include <QtGui/qrgbafloat.h>
 #include <rhi/qrhi.h>
@@ -706,6 +708,14 @@ QmlImageCanvas::QmlImageCanvas(QQuickItem* parent) : QQuickRhiItem(parent) {
     setAlphaBlending(false);
     setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
     setAcceptHoverEvents(true);
+    // Native hover events can be swallowed when a QQuickRhiItem is composited below
+    // ordinary Qt Quick overlay items. Polling the cursor while this short-lived canvas
+    // exists makes pixel inspection independent of that delivery path on macOS/Windows.
+    hoverProbeTimer_.setInterval(16);
+    hoverProbeTimer_.setTimerType(Qt::PreciseTimer);
+    connect(&hoverProbeTimer_, &QTimer::timeout, this,
+            &QmlImageCanvas::pollCursorForPixelProbe);
+    hoverProbeTimer_.start();
     connect(this, &QQuickItem::widthChanged, this, [this] {
         emit dividerPositionChanged();
         notifyNavigationChanged();
@@ -946,15 +956,42 @@ void QmlImageCanvas::emitPixelAt(const QPointF& position) {
         emit pixelHovered(slot, pixel, {}, false);
         return;
     }
-    QColor color;
-    if (const QImage* image = frame->qImage(); image && !image->isNull()) {
-        const int x = std::clamp(qFloor((pixel.x() + 0.5) * image->width() / imageSize.width()), 0,
-                                 image->width() - 1);
-        const int y = std::clamp(qFloor((pixel.y() + 0.5) * image->height() / imageSize.height()),
-                                 0, image->height() - 1);
-        color = image->pixelColor(x, y);
+    const ComparisonPixelSample sample = ComparisonPixelProbe::sample(
+        *frame, ComparisonPixelProbe::normalizedPixelCenter(pixel, imageSize));
+    emit pixelHovered(slot, pixel, sample.displayColor, sample.valid);
+}
+
+void QmlImageCanvas::clearPixelProbe() {
+    cursorInside_ = false;
+    hasLastHoverPosition_ = false;
+    emit pixelHovered(-1, {}, {}, false);
+}
+
+void QmlImageCanvas::pollCursorForPixelProbe() {
+    QQuickWindow* quickWindow = window();
+    if (!isVisible() || !quickWindow || !quickWindow->isVisible()) {
+        if (cursorInside_) {
+            clearPixelProbe();
+        }
+        hasLastHoverPosition_ = false;
+        return;
     }
-    emit pixelHovered(slot, pixel, color, true);
+
+    const QPoint windowPosition = quickWindow->mapFromGlobal(QCursor::pos());
+    const QPointF localPosition = mapFromScene(QPointF(windowPosition));
+    const bool navigationChanged = lastHoverNavigationRevision_ != navigationRevision_;
+    if (hasLastHoverPosition_ && localPosition == lastHoverPosition_ && !navigationChanged)
+        return;
+
+    lastHoverPosition_ = localPosition;
+    lastHoverNavigationRevision_ = navigationRevision_;
+    hasLastHoverPosition_ = true;
+    if (contains(localPosition)) {
+        cursorInside_ = true;
+        emitPixelAt(localPosition);
+    } else if (cursorInside_) {
+        clearPixelProbe();
+    }
 }
 
 void QmlImageCanvas::wheelEvent(QWheelEvent* event) {
@@ -1057,7 +1094,7 @@ void QmlImageCanvas::hoverMoveEvent(QHoverEvent* event) {
 
 void QmlImageCanvas::hoverLeaveEvent(QHoverEvent* event) {
     unsetCursor();
-    emit pixelHovered(-1, {}, {}, false);
+    clearPixelProbe();
     QQuickRhiItem::hoverLeaveEvent(event);
 }
 

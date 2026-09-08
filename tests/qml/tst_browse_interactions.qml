@@ -45,10 +45,12 @@ TestCase {
 
     function init() {
         browsePage.displayMode = 2;
+        mockSettings.smoothDisplay = true
         const navigator = findChild(browsePage, "folderNavigator")
         if (navigator !== null)
             navigator.platformName = Qt.platform.os
         mockController.clearSelection();
+        mockController.galleryFullResolution = false
         mockController.selectPath(mockController.thumbnails.get(0).path, false, false);
         mockController.selectPath(mockController.thumbnails.get(1).path, false, true);
         wait(80);
@@ -135,6 +137,30 @@ TestCase {
 
         mockSettings.smoothDisplay = true
         tryCompare(toolbarButton, "checked", true)
+    }
+
+    function test_nonSmoothOneToOneGalleryUsesFullResolutionTexture() {
+        const workspace = findChild(browsePage, "galleryWorkspace")
+        const galleryImage = findChild(browsePage, "galleryImage")
+        verify(workspace !== null)
+        verify(galleryImage !== null)
+
+        mockSettings.smoothDisplay = false
+        workspace.currentPreviewUrl = "image://thumbnail/test?v=1"
+        workspace.actualPixels = true
+        workspace.manualZoom = 2.0
+        mockController.galleryFullResolution = true
+        mockController.galleryImageChanged()
+        tryCompare(workspace, "useFullResolutionTexture", true)
+        tryVerify(function() {
+            return galleryImage.source.toString().indexOf("purpose=gallery-full") >= 0
+        })
+
+        mockController.galleryFullResolution = false
+        mockSettings.smoothDisplay = true
+        workspace.actualPixels = false
+        workspace.manualZoom = 1.0
+        workspace.currentPreviewUrl = ""
     }
 
     function test_hiddenMenuItemDoesNotReserveSpace() {

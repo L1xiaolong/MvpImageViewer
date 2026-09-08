@@ -104,7 +104,36 @@ void CoreTests::comparisonPixelProbeMapsDifferentSizesAndRawOrientation() {
     QVERIFY(raw.bayer.has_value());
     QCOMPARE(raw.bayer->value, quint16{5});
     QCOMPARE(raw.sourceValueText(), QStringLiteral("RAW(5, Gb)"));
-    QCOMPARE(raw.displayValueText(), QStringLiteral("RGBA(90,80,70,255)"));
+    QCOMPARE(raw.displayValueText(), QStringLiteral("RGBA(12,12,12,255)"));
+
+    RawImageParameters yuvParameters;
+    yuvParameters.size = {2, 2};
+    yuvParameters.format = RawPixelFormat::NV12;
+    yuvParameters.range = QuantizationRange::Full;
+    auto yuvStorage = std::make_shared<PlaneBufferSet>();
+    yuvStorage->storage = QByteArray(6, '\0');
+    yuvStorage->storage[0] = char(0);
+    yuvStorage->storage[1] = char(255);
+    yuvStorage->storage[2] = char(64);
+    yuvStorage->storage[3] = char(128);
+    yuvStorage->storage[4] = char(128);
+    yuvStorage->storage[5] = char(128);
+    yuvStorage->planes = {{0, 2, 4}, {4, 2, 2}};
+    yuvStorage->displayImage = QImage(1, 1, QImage::Format_RGBA8888);
+    yuvStorage->displayImage.fill(Qt::red);
+    ImageFrame yuvFrame;
+    yuvFrame.descriptor.size = yuvParameters.size;
+    yuvFrame.rawParameters = yuvParameters;
+    yuvFrame.storage = std::shared_ptr<const PlaneBufferSet>(yuvStorage);
+
+    const auto darkYuv = ComparisonPixelProbe::sample(
+        yuvFrame, ComparisonPixelProbe::normalizedPixelCenter({0, 0}, yuvParameters.size));
+    const auto brightYuv = ComparisonPixelProbe::sample(
+        yuvFrame, ComparisonPixelProbe::normalizedPixelCenter({1, 0}, yuvParameters.size));
+    QCOMPARE(darkYuv.displayPixel, QPoint(0, 0));
+    QCOMPARE(darkYuv.displayColor, QColor(0, 0, 0));
+    QCOMPARE(brightYuv.displayPixel, QPoint(1, 0));
+    QCOMPARE(brightYuv.displayColor, QColor(255, 255, 255));
 }
 
 void CoreTests::cursorAnchoredZoomPreservesImagePoint() {

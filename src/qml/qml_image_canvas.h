@@ -5,6 +5,7 @@
 #include "core/view_state.h"
 
 #include <QQuickRhiItem>
+#include <QTimer>
 #include <QVariantMap>
 #include <QtQml/qqml.h>
 
@@ -100,6 +101,11 @@ class QmlImageCanvas : public QQuickRhiItem {
     int navigationRevision_ = 0;
     QColor backgroundColor_{160, 160, 160};
     bool smoothDisplay_ = true;
+    QTimer hoverProbeTimer_;
+    QPointF lastHoverPosition_;
+    int lastHoverNavigationRevision_ = -1;
+    bool hasLastHoverPosition_ = false;
+    bool cursorInside_ = false;
 
     QRectF cellRect(int slot) const;
     int slotAt(const QPointF& position) const;
@@ -108,6 +114,8 @@ class QmlImageCanvas : public QQuickRhiItem {
                       bool synchronizeViews = true);
     void notifyNavigationChanged();
     void emitPixelAt(const QPointF& position);
+    void clearPixelProbe();
+    void pollCursorForPixelProbe();
 };
 
 } // namespace ispview

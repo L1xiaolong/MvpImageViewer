@@ -32,6 +32,7 @@ QtObject {
     property string statusText: "16 items · " + selectionCount + " selected"
     property size galleryImageSize: Qt.size(4000, 3000)
     property bool galleryImageReady: true
+    property bool galleryFullResolution: false
     property string galleryInfoText: "4000 × 3000  8-bit  JPG  13.89 MiB"
     property bool canEditRaw: selectionCount === 1 &&
                               (selectedPaths[0].toLowerCase().endsWith(".raw") ||

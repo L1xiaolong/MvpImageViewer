@@ -1,5 +1,6 @@
 #include "qml/browse_controller.h"
 
+#include "core/comparison_pixel_probe.h"
 #include "core/raw_plane_access.h"
 #include "io/directory_scanner.h"
 #include "io/drop_copy_operation.h"
@@ -940,31 +941,26 @@ QString BrowseController::probeGalleryPixel(int x, int y) {
     }
     if (!galleryFullResolution_) {
         requestGalleryFull();
+        return QStringLiteral("Loading pixel data…");
     }
 
-    QString value;
-    if (const QImage* image = galleryFrame_->qImage(); image && !image->isNull()) {
-        const int sampleX = std::clamp(
-            static_cast<int>((static_cast<double>(x) + 0.5) * image->width() /
-                             galleryImageSize_.width()),
-            0, image->width() - 1);
-        const int sampleY = std::clamp(
-            static_cast<int>((static_cast<double>(y) + 0.5) * image->height() /
-                             galleryImageSize_.height()),
-            0, image->height() - 1);
-        const QColor color = image->pixelColor(sampleX, sampleY);
-        value = QStringLiteral("RGBA(%1, %2, %3, %4)")
-                    .arg(color.red())
-                    .arg(color.green())
-                    .arg(color.blue())
-                    .arg(color.alpha());
+    const ComparisonPixelSample sample = ComparisonPixelProbe::sample(
+        *galleryFrame_,
+        ComparisonPixelProbe::normalizedPixelCenter(QPoint(x, y), galleryImageSize_));
+    if (!sample.valid || !sample.displayColor.isValid()) {
+        return {};
     }
-    const RawPlaneAccessor raw(*galleryFrame_);
-    if (raw.isValid()) {
-        const QString engineering = raw.pixelDescriptionAtDisplayPixel({x, y});
-        if (!engineering.isEmpty()) {
-            value += value.isEmpty() ? engineering : QStringLiteral(" · ") + engineering;
-        }
+    QString value;
+    const QColor color = sample.displayColor;
+    value = QStringLiteral("RGBA(%1, %2, %3, %4)")
+                .arg(color.red())
+                .arg(color.green())
+                .arg(color.blue())
+                .arg(color.alpha());
+    const QString engineering = sample.sourceValueText();
+    const bool duplicatesDisplayColor = !sample.yuv && !sample.bayer;
+    if (!engineering.isEmpty() && !duplicatesDisplayColor) {
+        value += QStringLiteral(" · ") + engineering;
     }
     return QStringLiteral("x %1 · y %2 · %3").arg(x).arg(y).arg(value);
 }

@@ -89,14 +89,17 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
             }
         }
         const QPointer<ThumbnailImageResponse> self(this);
-        const bool galleryPreview = id_.contains(QStringLiteral("purpose=gallery"));
-        const LoadCategory category = galleryPreview
+        const bool galleryFull = id_.contains(QStringLiteral("purpose=gallery-full"));
+        const bool galleryPreview = !galleryFull && id_.contains(QStringLiteral("purpose=gallery"));
+        const LoadCategory category = galleryFull || galleryPreview
                                           ? LoadCategory::Interactive
                                           : id_.contains(QStringLiteral("priority=near"))
                                                 ? LoadCategory::NearViewport
                                                 : LoadCategory::VisibleThumbnail;
-        const DecodePurpose purpose = galleryPreview ? DecodePurpose::Preview
-                                                     : DecodePurpose::Thumbnail;
+        const DecodePurpose purpose = galleryFull
+                                          ? DecodePurpose::Full
+                                          : galleryPreview ? DecodePurpose::Preview
+                                                           : DecodePurpose::Thumbnail;
         handle_ = loader_->request(
             ++requestCounter_, {path, purpose, requestedSize_, parameters},
             [self](quint64, const DecodeResult& result) {
@@ -134,9 +137,12 @@ ThumbnailImageProvider::ThumbnailImageProvider(std::shared_ptr<const IImageDecod
 
 QQuickImageResponse* ThumbnailImageProvider::requestImageResponse(const QString& id,
                                                                   const QSize& requestedSize) {
-    const QSize target = id.contains(QStringLiteral("purpose=gallery"))
-                             ? requestedSize.boundedTo(QSize(2048, 2048))
-                             : bucketedSize(requestedSize);
+    const bool galleryFull = id.contains(QStringLiteral("purpose=gallery-full"));
+    const bool galleryPreview = !galleryFull && id.contains(QStringLiteral("purpose=gallery"));
+    const QSize target = galleryFull
+                             ? QSize{}
+                             : galleryPreview ? requestedSize.boundedTo(QSize(2048, 2048))
+                                              : bucketedSize(requestedSize);
     return new ThumbnailImageResponse(loader_, id, target);
 }
 

@@ -53,6 +53,7 @@ class BrowseController final : public QObject {
     Q_PROPERTY(int gridCellWidth READ gridCellWidth WRITE setGridCellWidth NOTIFY gridCellWidthChanged)
     Q_PROPERTY(QSize galleryImageSize READ galleryImageSize NOTIFY galleryImageChanged)
     Q_PROPERTY(bool galleryImageReady READ galleryImageReady NOTIFY galleryImageChanged)
+    Q_PROPERTY(bool galleryFullResolution READ galleryFullResolution NOTIFY galleryImageChanged)
     Q_PROPERTY(QString galleryInfoText READ galleryInfoText NOTIFY galleryImageChanged)
     Q_PROPERTY(bool canEditRaw READ canEditRaw NOTIFY selectionChanged)
     Q_PROPERTY(bool canTransform READ canTransform NOTIFY selectionChanged)
@@ -90,6 +91,7 @@ class BrowseController final : public QObject {
     [[nodiscard]] int gridCellWidth() const { return gridCellWidth_; }
     [[nodiscard]] QSize galleryImageSize() const { return galleryImageSize_; }
     [[nodiscard]] bool galleryImageReady() const { return galleryFrame_ != nullptr; }
+    [[nodiscard]] bool galleryFullResolution() const { return galleryFullResolution_; }
     [[nodiscard]] QString galleryInfoText() const { return galleryInfoText_; }
     [[nodiscard]] bool canEditRaw() const;
     [[nodiscard]] bool canTransform() const;
