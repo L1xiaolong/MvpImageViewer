@@ -88,8 +88,8 @@ MVP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片浏览与
 
 预编译版本发布在 [GitHub Releases](../../releases)。
 
-- macOS：Apple Silicon
-- Windows：x64
+- macOS（Apple Silicon）：下载 `.dmg`，打开后将应用拖入 Applications
+- Windows（x64）：下载 `-setup.exe`，按安装向导完成安装；可从系统“已安装的应用”卸载
 
 直接启动应用，或在命令行传入一个初始目录：
 
@@ -97,7 +97,7 @@ MVP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片浏览与
 MVPImageViewer /path/to/images
 ```
 
-当前 macOS 包可能没有 Apple notarization。首次运行时，可能需要在 Finder 中右键应用并选择“打开”。
+当前 macOS 安装器可能没有 Apple notarization，Windows 安装器也可能尚未进行代码签名。首次运行时，系统可能显示安全提示；macOS 可在 Finder 中右键应用并选择“打开”。
 
 ## 支持的格式
 
@@ -141,7 +141,7 @@ TIFF、WebP、OpenEXR、HEIC/HEIF、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当
 
 - `dev`：在 `build/` 中生成 Debug 应用
 - `release`：在 `build/` 中生成 Release 应用
-- `package`：部署运行时依赖，并在 `dist/` 中生成 `.app` 和 ZIP；打包阶段会按白名单裁剪未使用的 Qt 样式、QML 模块和插件，并检查运行时依赖是否全部位于包内
+- `package`：部署运行时依赖，并在 `dist/` 中生成可安装的 DMG；默认还会生成便携 ZIP，可用 `--no-zip` 关闭。打包阶段会按白名单裁剪未使用的 Qt 样式、QML 模块和插件，并检查运行时依赖是否全部位于包内
 
 也可以直接使用 CMake Preset：
 
@@ -176,6 +176,8 @@ $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
 
+`package` 会使用 NSIS 3.x 在 `dist/` 中生成 `MVPImageViewer-<版本>-windows-x64-setup.exe`，安装到当前用户目录，创建开始菜单入口，并注册标准卸载程序。默认还会生成便携 ZIP；使用 `-NoZip` 可只生成安装器。
+
 Windows 的 `package` 模式采用与 macOS 相同的 Qt 运行时裁剪清单；平台插件仍分别保留 `qwindows` 和 `qcocoa`，不会强行统一操作系统专属组件。
 
 等效的 CMake Preset 命令：
@@ -205,7 +207,7 @@ cmake --preset macos-debug \
 - `metadata-exiv2`
 - `color-management`
 
-项目的 GitHub Release 构建目前关闭这三个可选组件，只发布基础 JPEG/PNG 功能，以缩小包体并隔离可选依赖的许可证要求。
+项目的 GitHub Release 构建目前关闭这三个可选组件，只发布 macOS DMG 和 Windows Setup.exe 安装器中的基础 JPEG/PNG 功能，以缩小包体并隔离可选依赖的许可证要求。
 
 > **许可证提示：** Exiv2 采用 GPL-2.0-or-later。启用并分发 Exiv2 的构建前，请确认整个分发方案与其许可证兼容。Qt、LibRaw、LittleCMS 及打包产生的传递依赖也各自保留原有许可证。
 

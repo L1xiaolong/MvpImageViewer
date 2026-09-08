@@ -88,8 +88,8 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 
 Prebuilt packages are published through [GitHub Releases](../../releases).
 
-- macOS: Apple Silicon
-- Windows: x64
+- macOS (Apple Silicon): download the `.dmg`, open it, and drag the app to Applications
+- Windows (x64): download `-setup.exe` and follow the installer; uninstall it from Installed apps
 
 Launch the application normally, or pass an initial directory on the command line:
 
@@ -97,7 +97,7 @@ Launch the application normally, or pass an initial directory on the command lin
 MVPImageViewer /path/to/images
 ```
 
-Current macOS packages may not be Apple-notarized. On first launch, you may need to Control-click the application in Finder and choose **Open**.
+Current macOS installers may not be Apple-notarized, and Windows installers may not yet be code-signed. The operating system may show a security warning on first launch; on macOS, Control-click the application in Finder and choose **Open**.
 
 ## Supported formats
 
@@ -141,7 +141,7 @@ Use the project wrapper:
 
 - `dev` creates a Debug application under `build/`
 - `release` creates a Release application under `build/`
-- `package` deploys runtime dependencies and writes the `.app` and ZIP to `dist/`; packaging also prunes unused Qt styles, QML modules, and plug-ins through a whitelist, then verifies that runtime dependencies are bundle-local
+- `package` deploys runtime dependencies and writes an installable DMG to `dist/`; it also creates a portable ZIP by default, which `--no-zip` disables. Packaging prunes unused Qt styles, QML modules, and plug-ins through a whitelist, then verifies that runtime dependencies are bundle-local
 
 Equivalent CMake Preset commands:
 
@@ -178,6 +178,8 @@ $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
 
+`package` uses NSIS 3.x to create `MVPImageViewer-<version>-windows-x64-setup.exe` in `dist/`. It installs for the current user, creates Start menu shortcuts, and registers a standard uninstaller. A portable ZIP is also created by default; pass `-NoZip` to create only the installer.
+
 Windows package mode uses the same Qt runtime pruning policy as macOS. Platform-specific components remain separate: `qwindows` is retained on Windows and `qcocoa` on macOS.
 
 Equivalent CMake Preset commands:
@@ -207,7 +209,7 @@ The vcpkg manifest exposes these optional features:
 - `metadata-exiv2`
 - `color-management`
 
-The current GitHub Release workflow disables all three optional components and ships the core JPEG/PNG feature set. This keeps release packages smaller and isolates the licensing requirements of optional dependencies.
+The current GitHub Release workflow disables all three optional components and ships the core JPEG/PNG feature set in a macOS DMG and Windows Setup.exe. This keeps release packages smaller and isolates the licensing requirements of optional dependencies.
 
 > **License note:** Exiv2 is licensed under GPL-2.0-or-later. Before enabling and distributing an Exiv2-backed build, make sure the complete distribution is compatible with that license. Qt, LibRaw, LittleCMS, and transitive packaged dependencies retain their respective licenses as well.
 

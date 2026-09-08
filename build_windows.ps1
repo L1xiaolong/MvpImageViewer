@@ -36,12 +36,12 @@ Options:
   -Msys2Ucrt64 PATH      MSYS2 UCRT64 prefix.
   -Test                  Run CTest for a Debug build.
   -Clean                 Remove the selected build directory first.
-  -NoZip                 Do not create a ZIP in package mode.
+  -NoZip                 Do not also create the optional portable ZIP.
   -Jobs N                Parallel build jobs. Default: CPU core count.
 
 Outputs:
   dev/release  build\windows-* only
-  package      dist\MVPImageViewer-windows-x64 and a versioned ZIP
+  package      dist\MVPImageViewer-<version>-windows-x64-setup.exe (plus an optional ZIP)
 "@
 }
 
@@ -113,6 +113,45 @@ function Copy-Msys2DependencyClosure {
     }
 }
 
+function Find-MakeNsis {
+    $command = Get-Command makensis.exe -ErrorAction SilentlyContinue
+    if ($null -ne $command) { return $command.Source }
+
+    foreach ($candidate in @(
+        (Join-Path $env:ProgramFiles "NSIS\makensis.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe")
+    )) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+    throw "NSIS was not found. Install NSIS 3.x and add makensis.exe to PATH."
+}
+
+function New-WindowsInstaller {
+    param(
+        [Parameter(Mandatory = $true)][string]$StageDir,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    $makeNsis = Find-MakeNsis
+    $installerPath = Join-Path $ScriptDir "dist\MVPImageViewer-$Version-windows-x64-setup.exe"
+    $nsisScript = Join-Path $ScriptDir "packaging\windows\installer.nsi"
+    $iconPath = Join-Path $ScriptDir "assets\icons\windows\ISPImageViewer.ico"
+    if (Test-Path -LiteralPath $installerPath) {
+        Remove-Item -LiteralPath $installerPath -Force
+    }
+
+    Write-Host "Creating Windows installer with $makeNsis"
+    & $makeNsis /V3 "/DSTAGE_DIR=$StageDir" "/DOUTPUT_FILE=$installerPath" `
+        "/DAPP_VERSION=$Version" "/DAPP_ICON=$iconPath" $nsisScript
+    if ($LASTEXITCODE -ne 0) { throw "NSIS failed with exit code $LASTEXITCODE" }
+    if (-not (Test-Path -LiteralPath $installerPath)) {
+        throw "NSIS did not produce the expected installer: $installerPath"
+    }
+    $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Host "SHA-256: $hash"
+    Write-Host "Windows installer: $installerPath"
+}
+
 function Publish-WindowsPackage {
     param(
         [Parameter(Mandatory = $true)][string]$Executable,
@@ -162,6 +201,8 @@ Translations=translations
     $versionMatch = Select-String -LiteralPath (Join-Path $ScriptDir "CMakeLists.txt") `
         -Pattern "project\(ISPImageViewer VERSION ([0-9.]+)" | Select-Object -First 1
     $version = if ($null -ne $versionMatch) { $versionMatch.Matches[0].Groups[1].Value } else { "unknown" }
+    if ($version -eq "unknown") { throw "Could not read the project version from CMakeLists.txt" }
+    New-WindowsInstaller -StageDir $stageDir -Version $version
     $zipPath = Join-Path $ScriptDir "dist\MVPImageViewer-$version-windows-x64.zip"
     if (-not $NoZip) {
         if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }

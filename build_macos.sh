@@ -24,7 +24,7 @@ Options:
   --clean      Remove the selected build directory before configuring.
   --qt-prefix  Build with a custom Qt installation instead of the Qt on PATH.
   --sign ID    Code-sign a package with ID. Default is an ad-hoc local signature.
-  --no-zip     Do not create the distributable ZIP in package mode.
+  --no-zip     Do not also create the optional portable ZIP in package mode.
   -j N         Parallel build jobs. Defaults to the local CPU count.
   -h,--help    Show this help.
 
@@ -35,7 +35,7 @@ Outputs:
   dev/debug  build/macos-preset-debug/src/qml/MVPImageViewer.app
   release    build/macos-preset-release/src/qml/MVPImageViewer.app
   custom Qt  build/macos-custom-qt-<mode>/src/qml/MVPImageViewer.app
-  package    dist/MVPImageViewer.app and dist/MVPImageViewer-<version>-macos-<arch>.zip
+  package    dist/MVPImageViewer-<version>-macos-<arch>.dmg (plus an optional ZIP)
 EOF
 }
 
@@ -208,7 +208,8 @@ if [[ "$command_name" != "package" ]]; then
     exit 0
 fi
 
-for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto file lipo unzip; do
+for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto file lipo \
+                      hdiutil unzip; do
     command -v "$tool_name" >/dev/null 2>&1 || {
         echo "Required packaging tool is missing: $tool_name" >&2
         exit 1
@@ -395,15 +396,36 @@ fi
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
     "$staged_app/Contents/Info.plist")"
-architecture="$(uname -m)"
+# The build configuration and architecture check above require arm64 even when
+# packaging is run from a cross-compiling Intel host.
+architecture="arm64"
 dist_dir="$script_dir/dist"
 dist_app="$dist_dir/MVPImageViewer.app"
 zip_name="MVPImageViewer-${version}-macos-${architecture}.zip"
 zip_path="$dist_dir/$zip_name"
+dmg_name="MVPImageViewer-${version}-macos-${architecture}.dmg"
+dmg_path="$dist_dir/$dmg_name"
 
 mkdir -p "$dist_dir"
 rm -rf "$dist_app"
 ditto "$staged_app" "$dist_app"
+
+echo "Creating macOS installer image"
+dmg_root="$stage_dir/dmg-root"
+mkdir -p "$dmg_root"
+ditto "$staged_app" "$dmg_root/MVPImageViewer.app"
+ln -s /Applications "$dmg_root/Applications"
+rm -f "$dmg_path"
+hdiutil create \
+    -volname "MVP Image Viewer" \
+    -srcfolder "$dmg_root" \
+    -fs HFS+ \
+    -format UDZO \
+    -imagekey zlib-level=9 \
+    "$dmg_path"
+hdiutil verify "$dmg_path"
+echo "SHA-256: $(shasum -a 256 "$dmg_path" | awk '{print $1}')"
+echo "macOS installer: $dmg_path"
 
 if [[ "$create_zip" -eq 1 ]]; then
     rm -f "$zip_path"
