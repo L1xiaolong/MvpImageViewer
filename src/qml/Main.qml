@@ -33,6 +33,8 @@ ApplicationWindow {
     property bool showingFullScreen: false
     property bool fullScreenTransitioning: false
     property bool enteringFullScreen: false
+    property var fullScreenEnterAction: null
+    property int coverFramesRemaining: 0
     property bool instantFullScreenActive: false
     property var pendingFullScreenPaths: []
     property int pendingFullScreenIndex: 0
@@ -68,6 +70,7 @@ ApplicationWindow {
 
     function completeFullScreenOpen() {
         if (!fullScreenTransitioning || !enteringFullScreen
+                || showingFullScreen
                 || (instantFullScreenActive
                     ? !fullScreenPresentationController.active
                     : visibility !== Window.FullScreen))
@@ -78,12 +81,13 @@ ApplicationWindow {
         fullScreenPage.open(pendingFullScreenPaths, pendingFullScreenIndex)
         pendingFullScreenPaths = []
         showingFullScreen = true
-        enteringFullScreen = false
-        fullScreenTransitioning = false
+        fullScreenPage.forceActiveFocus()
+        // Keep the cover until the canvas has uploaded and drawn the first image.
+        // Finishing the asynchronous decode alone does not make a frame ready to display.
     }
 
     function openFullScreen(paths, initialIndex) {
-        if (showingFullScreen || fullScreenTransitioning)
+        if (!paths || paths.length === 0 || showingFullScreen || fullScreenTransitioning)
             return
         showingCompare = false
         const targetScreen = screenAtWindowCenter()
@@ -98,9 +102,10 @@ ApplicationWindow {
         pendingFullScreenIndex = initialIndex
         enteringFullScreen = true
         fullScreenTransitioning = true
-        // Give the transition cover one event-loop turn before changing the native frame. The
-        // viewer is created only after the platform has synchronously applied the final geometry.
-        Qt.callLater(function() {
+        // The first swap may belong to a frame already in flight. Wait for the next one as
+        // well so the cover has actually been submitted before resizing the native window.
+        coverFramesRemaining = 2
+        fullScreenEnterAction = function() {
             if (!window.enteringFullScreen)
                 return
             if (window.instantFullScreenActive
@@ -115,7 +120,21 @@ ApplicationWindow {
                 window.showFullScreen()
             }
             Qt.callLater(function() { window.completeFullScreenOpen() })
-        })
+        }
+        window.update()
+    }
+
+    onFrameSwapped: {
+        if (!fullScreenEnterAction)
+            return
+        coverFramesRemaining -= 1
+        if (coverFramesRemaining > 0) {
+            window.update()
+        } else {
+            const enter = fullScreenEnterAction
+            fullScreenEnterAction = null
+            Qt.callLater(enter)
+        }
     }
 
     function closeCompare() {
@@ -162,6 +181,7 @@ ApplicationWindow {
             fullScreenPresentationController.end()
         }
         pendingFullScreenPaths = []
+        fullScreenEnterAction = null
         fullScreenTransitioning = false
         enteringFullScreen = false
         instantFullScreenActive = false
@@ -242,10 +262,17 @@ ApplicationWindow {
         controller: fullScreenController
         propertiesController: imagePropertiesController
         settingsController: appSettings
+        messageParent: window.contentItem
         parent: window.contentItem
         anchors.fill: parent
         visible: window.showingFullScreen
         onCloseRequested: window.closeFullScreen()
+        onImageFrameReady: {
+            if (window.enteringFullScreen && window.showingFullScreen) {
+                window.enteringFullScreen = false
+                window.fullScreenTransitioning = false
+            }
+        }
     }
     Rectangle {
         anchors.fill: parent

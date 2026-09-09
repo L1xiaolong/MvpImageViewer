@@ -65,6 +65,8 @@ class QmlImageCanvas : public QQuickRhiItem {
     Q_INVOKABLE QVariantMap navigationState(int slot) const;
 
   signals:
+    // Delivered on the GUI thread after rendering the current image at the current size.
+    void imageFrameRendered();
     void presentationModeChanged();
     void compareAmountChanged();
     void dividerPositionChanged();

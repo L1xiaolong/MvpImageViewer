@@ -15,6 +15,33 @@ TestCase {
         anchors.fill: parent
     }
 
+    function test_loadingMessageSkipsFastLoadsAndResetsBetweenLoads() {
+        const page = findChild(preview, "fullScreenPage")
+        const message = findChild(page, "fullScreenLoadingMessage")
+        page.controller.loading = true
+        verify(!message.visible)
+        wait(50)
+        page.controller.loading = false
+        wait(220)
+        verify(!message.visible)
+        page.controller.loading = true
+        tryCompare(message, "visible", true, 1000)
+        page.controller.loading = false
+        verify(!message.visible)
+        page.controller.loading = true
+        verify(!message.visible)
+        page.controller.loading = false
+    }
+
+    function test_loadErrorIsVisibleWithoutLoadingDelay() {
+        const page = findChild(preview, "fullScreenPage")
+        const message = findChild(page, "fullScreenLoadingMessage")
+        page.controller.errorText = "Cannot decode image"
+        verify(message.visible)
+        page.controller.errorText = ""
+        verify(!message.visible)
+    }
+
     function test_productionPageUsesOnlyFixedCornerInformation() {
         const page = findChild(preview, "fullScreenPage")
         const canvas = findChild(page, "designFullScreenCanvas")

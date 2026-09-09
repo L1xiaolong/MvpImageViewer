@@ -19,6 +19,17 @@ Item {
     property string pixelText: qsTr("Move over the image")
     property string inspectedPath: ""
     readonly property var imageCanvas: canvasLoader.item
+    property Item messageParent: root
+    property bool loadingMessageVisible: false
+    readonly property bool imageLoading: root.visible && root.controller.loading
+    onImageLoadingChanged: loadingMessageVisible = false
+    signal imageFrameReady()
+
+    Timer {
+        interval: 180
+        running: root.imageLoading
+        onTriggered: root.loadingMessageVisible = true
+    }
     readonly property var navigationData: {
         if (!imageCanvas)
             return ({ "visible": false })
@@ -106,6 +117,7 @@ Item {
         function onContextMenuRequested(position) {
             fullScreenContextMenu.popup(position.x, position.y)
         }
+        function onImageFrameRendered() { root.imageFrameReady() }
     }
 
     Connections {
@@ -246,7 +258,11 @@ Item {
     }
 
     Rectangle {
-        visible: root.controller.loading || root.controller.errorText.length > 0
+        objectName: "fullScreenLoadingMessage"
+        parent: root.messageParent
+        z: 10001
+        visible: root.visible && ((root.controller.loading && root.loadingMessageVisible)
+                                 || root.controller.errorText.length > 0)
         anchors.centerIn: parent
         width: Math.min(420, messageText.implicitWidth + 36)
         height: 42

@@ -9,6 +9,7 @@
 #include <QHoverEvent>
 #include <QMatrix4x4>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QQuickWindow>
 #include <QWheelEvent>
 #include <QtGui/qrgbafloat.h>
@@ -226,6 +227,8 @@ class Renderer final : public QQuickRhiItemRenderer {
     QVector<QImage> displayImages_;
     QVector<ViewState> viewStates_;
     QSize itemSize_;
+    QPointer<QmlImageCanvas> canvas_;
+    bool notifyImageFrame_ = false;
     int presentationMode_ = 0;
     qreal compareAmount_ = 0.5;
     QColor backgroundColor_{160, 160, 160};
@@ -583,7 +586,10 @@ class Renderer final : public QQuickRhiItemRenderer {
 
     void synchronize(QQuickRhiItem* item) override {
         auto* canvas = static_cast<QmlImageCanvas*>(item);
+        canvas_ = canvas;
         const QVector<ImageFramePtr> incoming = canvas->frames();
+        const QSize incomingSize(qRound(canvas->width()), qRound(canvas->height()));
+        notifyImageFrame_ = notifyImageFrame_ || frames_ != incoming || itemSize_ != incomingSize;
         const int incomingMode = canvas->presentationMode();
         if (frames_ != incoming || ((presentationMode_ == 0) != (incomingMode == 0))) {
             frames_ = incoming;
@@ -698,6 +704,19 @@ class Renderer final : public QQuickRhiItemRenderer {
             }
         }
         commandBuffer->endPass();
+        if (notifyImageFrame_ && canvas_ && frames_.value(0) && !itemSize_.isEmpty()) {
+            notifyImageFrame_ = false;
+            // A decode callback only supplies CPU data. Reveal the viewer after its texture
+            // upload and draw commands exist; the following scene-graph frame removes the cover.
+            const auto canvas = canvas_;
+            const auto frames = frames_;
+            const auto size = itemSize_;
+            QMetaObject::invokeMethod(canvas, [canvas, frames, size] {
+                if (canvas && canvas->frames() == frames &&
+                    QSize(qRound(canvas->width()), qRound(canvas->height())) == size)
+                    emit canvas->imageFrameRendered();
+            }, Qt::QueuedConnection);
+        }
     }
 };
 
