@@ -221,6 +221,9 @@ trap 'rm -rf "$stage_dir"' EXIT
 staged_app="$stage_dir/MVPImageViewer.app"
 ditto "$built_app" "$staged_app"
 
+cmake "-DNOTICE_DESTINATION=$staged_app/Contents/Resources" \
+    -P "$script_dir/scripts/package_licenses.cmake"
+
 echo "Deploying Qt and QML dependencies"
 deploy_log="$stage_dir/macdeployqt.log"
 if ! macdeployqt "$staged_app" \
@@ -363,6 +366,21 @@ done < <(otool -l "$app_binary" | awk '/LC_RPATH/ { getline; getline; print $2 }
 if ! otool -l "$app_binary" | awk '/LC_RPATH/ { getline; getline; print $2 }' \
     | grep -Fxq '@executable_path/../Frameworks'; then
     install_name_tool -add_rpath '@executable_path/../Frameworks' "$app_binary"
+fi
+
+# The catalog identifies deployed bytes after relocation and before signing.
+# SDK/Homebrew/custom-build notices must describe the actual runtime used.
+if ! python3 "$script_dir/scripts/collect_runtime_licenses.py" "$staged_app" \
+    --output "$staged_app/Contents/Resources"; then
+    audit_dir="$script_dir/build/runtime-license-audit-macos"
+    mkdir -p "$audit_dir"
+    for report in RUNTIME_DEPENDENCIES.json RUNTIME_DEPENDENCIES.md; do
+        if [[ -f "$staged_app/Contents/Resources/$report" ]]; then
+            cp "$staged_app/Contents/Resources/$report" "$audit_dir/$report"
+        fi
+    done
+    echo "Runtime license collection failed; inspect $audit_dir. Set ISPVIEW_RUNTIME_CATALOG for this SDK/build." >&2
+    exit 1
 fi
 
 chmod -R u+w "$staged_app"

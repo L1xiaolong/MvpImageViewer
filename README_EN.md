@@ -250,6 +250,10 @@ tools          Benchmarks and diagnostic tools
 
 ## License
 
-The project-level open-source license is still being prepared. Until a formal `LICENSE` file is added at the repository root, the repository remains under default copyright and does not grant permission to copy, modify, or redistribute its contents.
+Original project code and assets are licensed under the [MIT License](LICENSE), permitting use, modification, and redistribution, including commercial use, provided the copyright and permission notices are retained.
 
-Third-party components are not covered by the future project license. Distributors must independently comply with the licenses of Qt, Exiv2, LibRaw, LittleCMS, and all transitive dependencies.
+Third-party components retain their own licenses and are not covered by the project's MIT license. See [third-party notices](THIRD_PARTY_NOTICES.md) and the [complete icon license](licenses/Lucide-LICENSE) for the Lucide and Feather-derived icon attributions and file inventory. The application uses system fonts and does not bundle third-party font files.
+
+Packaging scripts include the project license and icon notices. These do not replace the notices and source delivery required by Qt, Exiv2, LibRaw, LittleCMS, and their transitive dependencies. Builds with Exiv2 enabled still require a combined distribution compatible with GPL-2.0-or-later.
+
+Packaging also requires Python 3.9+ and inventories deployed runtime files, collecting license notices and available SBOMs. Unverified provenance or missing notices blocks installer creation. MSYS2 matching is automatic; other SDKs/custom builds require a reviewed provenance catalog. See [runtime license collection](packaging/RUNTIME_LICENSES.md) for configuration and scope.

@@ -10,3 +10,4 @@
 *.user
 *.qtds
 *.swp
+__pycache__/

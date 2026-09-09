@@ -193,6 +193,18 @@ Translations=translations
         Copy-Msys2DependencyClosure -TargetDir $stageDir -Prefix $MsysPrefix
     }
 
+    cmake "-DNOTICE_DESTINATION=$stageDir" -P (Join-Path $ScriptDir "scripts\package_licenses.cmake")
+    if ($LASTEXITCODE -ne 0) { throw "License packaging failed with exit code $LASTEXITCODE" }
+
+    $licenseArgs = @((Join-Path $ScriptDir "scripts\collect_runtime_licenses.py"), $stageDir)
+    if (-not [string]::IsNullOrWhiteSpace($MsysPrefix)) {
+        $licenseArgs += @("--msys-root", (Split-Path -Parent $MsysPrefix))
+    }
+    & python @licenseArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Runtime license collection failed; inspect $stageDir\RUNTIME_DEPENDENCIES.md. Vendor SDKs require ISPVIEW_RUNTIME_CATALOG."
+    }
+
     if (Test-Path -LiteralPath $distDir) {
         Remove-Item -LiteralPath $distDir -Recurse -Force
     }

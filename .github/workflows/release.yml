@@ -59,6 +59,9 @@ jobs:
             fi
           fi
 
+      - name: Test runtime license collection
+        run: python3 -m unittest discover -s tests -p test_runtime_licenses.py
+
   ci:
     name: CI gate
     needs: validate
@@ -114,6 +117,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-shadertools
             mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-python
             zip
             unzip
 
@@ -136,6 +140,7 @@ jobs:
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
           ISPVIEW_GITHUB_REPOSITORY: ${{ github.repository }}
+          ISPVIEW_RUNTIME_CATALOG: ${{ vars.ISPVIEW_RUNTIME_CATALOG_MACOS }}
         run: |
           ./build_macos.sh package --no-zip
           project_version="$(sed -nE \
@@ -166,6 +171,7 @@ jobs:
         shell: msys2 {0}
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
+          ISPVIEW_RUNTIME_CATALOG: ${{ vars.ISPVIEW_RUNTIME_CATALOG_WINDOWS }}
         run: |
           set -euxo pipefail
 
@@ -226,6 +232,19 @@ jobs:
           # windeployqt --compiler-runtime does not deploy. Resolve the import
           # graph for the EXE, Qt plugins, and QML plugins recursively.
           ./scripts/deploy_msys2_runtime.sh "$package_directory"
+          cmake "-DNOTICE_DESTINATION=$package_directory" -P scripts/package_licenses.cmake
+          python scripts/collect_runtime_licenses.py "$package_directory" \
+            --msys-root "$(cygpath -m /)"
+
+      - name: Retain runtime license diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-license-audit-${{ matrix.asset_suffix }}
+          path: |
+            build/runtime-license-audit-macos/RUNTIME_DEPENDENCIES.*
+            dist/MVPImageViewer/RUNTIME_DEPENDENCIES.*
+          if-no-files-found: ignore
 
       - name: Create Windows installer
         if: runner.os == 'Windows'
@@ -262,6 +281,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v8
         with:
+          pattern: MVPImageViewer-*
           path: release-assets
           merge-multiple: true
 
