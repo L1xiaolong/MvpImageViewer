@@ -1,6 +1,7 @@
 #include "io/supported_image_formats.h"
 
 #include "io/camera_raw_decoder.h"
+#include "io/qt_image_decoder.h"
 
 #include <QFileInfo>
 
@@ -9,8 +10,8 @@
 namespace ispview {
 
 QStringList supportedImageSuffixes() {
-    QStringList suffixes{QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("png"),
-                         QStringLiteral("raw"), QStringLiteral("yuv")};
+    QStringList suffixes = QtImageDecoder::supportedSuffixes();
+    suffixes.append({QStringLiteral("raw"), QStringLiteral("yuv")});
     suffixes.append(CameraRawDecoder::supportedSuffixes());
     suffixes.removeDuplicates();
     return suffixes;

@@ -2,12 +2,15 @@
 
 #include "io/image_decoder.h"
 
+#include <QStringList>
+
 namespace ispview {
 
 class QtImageDecoder final : public IImageDecoder {
   public:
     [[nodiscard]] static bool autoOrientationEnabled();
     [[nodiscard]] static bool preserveHighBitDepth();
+    [[nodiscard]] static QStringList supportedSuffixes();
     static void setAutoOrientationEnabled(bool enabled);
     static void setPreserveHighBitDepth(bool enabled);
 

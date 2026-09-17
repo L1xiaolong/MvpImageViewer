@@ -147,12 +147,12 @@ if(PACKAGE_PLATFORM STREQUAL "macos")
     )
 endif()
 
-# The encoded-image decoder intentionally accepts JPEG and PNG only. SVG remains required by
-# the application icon/image provider. Keep ICO/ICNS conservatively for native shell artwork.
+# The encoded-image decoder accepts JPEG, PNG, BMP, and runtime-available HEIC/HEIF. SVG remains
+# required by the application icon/image provider. Keep ICO/ICNS conservatively for native shell
+# artwork, and retain qmacheif when deployment provides it so Apple platforms can expose HEIC.
 remove_plugins("imageformats"
     qgif
     qjp2
-    qmacheif
     qmng
     qpdf
     qtga

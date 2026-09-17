@@ -107,13 +107,15 @@ The app checks GitHub Releases at most once every 24 hours when automatic checks
 |---|---|---|
 | JPEG / JPG | Built in | Browsing, thumbnails, full screen, and comparison |
 | PNG | Built in | Browsing, thumbnails, full screen, and comparison with Alpha preserved |
+| BMP / DIB | Built in | Standard Windows Bitmap; `.dib` uses the BMP decoder |
+| HEIC / HEIF | System-dependent | Enabled when the current Qt/OS HEIF plugin is available; reads the primary image without sequence playback |
 | NV12 / NV21 / I420 / P010 | Built-in advanced feature | Headerless data; width, height, stride, and related parameters are required |
 | Bayer RAW10 / RAW12 / RAW16 | Built-in advanced feature | CFA, valid bits, byte order, black/white levels, white balance, CCM, and gamma parameters |
 | DNG / camera RAW | Optional | Requires LibRaw 0.21+ |
 | EXIF / IPTC / XMP | Optional | JPEG/PNG metadata requires Exiv2 0.28+ |
 | Embedded RGB ICC | Optional | Requires LittleCMS 2.x and converts into an sRGB display buffer |
 
-TIFF, WebP, OpenEXR, HEIC/HEIF, AVIF, JPEG XL, PSD, SVG, PDF, and GIF are currently outside the supported scope.
+TIFF, WebP, OpenEXR, AVIF, JPEG XL, PSD, SVG, PDF, and GIF are currently outside the supported scope. Actual HEIC/HEIF availability depends on the runtime; files are hidden from the gallery when the corresponding Qt image plugin is unavailable.
 
 ## Requirements
 

@@ -193,6 +193,8 @@ class IoTests final : public QObject {
   private slots:
     void decoderScalesPreviewAndKeepsMetadata();
     void qtDecoderAcceptsOnlyMvpEncodedFormats();
+    void qtDecoderReadsBmpAndDibAliases();
+    void heifCapabilityMatchesRuntimePlugins();
     void singleFileRenameMovesSidecarAndRejectsConflicts();
     void dropCopyCopiesFilesAndFoldersWithoutOverwriting();
     void scannerFiltersAndNaturallySortsFiles();
@@ -265,11 +267,71 @@ void IoTests::qtDecoderAcceptsOnlyMvpEncodedFormats() {
     QVERIFY(decoder.canDecode(QStringLiteral("image.jpg")));
     QVERIFY(decoder.canDecode(QStringLiteral("image.JPEG")));
     QVERIFY(decoder.canDecode(QStringLiteral("image.png")));
+    QVERIFY(decoder.canDecode(QStringLiteral("image.bmp")));
+    QVERIFY(decoder.canDecode(QStringLiteral("image.DIB")));
     for (const QString& path :
          {QStringLiteral("image.tif"), QStringLiteral("image.tiff"), QStringLiteral("image.webp"),
-          QStringLiteral("image.exr"), QStringLiteral("image.gif"), QStringLiteral("image.heic")}) {
+          QStringLiteral("image.avif"), QStringLiteral("image.exr"),
+          QStringLiteral("image.gif")}) {
         QVERIFY2(!decoder.canDecode(path), qPrintable(path));
     }
+}
+
+void IoTests::qtDecoderReadsBmpAndDibAliases() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QImage source(20, 10, QImage::Format_RGB32);
+    source.fill(QColor(21, 42, 84));
+    const QString bmpPath = directory.filePath(QStringLiteral("sample.bmp"));
+    const QString dibPath = directory.filePath(QStringLiteral("sample.dib"));
+    QVERIFY(source.save(bmpPath, "BMP"));
+    QVERIFY(QFile::copy(bmpPath, dibPath));
+
+    QtImageDecoder decoder;
+    for (const QString& path : {bmpPath, dibPath}) {
+        const DecodeResult result =
+            decoder.decode({path, DecodePurpose::Preview, QSize(10, 10)});
+        QVERIFY2(result.succeeded(), qPrintable(result.error));
+        QCOMPARE(result.frame->descriptor.size, QSize(10, 5));
+        QCOMPARE(result.frame->metadata.format, QFileInfo(path).suffix().toUpper());
+        QCOMPARE(result.frame->qImage()->pixelColor(0, 0), QColor(21, 42, 84));
+    }
+}
+
+void IoTests::heifCapabilityMatchesRuntimePlugins() {
+    QList<QByteArray> readerFormats = QImageReader::supportedImageFormats();
+    for (QByteArray& format : readerFormats) format = format.toLower();
+    const bool readerAvailable = readerFormats.contains(QByteArrayLiteral("heic")) ||
+                                 readerFormats.contains(QByteArrayLiteral("heif"));
+    const QStringList suffixes = QtImageDecoder::supportedSuffixes();
+    QCOMPARE(suffixes.contains(QStringLiteral("heic")), readerAvailable);
+    QCOMPARE(suffixes.contains(QStringLiteral("heif")), readerAvailable);
+
+    QtImageDecoder decoder;
+    QCOMPARE(decoder.canDecode(QStringLiteral("sample.heic")), readerAvailable);
+    QCOMPARE(decoder.canDecode(QStringLiteral("sample.HEIF")), readerAvailable);
+    QCOMPARE(hasSupportedImageSuffix(QStringLiteral("sample.heic")), readerAvailable);
+
+    QList<QByteArray> writerFormats = QImageWriter::supportedImageFormats();
+    for (QByteArray& format : writerFormats) format = format.toLower();
+    const QByteArray writerFormat = writerFormats.contains(QByteArrayLiteral("heic"))
+                                        ? QByteArrayLiteral("heic")
+                                        : QByteArrayLiteral("heif");
+    if (!readerAvailable || !writerFormats.contains(writerFormat)) return;
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("primary.heic"));
+    QImage source(12, 8, QImage::Format_RGB32);
+    source.fill(QColor(18, 72, 36));
+    // Apple's HEIF plug-in can advertise writing while the headless test process is unable to
+    // create an ImageIO destination. Capability routing remains testable in that environment;
+    // perform the decode round trip only when fixture creation actually succeeds.
+    if (!source.save(path, writerFormat.constData())) return;
+    const DecodeResult result = decoder.decode({path, DecodePurpose::Preview, {}});
+    QVERIFY2(result.succeeded(), qPrintable(result.error));
+    QCOMPARE(result.frame->descriptor.size, source.size());
+    QCOMPARE(result.frame->metadata.format, QStringLiteral("HEIC"));
 }
 
 void IoTests::singleFileRenameMovesSidecarAndRejectsConflicts() {
@@ -494,7 +556,7 @@ void IoTests::colorManagementCapabilityMatchesBuildFeature() {
     QVERIFY(EncodedColorManagement::version().isEmpty());
 #endif
     const QString identity = QtImageDecoder().cacheIdentity();
-    QVERIFY(identity.contains(QStringLiteral("qt-image-v4")));
+    QVERIFY(identity.contains(QStringLiteral("qt-image-v5")));
     QVERIFY(ImageLoader::cacheKey({QStringLiteral("/tmp/a.png"), DecodePurpose::Thumbnail, {}}) !=
             ImageLoader::cacheKey({QStringLiteral("/tmp/a.png"), DecodePurpose::Thumbnail, {}},
                                   identity));
@@ -639,7 +701,8 @@ void IoTests::scannerFiltersAndNaturallySortsFiles() {
     }
     for (const QString& name :
          {QStringLiteral("image10.jpg"), QStringLiteral("image2.JPG"), QStringLiteral("notes.txt"),
-          QStringLiteral("image1.png"), QStringLiteral("image3.tiff"),
+          QStringLiteral("image1.png"), QStringLiteral("image0.bmp"),
+          QStringLiteral("image0.dib"), QStringLiteral("image3.tiff"),
           QStringLiteral("image4.webp"), QStringLiteral("image5.exr")}) {
         QFile file(directory.filePath(name));
         QVERIFY(file.open(QIODevice::WriteOnly));
@@ -649,6 +712,7 @@ void IoTests::scannerFiltersAndNaturallySortsFiles() {
     const auto files = DirectoryScanner::scan(directory.path());
     QStringList expected{QStringLiteral("album2"),     QStringLiteral("container"),
                          QStringLiteral("documents"),  QStringLiteral("empty"),
+                         QStringLiteral("image0.bmp"), QStringLiteral("image0.dib"),
                          QStringLiteral("image1.png"), QStringLiteral("image2.JPG"),
                          QStringLiteral("image10.jpg")};
     QCOMPARE(files.size(), expected.size());
@@ -954,15 +1018,19 @@ void IoTests::decoderRegistryRoutesByFormat() {
     QVERIFY(!registry.canDecode(QStringLiteral("frame.tiff")));
     QVERIFY(!registry.canDecode(QStringLiteral("frame.webp")));
     QVERIFY(!registry.canDecode(QStringLiteral("notes.txt")));
-    QVERIFY(registry.cacheIdentity().contains(QStringLiteral("qt-image-v4")));
+    QVERIFY(registry.canDecode(QStringLiteral("frame.bmp")));
+    QVERIFY(registry.canDecode(QStringLiteral("frame.DIB")));
+    QVERIFY(registry.cacheIdentity().contains(QStringLiteral("qt-image-v5")));
 }
 
 void IoTests::defaultDecoderAndFormatCatalogStayConsistent() {
     const auto decoder = createDefaultImageDecoder();
     QVERIFY(decoder);
-    for (const QString& suffix :
-         {QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("png"),
-          QStringLiteral("raw"), QStringLiteral("yuv")}) {
+    QVERIFY(QtImageDecoder::supportedSuffixes().contains(QStringLiteral("bmp")));
+    QVERIFY(QtImageDecoder::supportedSuffixes().contains(QStringLiteral("dib")));
+    QStringList expectedSuffixes = QtImageDecoder::supportedSuffixes();
+    expectedSuffixes.append({QStringLiteral("raw"), QStringLiteral("yuv")});
+    for (const QString& suffix : expectedSuffixes) {
         const QString path = QStringLiteral("sample.%1").arg(suffix);
         QVERIFY2(hasSupportedImageSuffix(path), qPrintable(path));
         QVERIFY2(decoder->canDecode(path), qPrintable(path));

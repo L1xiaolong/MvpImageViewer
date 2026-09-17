@@ -14,6 +14,40 @@ namespace ispview {
 namespace {
 std::atomic_bool autoOrientation{true};
 std::atomic_bool keepHighBitDepth{true};
+
+const QList<QByteArray>& availableFormats() {
+    static const QList<QByteArray> formats = [] {
+        QList<QByteArray> result = QImageReader::supportedImageFormats();
+        for (QByteArray& format : result) {
+            format = format.toLower();
+        }
+        return result;
+    }();
+    return formats;
+}
+
+bool containsAny(const QList<QByteArray>& formats,
+                 std::initializer_list<QByteArray> candidates) {
+    return std::any_of(candidates.begin(), candidates.end(), [&formats](const QByteArray& value) {
+        return formats.contains(value);
+    });
+}
+
+QByteArray readerFormatForSuffix(const QString& suffix) {
+    if (suffix == QStringLiteral("dib")) {
+        return QByteArrayLiteral("bmp");
+    }
+    if (suffix == QStringLiteral("heic") || suffix == QStringLiteral("heif")) {
+        const QList<QByteArray>& formats = availableFormats();
+        const QByteArray requested = suffix.toLatin1();
+        if (formats.contains(requested)) {
+            return requested;
+        }
+        return formats.contains(QByteArrayLiteral("heic")) ? QByteArrayLiteral("heic")
+                                                           : QByteArrayLiteral("heif");
+    }
+    return suffix.toLatin1();
+}
 }
 
 bool QtImageDecoder::autoOrientationEnabled() {
@@ -22,6 +56,27 @@ bool QtImageDecoder::autoOrientationEnabled() {
 
 bool QtImageDecoder::preserveHighBitDepth() {
     return keepHighBitDepth.load(std::memory_order_relaxed);
+}
+
+QStringList QtImageDecoder::supportedSuffixes() {
+    static const QStringList suffixes = [] {
+        const QList<QByteArray>& formats = availableFormats();
+        QStringList result;
+        if (containsAny(formats, {QByteArrayLiteral("jpg"), QByteArrayLiteral("jpeg")})) {
+            result.append({QStringLiteral("jpg"), QStringLiteral("jpeg")});
+        }
+        if (formats.contains(QByteArrayLiteral("png"))) {
+            result.append(QStringLiteral("png"));
+        }
+        if (formats.contains(QByteArrayLiteral("bmp"))) {
+            result.append({QStringLiteral("bmp"), QStringLiteral("dib")});
+        }
+        if (containsAny(formats, {QByteArrayLiteral("heic"), QByteArrayLiteral("heif")})) {
+            result.append({QStringLiteral("heic"), QStringLiteral("heif")});
+        }
+        return result;
+    }();
+    return suffixes;
 }
 
 void QtImageDecoder::setAutoOrientationEnabled(bool enabled) {
@@ -37,8 +92,9 @@ QString QtImageDecoder::cacheIdentity() const {
         EncodedColorManagement::isAvailable()
             ? QStringLiteral("lcms-%1").arg(EncodedColorManagement::version())
             : QStringLiteral("lcms-disabled");
-    return QStringLiteral("qt-image-v4|qt-%1|%2|icc-%3|orientation-%4|depth-%5")
-        .arg(QString::fromLatin1(qVersion()), colorIdentity,
+    return QStringLiteral("qt-image-v5|qt-%1|formats-%2|%3|icc-%4|orientation-%5|depth-%6")
+        .arg(QString::fromLatin1(qVersion()), supportedSuffixes().join(QLatin1Char(',')),
+             colorIdentity,
              EncodedColorManagement::isEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
              autoOrientationEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
              preserveHighBitDepth() ? QStringLiteral("native") : QStringLiteral("8"));
@@ -46,13 +102,7 @@ QString QtImageDecoder::cacheIdentity() const {
 
 bool QtImageDecoder::canDecode(const QString& path) const {
     const QString suffix = QFileInfo(path).suffix().toLower();
-    if (suffix != QStringLiteral("jpg") && suffix != QStringLiteral("jpeg") &&
-        suffix != QStringLiteral("png")) {
-        return false;
-    }
-    const auto formats = QImageReader::supportedImageFormats();
-    const QByteArray encodedSuffix = suffix.toLatin1();
-    return formats.contains(encodedSuffix);
+    return supportedSuffixes().contains(suffix);
 }
 
 DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
@@ -60,7 +110,8 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
         return {{}, QStringLiteral("Unsupported image format")};
     }
 
-    QByteArray readerFormat = QFileInfo(request.path).suffix().toLower().toLatin1();
+    const QString suffix = QFileInfo(request.path).suffix().toLower();
+    const QByteArray readerFormat = readerFormatForSuffix(suffix);
     QImageReader reader(request.path, readerFormat);
     reader.setAutoTransform(autoOrientationEnabled());
     // The registry has already validated the suffix. Selecting the corresponding Qt

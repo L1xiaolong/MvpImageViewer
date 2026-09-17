@@ -107,13 +107,15 @@ MVPImageViewer /path/to/images
 |---|---|---|
 | JPEG / JPG | 内置 | 浏览、缩略图、全屏和对比 |
 | PNG | 内置 | 浏览、缩略图、全屏和对比，保留 Alpha |
+| BMP / DIB | 内置 | 标准 Windows Bitmap；`.dib` 使用 BMP 解码器 |
+| HEIC / HEIF | 依赖系统能力 | 当前 Qt/操作系统提供 HEIF 插件时自动启用并读取主图；不播放图像序列 |
 | NV12 / NV21 / I420 / P010 | 内置高级功能 | 无头数据，需要提供宽高、步长等参数 |
 | Bayer RAW10 / RAW12 / RAW16 | 内置高级功能 | 支持 CFA、有效位、字节序、黑白电平、白平衡、CCM 和 Gamma 参数 |
 | DNG / 相机 RAW | 可选 | 需要 LibRaw 0.21+ |
 | EXIF / IPTC / XMP | 可选 | JPEG/PNG 元数据读取需要 Exiv2 0.28+ |
 | 嵌入式 RGB ICC | 可选 | 需要 LittleCMS 2.x，转换到 sRGB 显示缓冲区 |
 
-TIFF、WebP、OpenEXR、HEIC/HEIF、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当前不在支持范围内。
+TIFF、WebP、OpenEXR、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当前不在支持范围内。HEIC/HEIF 的实际可用性取决于运行环境；没有对应 Qt 图像插件时，这些文件不会出现在图库中。
 
 ## 系统与构建要求
 
