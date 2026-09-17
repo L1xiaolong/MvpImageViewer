@@ -192,6 +192,8 @@ jobs:
           package_directory='dist/MVPImageViewer'
           mkdir -p "$package_directory"
           cp "$executable" "$package_directory/MVPImageViewer.exe"
+          cp "$(dirname "$executable")/ispview_crash_handler.exe" "$package_directory/"
+          python scripts/archive_diagnostic_symbols.py --binary "$executable" --staged-binary "$package_directory/MVPImageViewer.exe" --output dist/symbols
           # MSYS2's windeployqt cannot launch its QML import scanner reliably.
           # Our QML module is compiled into the executable; deploy the required
           # Qt runtime and Qt-provided QML import trees explicitly.
@@ -263,6 +265,14 @@ jobs:
             "/DAPP_VERSION=$version" "/DAPP_ICON=$icon" "packaging\windows\installer.nsi"
           if ($LASTEXITCODE -ne 0) { throw "NSIS failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path -LiteralPath $installer)) { throw "Installer was not created" }
+
+      - name: Archive diagnostic symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostic-symbols-${{ matrix.asset_suffix }}-${{ github.sha }}
+          path: dist/symbols/
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Upload release asset
         uses: actions/upload-artifact@v7

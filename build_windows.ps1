@@ -168,6 +168,11 @@ function Publish-WindowsPackage {
 
     $targetExe = Join-Path $stageDir "MVPImageViewer.exe"
     Copy-Item -LiteralPath $Executable -Destination $targetExe
+    $crashHelper = Join-Path (Split-Path -Parent $Executable) "ispview_crash_handler.exe"
+    if (-not (Test-Path -LiteralPath $crashHelper)) { throw "Crash helper is missing: $crashHelper" }
+    Copy-Item -LiteralPath $crashHelper -Destination (Split-Path -Parent $targetExe)
+    python "$ScriptDir/scripts/archive_diagnostic_symbols.py" --binary $Executable --staged-binary $targetExe --output "$ScriptDir/dist/symbols"
+    if ($LASTEXITCODE -ne 0) { throw "Diagnostic symbol archive failed" }
     $deployQt = Find-WinDeployQt -QtBin $QtBin
     Write-Host "Deploying Qt and QML dependencies with $deployQt"
     & $deployQt --release --compiler-runtime --qmldir (Join-Path $ScriptDir "src\qml") $targetExe

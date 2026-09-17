@@ -60,3 +60,9 @@ materials required by the actual libraries included in their packages.
 
 Exiv2 is GPL-2.0-or-later; enabling it requires a compatible distribution
 of the combined application, independently of the project's own license.
+
+## Diagnostic archives and crash capture
+
+- miniz 3.0.2 is statically linked for ZIP export. Source: https://github.com/richgel999/miniz/tree/3.0.2 . Full upstream license: `third_party/miniz/LICENSE`, distributed as `licenses/miniz-LICENSE`.
+- macOS embeds Crashpad revision `4b8fc2b536e04407032cb6eba687cfe68cb5966a` and its pinned mini_chromium dependency. Source: https://chromium.googlesource.com/crashpad/crashpad/ . These components are built by `scripts/build_crashpad_macos.sh`; their upstream licenses are copied into the application resource licenses directory at packaging time. Crash reporting is local only; network uploads are disabled.
+- `ispview_crash_handler.exe` is this project's Windows helper using the Windows DbgHelp API.

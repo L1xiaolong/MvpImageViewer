@@ -220,8 +220,18 @@ stage_dir="$(mktemp -d /tmp/ispview-package.XXXXXX)"
 trap 'rm -rf "$stage_dir"' EXIT
 staged_app="$stage_dir/MVPImageViewer.app"
 ditto "$built_app" "$staged_app"
+python3 "$script_dir/scripts/archive_diagnostic_symbols.py" \
+    --binary "$built_app/Contents/MacOS/MVPImageViewer" --staged-binary "$staged_app/Contents/MacOS/MVPImageViewer" --output "$script_dir/dist/symbols"
+# dSYM belongs to the separate symbol archive, not the application bundle.
+if [[ -d "$staged_app/Contents/MacOS/MVPImageViewer.dSYM" ]]; then
+    rm -rf "$staged_app/Contents/MacOS/MVPImageViewer.dSYM"
+fi
+# The helper must be present and signed before sealing the containing app.
+test -x "$staged_app/Contents/Helpers/crashpad_handler"
 
+crashpad_root="$(sed -n 's/^ISPVIEW_CRASHPAD_ROOT:PATH=//p' "$build_dir/CMakeCache.txt")"
 cmake "-DNOTICE_DESTINATION=$staged_app/Contents/Resources" \
+    "-DISPVIEW_CRASHPAD_ROOT=$crashpad_root" \
     -P "$script_dir/scripts/package_licenses.cmake"
 
 echo "Deploying Qt and QML dependencies"
@@ -386,6 +396,11 @@ fi
 chmod -R u+w "$staged_app"
 xattr -cr "$staged_app" 2>/dev/null || true
 
+if [[ "$sign_identity" != "-" ]]; then
+    codesign --force --options runtime --timestamp --sign "$sign_identity" "$staged_app/Contents/Helpers/crashpad_handler"
+else
+    codesign --force --sign - "$staged_app/Contents/Helpers/crashpad_handler"
+fi
 if [[ "$sign_identity" == "-" ]]; then
     echo "Applying ad-hoc local-test signature"
     codesign --force --deep --sign - \

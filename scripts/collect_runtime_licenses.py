@@ -21,7 +21,10 @@ RUNTIME_SUFFIXES = {".dll", ".exe", ".dylib", ".so", ".qml", ".js", ".mjs",
 MACHO_MAGIC = {bytes.fromhex(x) for x in
                ("feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca",
                 "cafebabf", "bfbafeca")}
-APPLICATION_FILES = {"MVPImageViewer.exe", "Contents/MacOS/MVPImageViewer"}
+# Build-produced artifacts (including pinned static Crashpad); their notices are staged
+# by package_licenses.cmake. Imported runtime files below still require hash provenance.
+APPLICATION_FILES = {"MVPImageViewer.exe", "Contents/MacOS/MVPImageViewer", "ispview_crash_handler.exe",
+                     "Contents/Helpers/crashpad_handler"}
 
 
 def digest(path):
