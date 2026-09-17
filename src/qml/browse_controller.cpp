@@ -1,3 +1,4 @@
+#include "diagnostics/diagnostics.h"
 #include "qml/browse_controller.h"
 
 #include "core/comparison_pixel_probe.h"
@@ -110,6 +111,8 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                 if (generation != scanGeneration_ || directory != currentDirectory_) {
                     return;
                 }
+                diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.scan_complete"),
+                    {{"directory", diagnostics::fileId(directory)}, {"generation", static_cast<qint64>(generation)}, {"items", files.size()}}, true);
                 if (!incrementalScan_) {
                     thumbnailModel_->updateFiles(files);
                 }
@@ -691,7 +694,15 @@ QString BrowseController::renameSelectedTo(const QString& requestedName) {
     if (newName == source.fileName()) return {};
     const QString destination = source.dir().filePath(newName);
     QString error;
-    if (!SingleFileRename::execute(source.absoluteFilePath(), destination, &error)) return error;
+    const QString operation = diagnostics::operationId();
+    const QJsonObject context{{"operation", operation}, {"file", diagnostics::fileId(source.absoluteFilePath())}};
+    diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("rename.begin"), context, true);
+    if (!SingleFileRename::execute(source.absoluteFilePath(), destination, &error)) {
+        auto failure = context; failure.insert(QStringLiteral("reason"), error);
+        diagnostics::event(diagnostics::Level::Error, diagnostics::files(), QStringLiteral("rename.failed"), failure, true);
+        return error;
+    }
+    diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("rename.complete"), context, true);
     updateSelection({destination});
     rescanCurrentDirectory();
     setStatusText(QStringLiteral("Renamed to %1").arg(newName));
@@ -706,9 +717,13 @@ void BrowseController::moveSelectedToTrash() {
 QString BrowseController::moveSelectedToTrashConfirmed() {
     if (selectedPaths_.isEmpty()) return {};
     const int requestedCount = static_cast<int>(selectedPaths_.size());
+    const QString operation = diagnostics::operationId();
+    diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("trash.begin"), {{"operation", operation}, {"count", requestedCount}}, true);
     QStringList failures;
     for (const QString& path : std::as_const(selectedPaths_)) {
         if (!QFile::moveToTrash(path)) {
+            diagnostics::event(diagnostics::Level::Error, diagnostics::files(), QStringLiteral("trash.failed"),
+                {{"operation", operation}, {"file", diagnostics::fileId(path)}}, true);
             failures.append(QFileInfo(path).fileName());
             continue;
         }
@@ -729,6 +744,7 @@ QString BrowseController::moveSelectedToTrashConfirmed() {
                           .arg(requestedCount));
         return message;
     }
+    diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("trash.complete"), {{"operation", operation}, {"count", requestedCount}}, true);
     setStatusText(QStringLiteral("Moved %1 item(s) to Trash").arg(requestedCount));
     return {};
 }
@@ -812,7 +828,12 @@ QString BrowseController::resizeSelected(int width, int height) {
         return QStringLiteral("Configure the RAW/YUV dimensions and pixel format first.");
     if (raw && raw->isYuv() && ((width & 1) != 0 || (height & 1) != 0))
         return QStringLiteral("YUV 4:2:0 output dimensions must be even.");
+    QJsonObject context{{"operation", diagnostics::operationId()}, {"file", diagnostics::fileId(path)}, {"width", width}, {"height", height}};
+    diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("resize.begin"), context, true);
     const QString error = ImageTransformer::resize(path, {width, height}, raw);
+    if (!error.isEmpty()) context.insert(QStringLiteral("reason"), error);
+    diagnostics::event(error.isEmpty() ? diagnostics::Level::Info : diagnostics::Level::Error, diagnostics::files(),
+        error.isEmpty() ? QStringLiteral("resize.complete") : QStringLiteral("resize.failed"), context, true);
     if (error.isEmpty()) refreshTransformedPath(path);
     else setStatusText(error);
     return error;
@@ -987,6 +1008,8 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     currentDirectory_ = info.absoluteFilePath();
     // Persist at navigation time so an ordinary force-quit or crash still restores the last
     // meaningful workspace on the next start.
+    diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.open"),
+        {{"directory", diagnostics::fileId(currentDirectory_)}}, true);
     QSettings().setValue(QStringLiteral("browser/lastDirectory"), currentDirectory_);
     recentCandidateTimer_->stop();
     recentCandidateDirectory_ = currentDirectory_;

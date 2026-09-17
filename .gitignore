@@ -1,6 +1,6 @@
 /build*/
 /out/
-/docs/
+/docs/build/
 /dist/
 /test_images*/
 /.vscode/

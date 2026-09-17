@@ -1,3 +1,4 @@
+#include "diagnostics/diagnostics.h"
 #include "qml/qml_image_canvas.h"
 
 #include "core/comparison_pixel_probe.h"
@@ -279,7 +280,7 @@ class Renderer final : public QQuickRhiItemRenderer {
                                         smoothDisplay_ ? QRhiSampler::Linear : QRhiSampler::Nearest,
                                         QRhiSampler::None, QRhiSampler::ClampToEdge,
                                         QRhiSampler::ClampToEdge));
-        sampler_->create();
+        if (!sampler_->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "sampler_"}}, true);
         samplerDirty_ = false;
         if (slots_[0].encoded)
             rebuildBindings();
@@ -345,7 +346,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         if (texture)
             return;
         texture.reset(rhi_->newTexture(format, QSize(1, 1), 1));
-        texture->create();
+        if (!texture->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "texture"}}, true);
     }
 
     void rebuildBindings() {
@@ -372,7 +373,7 @@ class Renderer final : public QQuickRhiItemRenderer {
                 QRhiShaderResourceBinding::uniformBuffer(
                     8, QRhiShaderResourceBinding::FragmentStage, slot.sourceUniform.get()),
             });
-            slot.sideBindings->create();
+            if (!slot.sideBindings->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.sideBindings"}}, true);
         }
 
         encodedCompareBindings_.reset(rhi_->newShaderResourceBindings());
@@ -386,7 +387,7 @@ class Renderer final : public QQuickRhiItemRenderer {
             QRhiShaderResourceBinding::uniformBuffer(3, QRhiShaderResourceBinding::FragmentStage,
                                                      compareUniform_.get()),
         });
-        encodedCompareBindings_->create();
+        if (!encodedCompareBindings_->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "encodedCompareBindings_"}}, true);
 
         yuvCompareBindings_.reset(rhi_->newShaderResourceBindings());
         yuvCompareBindings_->setBindings({
@@ -411,7 +412,7 @@ class Renderer final : public QQuickRhiItemRenderer {
             QRhiShaderResourceBinding::uniformBuffer(9, QRhiShaderResourceBinding::FragmentStage,
                                                      compareUniform_.get()),
         });
-        yuvCompareBindings_->create();
+        if (!yuvCompareBindings_->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "yuvCompareBindings_"}}, true);
 
         bayerCompareBindings_.reset(rhi_->newShaderResourceBindings());
         bayerCompareBindings_->setBindings({
@@ -428,7 +429,7 @@ class Renderer final : public QQuickRhiItemRenderer {
             QRhiShaderResourceBinding::uniformBuffer(5, QRhiShaderResourceBinding::FragmentStage,
                                                      compareUniform_.get()),
         });
-        bayerCompareBindings_->create();
+        if (!bayerCompareBindings_->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "bayerCompareBindings_"}}, true);
     }
 
     void rebuildResources(QRhiCommandBuffer* commandBuffer) {
@@ -449,7 +450,7 @@ class Renderer final : public QQuickRhiItemRenderer {
             }
             const EncodedTextureUpload upload = encodedTextureUpload(encoded);
             slot.encoded.reset(rhi_->newTexture(upload.format, encoded.size(), 1));
-            slot.encoded->create();
+            if (!slot.encoded->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.encoded"}}, true);
             updates->uploadTexture(
                 slot.encoded.get(),
                 QRhiTextureUploadDescription(QRhiTextureUploadEntry(0, 0, upload.description)));
@@ -486,7 +487,7 @@ class Renderer final : public QQuickRhiItemRenderer {
             target->setShaderResourceBindings(bindings);
             target->setFlags(QRhiGraphicsPipeline::UsesScissor);
             target->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
-            target->create();
+            if (!target->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "target"}}, true);
         };
         for (int slot = 0; slot < kMaximumImages; ++slot) {
             const auto index = static_cast<std::size_t>(slot);
@@ -550,28 +551,30 @@ class Renderer final : public QQuickRhiItemRenderer {
         if (rhi_ != rhi()) {
             resetAll();
             rhi_ = rhi();
+            if (rhi_) diagnostics::event(diagnostics::Level::Info, diagnostics::render(), QStringLiteral("rhi.initialized"),
+                {{"backend", static_cast<int>(rhi_->backend())}, {"device", QString::fromUtf8(rhi_->driverInfo().deviceName)}}, true);
             resourcesDirty_ = true;
         }
         if (!vertices_) {
             vertices_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer,
                                             sizeof(kQuadVertices)));
-            vertices_->create();
+            if (!vertices_->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "vertices_"}}, true);
             compareUniform_.reset(
                 rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32));
-            compareUniform_->create();
+            if (!compareUniform_->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "compareUniform_"}}, true);
             for (auto& slot : slots_) {
                 slot.matrix.reset(
                     rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64));
-                slot.matrix->create();
+                if (!slot.matrix->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.matrix"}}, true);
                 slot.yuvUniform.reset(
                     rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 48));
-                slot.yuvUniform->create();
+                if (!slot.yuvUniform->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.yuvUniform"}}, true);
                 slot.bayerUniform.reset(
                     rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 112));
-                slot.bayerUniform->create();
+                if (!slot.bayerUniform->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.bayerUniform"}}, true);
                 slot.sourceUniform.reset(
                     rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16));
-                slot.sourceUniform->create();
+                if (!slot.sourceUniform->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.sourceUniform"}}, true);
             }
             auto* updates = rhi_->nextResourceUpdateBatch();
             updates->uploadStaticBuffer(vertices_.get(), kQuadVertices.data());

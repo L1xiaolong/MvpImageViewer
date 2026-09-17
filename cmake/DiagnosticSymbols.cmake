@@ -1,0 +1,10 @@
+function(ispview_diagnostic_symbols target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/Zi>)
+        target_link_options(${target} PRIVATE /DEBUG)
+    endif()
+    if(APPLE)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND dsymutil $<TARGET_FILE:${target}> -o "$<TARGET_FILE:${target}>.dSYM")
+    endif()
+endfunction()

@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-111111?style=flat-square&logo=apple">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows11">
-  <img alt="Qt 6" src="https://img.shields.io/badge/Qt-6.7%2B-41CD52?style=flat-square&logo=qt&logoColor=white">
+  <img alt="Qt 6" src="https://img.shields.io/badge/Qt-6.9%2B-41CD52?style=flat-square&logo=qt&logoColor=white">
   <img alt="C++20" src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus">
 </p>
 
@@ -119,7 +119,7 @@ TIFF, WebP, OpenEXR, HEIC/HEIF, AVIF, JPEG XL, PSD, SVG, PDF, and GIF are curren
 
 - CMake 3.25+
 - A C++20 compiler
-- Qt 6.7+ with Core, Gui, Quick, Quick Controls 2, Quick Layouts, Svg, ShaderTools, LinguistTools, and private Gui headers
+- Qt 6.9+ with Core, Gui, Quick, Quick Controls 2, Quick Layouts, Svg, ShaderTools, LinguistTools, and private Gui headers
 - macOS: Apple Silicon; Qt 6.9.x is the currently validated version
 - Windows: x64; MSYS2/UCRT64 with GCC and Ninja is recommended
 
@@ -257,3 +257,9 @@ Third-party components retain their own licenses and are not covered by the proj
 Packaging scripts include the project license and icon notices. These do not replace the notices and source delivery required by Qt, Exiv2, LibRaw, LittleCMS, and their transitive dependencies. Builds with Exiv2 enabled still require a combined distribution compatible with GPL-2.0-or-later.
 
 Packaging also requires Python 3.9+ and inventories deployed runtime files, collecting license notices and available SBOMs. Unverified provenance or missing notices blocks installer creation. MSYS2 matching is automatic; other SDKs/custom builds require a reviewed provenance catalog. See [runtime license collection](packaging/RUNTIME_LICENSES.md) for configuration and scope.
+
+## Logging and crash diagnostics
+
+[Diagnostic settings, export, symbols and validation](docs/diagnostics.md)
+
+macOS builds can pass `-DISPVIEW_ENABLE_CRASHPAD=OFF` to skip Crashpad; the settings page then reports crash capture as unavailable while logging, cleanup and export keep working.

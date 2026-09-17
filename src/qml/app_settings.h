@@ -19,6 +19,9 @@ namespace ispview {
 
 class AppSettings final : public QObject {
     Q_OBJECT
+    Q_PROPERTY(bool loggingEnabled READ loggingEnabled WRITE setLoggingEnabled NOTIFY diagnosticsChanged)
+    Q_PROPERTY(QString logLevel READ logLevel WRITE setLogLevel NOTIFY diagnosticsChanged)
+    Q_PROPERTY(bool crashReportingEnabled READ crashReportingEnabled WRITE setCrashReportingEnabled NOTIFY diagnosticsChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString effectiveLanguage READ effectiveLanguage NOTIFY languageChanged)
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY themeChanged)
@@ -76,6 +79,12 @@ class AppSettings final : public QObject {
     [[nodiscard]] int shortcutsRevision() const;
     [[nodiscard]] QString applicationVersion() const;
 
+    bool loggingEnabled() const { return loggingEnabled_; }
+    QString logLevel() const { return logLevel_; }
+    bool crashReportingEnabled() const { return crashReportingEnabled_; }
+    void setLoggingEnabled(bool enabled);
+    void setLogLevel(const QString& level);
+    void setCrashReportingEnabled(bool enabled);
     void setLanguage(const QString& language);
     void setTheme(const QString& theme);
     void setRestoreLastDirectory(bool restore);
@@ -100,6 +109,7 @@ class AppSettings final : public QObject {
     Q_INVOKABLE void restoreDefaults();
 
   signals:
+    void diagnosticsChanged();
     void languageChanged();
     void themeChanged();
     void restoreLastDirectoryChanged();
@@ -123,6 +133,9 @@ class AppSettings final : public QObject {
     [[nodiscard]] static QString normalizedTheme(const QString& theme);
     [[nodiscard]] static QString normalizedCanvasBackground(const QString& background);
 
+    bool loggingEnabled_ = true;
+    bool crashReportingEnabled_ = true;
+    QString logLevel_ = QStringLiteral("Info");
     QGuiApplication* application_ = nullptr;
     QTranslator translator_;
     QString language_;

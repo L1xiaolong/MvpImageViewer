@@ -285,10 +285,49 @@ ApplicationWindow {
         function onFilesystemChanged() { browseController.refreshAll() }
     }
 
+    Rectangle {
+        id: diagnosticNotice
+        property bool dismissed: false
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 16
+        z: 100
+        width: Math.min(470, parent.width - 32)
+        height: noticeColumn.implicitHeight + 24
+        radius: 8
+        color: Theme.paperWhite
+        border.color: Theme.exposureAmber
+        visible: !dismissed && typeof diagnosticsController !== "undefined"
+                 && diagnosticsController.previousExit.length > 0
+        Column {
+            id: noticeColumn
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 8
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                color: Theme.graphiteInk
+                text: typeof diagnosticsController !== "undefined" && diagnosticsController.previousExit === "crash"
+                      ? qsTr("A crash report from the previous session is available.")
+                      : qsTr("The previous session ended unexpectedly. Diagnostic information may be available.")
+            }
+            Row {
+                spacing: 8
+                Button {
+                    text: qsTr("Diagnostics / Export")
+                    onClicked: { settingsCard.currentSection = 6; settingsCard.open(); diagnosticNotice.dismissed = true }
+                }
+                Button { text: qsTr("Dismiss"); onClicked: diagnosticNotice.dismissed = true }
+            }
+        }
+    }
+
     SettingsCard {
         id: settingsCard
         parent: Overlay.overlay
         settingsController: appSettings
+        diagnostics: typeof diagnosticsController !== "undefined" ? diagnosticsController : null
     }
 
     Shortcut {

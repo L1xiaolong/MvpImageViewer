@@ -1,5 +1,6 @@
 #include "browser/file_clipboard.h"
 #include "browser/thumbnail_model.h"
+#include "diagnostics/diagnostics.h"
 #include "io/encoded_color_management.h"
 #include "io/image_loader.h"
 #include "io/qt_image_decoder.h"
@@ -15,6 +16,7 @@
 #include "qml/thumbnail_image_provider.h"
 
 #include <QDir>
+#include <QDirIterator>
 #include <QCryptographicHash>
 #include <QFile>
 #include <QGuiApplication>
@@ -41,6 +43,15 @@
 
 namespace ispview {
 namespace {
+QString sessionLogText(const ispview::diagnostics::Service& service) {
+    QString text;
+    QDirIterator it(service.sessionDirectory(), {QStringLiteral("*.jsonl")}, QDir::Files);
+    while (it.hasNext()) {
+        QFile file(it.next());
+        if (file.open(QIODevice::ReadOnly)) text += QString::fromUtf8(file.readAll());
+    }
+    return text;
+}
 
 class RawParameterColorDecoder final : public IImageDecoder {
   public:
@@ -189,9 +200,12 @@ class QmlWorkspaceControllerTests final : public QObject {
 
   private:
     std::unique_ptr<QTemporaryDir> settingsDirectory_;
+    std::unique_ptr<QTemporaryDir> diagnosticsDirectory_;
+    std::unique_ptr<diagnostics::Service> diagnosticsService_;
 
   private slots:
     void initTestCase();
+    void diagnosticSettingsPersistAndNormalize();
     void addsActivatesAndClosesOneToFourPanes();
     void defersStartupDirectoryUntilExplicitlyStarted();
     void exposesNativeFolderNavigationStructure();
@@ -220,7 +234,21 @@ class QmlWorkspaceControllerTests final : public QObject {
     void otaDownloadsAndVerifiesPlatformInstaller();
     void otaRejectsInstallerWithWrongChecksum();
     void otaDownloadCanBeCancelled();
+    void diagnosticsReceivesPresentationSessionEvents();
 };
+
+void QmlWorkspaceControllerTests::diagnosticSettingsPersistAndNormalize() {
+    auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
+    { AppSettings settings(application); settings.setLoggingEnabled(false); settings.setLogLevel(QStringLiteral("Error")); settings.setCrashReportingEnabled(false); }
+    AppSettings restored(application);
+    QVERIFY(!restored.loggingEnabled());
+    QCOMPARE(restored.logLevel(), QStringLiteral("Error"));
+    QVERIFY(!restored.crashReportingEnabled());
+    restored.setLogLevel(QStringLiteral("invalid"));
+    QCOMPARE(restored.logLevel(), QStringLiteral("Info"));
+    restored.restoreDefaults();
+    QVERIFY(restored.loggingEnabled()); QVERIFY(restored.crashReportingEnabled());
+}
 
 void QmlWorkspaceControllerTests::initTestCase() {
     settingsDirectory_ = std::make_unique<QTemporaryDir>();
@@ -231,6 +259,12 @@ void QmlWorkspaceControllerTests::initTestCase() {
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory_->path());
     QSettings().clear();
+    // The production controllers are instrumented, so this run also proves that compare and
+    // full-screen session events reach the diagnostics store.
+    diagnosticsDirectory_ = std::make_unique<QTemporaryDir>();
+    QVERIFY(diagnosticsDirectory_->isValid());
+    diagnosticsService_ = std::make_unique<diagnostics::Service>(
+        diagnostics::Options{diagnosticsDirectory_->path(), true, false, diagnostics::Level::Debug});
 }
 
 void QmlWorkspaceControllerTests::addsActivatesAndClosesOneToFourPanes() {
@@ -1170,7 +1204,7 @@ void QmlWorkspaceControllerTests::otaDownloadsAndVerifiesPlatformInstaller() {
     QCOMPARE(settings.latestVersion(), QStringLiteral("99.0.0"));
 
     settings.downloadUpdate();
-    QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("ready"), 3000);
+    QTRY_VERIFY2_WITH_TIMEOUT(settings.updateState() == QStringLiteral("ready"), qPrintable(settings.updateError()), 3000);
     QCOMPARE(settings.updateDownloadProgress(), 100);
     QVERIFY(!settings.downloadedUpdatePath().isEmpty());
     QFile downloaded(settings.downloadedUpdatePath());
@@ -1202,7 +1236,7 @@ void QmlWorkspaceControllerTests::otaRejectsInstallerWithWrongChecksum() {
     settings.downloadUpdate();
     QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("error"), 3000);
     QVERIFY(settings.downloadedUpdatePath().isEmpty());
-    QVERIFY(settings.updateError().contains(QStringLiteral("SHA-256")));
+    QVERIFY2(settings.updateError().contains(QStringLiteral("SHA-256")), qPrintable(settings.updateError()));
 }
 
 void QmlWorkspaceControllerTests::otaDownloadCanBeCancelled() {
@@ -1226,11 +1260,22 @@ void QmlWorkspaceControllerTests::otaDownloadCanBeCancelled() {
     settings.checkForUpdates();
     QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("available"), 3000);
     settings.downloadUpdate();
-    QCOMPARE(settings.updateState(), QStringLiteral("downloading"));
+    QVERIFY2(settings.updateState() == QStringLiteral("downloading"), qPrintable(settings.updateError()));
     settings.cancelUpdateDownload();
     QTRY_COMPARE_WITH_TIMEOUT(settings.updateState(), QStringLiteral("available"), 3000);
     QCOMPARE(settings.updateDownloadProgress(), -1);
     QVERIFY(settings.downloadedUpdatePath().isEmpty());
+}
+
+void QmlWorkspaceControllerTests::diagnosticsReceivesPresentationSessionEvents() {
+    QVERIFY(diagnosticsService_);
+    QVERIFY(diagnosticsService_->flush());
+    const QString log = sessionLogText(*diagnosticsService_);
+    // Compare and full screen are the highest-risk presentation paths, so their lifecycle has to be
+    // visible in the export a user sends to support.
+    QVERIFY2(log.contains(QStringLiteral("compare.session_open")), qPrintable(log.left(400)));
+    QVERIFY2(log.contains(QStringLiteral("fullscreen.session_open")), qPrintable(log.left(400)));
+    QVERIFY(log.contains(QStringLiteral("compare.presentation_mode")));
 }
 
 } // namespace ispview

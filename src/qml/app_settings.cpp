@@ -1,3 +1,4 @@
+#include "diagnostics/diagnostics.h"
 #include "qml/app_settings.h"
 #include "io/encoded_color_management.h"
 #include "io/qt_image_decoder.h"
@@ -94,6 +95,9 @@ const ShortcutDefinition* shortcutDefinition(const QString& action) {
 AppSettings::AppSettings(QGuiApplication* application, QObject* parent)
     : QObject(parent), application_(application) {
     const QSettings settings;
+    loggingEnabled_ = settings.value(QStringLiteral("diagnostics/loggingEnabled"), true).toBool();
+    crashReportingEnabled_ = settings.value(QStringLiteral("diagnostics/crashReportingEnabled"), true).toBool();
+    logLevel_ = diagnostics::levelName(diagnostics::parseLevel(settings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString()));
     language_ = normalizedLanguage(
         settings.value(QLatin1String(kLanguageKey), QStringLiteral("system")).toString());
     theme_ = normalizedTheme(
@@ -218,6 +222,7 @@ void AppSettings::setTheme(const QString& theme) {
     if (theme_ == normalized)
         return;
     theme_ = normalized;
+    diagnostics::event(diagnostics::Level::Info, diagnostics::settings(), QStringLiteral("settings.theme"), {{"theme", normalized}}, true);
     QSettings().setValue(QLatin1String(kThemeKey), theme_);
     emit themeChanged();
 }
@@ -286,6 +291,7 @@ void AppSettings::setSmoothDisplay(bool enabled) {
     if (smoothDisplay_ == enabled)
         return;
     smoothDisplay_ = enabled;
+    diagnostics::event(diagnostics::Level::Info, diagnostics::settings(), QStringLiteral("settings.smoothing"), {{"enabled", enabled}}, true);
     QSettings().setValue(QLatin1String(kSmoothDisplayKey), enabled);
     emit smoothDisplayChanged();
 }
@@ -567,6 +573,7 @@ void AppSettings::installUpdate() {
 }
 
 void AppSettings::failUpdate(const QString& error) {
+    diagnostics::event(diagnostics::Level::Error, diagnostics::updates(), QStringLiteral("update.failed"), {{"reason", error}}, true);
     if (updateFile_)
         updateFile_->cancelWriting();
     updateFile_.reset();
@@ -609,7 +616,33 @@ void AppSettings::openUserGuide() const {
         QDesktopServices::openUrl(url);
 }
 
+void AppSettings::setLoggingEnabled(bool enabled) {
+    if (loggingEnabled_ == enabled) return;
+    loggingEnabled_ = enabled;
+    QSettings().setValue(QStringLiteral("diagnostics/loggingEnabled"), enabled);
+    emit diagnosticsChanged();
+    diagnostics::event(diagnostics::Level::Info, diagnostics::settings(), QStringLiteral("settings.logging"), {{"enabled", enabled}}, true);
+}
+void AppSettings::setLogLevel(const QString& level) {
+    const QString normalized = diagnostics::levelName(diagnostics::parseLevel(level));
+    if (logLevel_ == normalized) return;
+    logLevel_ = normalized;
+    QSettings().setValue(QStringLiteral("diagnostics/logLevel"), normalized);
+    emit diagnosticsChanged();
+    diagnostics::event(diagnostics::Level::Info, diagnostics::settings(), QStringLiteral("settings.log_level"), {{"level", normalized}}, true);
+}
+void AppSettings::setCrashReportingEnabled(bool enabled) {
+    if (crashReportingEnabled_ == enabled) return;
+    crashReportingEnabled_ = enabled;
+    QSettings().setValue(QStringLiteral("diagnostics/crashReportingEnabled"), enabled);
+    emit diagnosticsChanged();
+    diagnostics::event(diagnostics::Level::Info, diagnostics::settings(), QStringLiteral("settings.crash_capture"), {{"enabledNextStart", enabled}}, true);
+}
+
 void AppSettings::restoreDefaults() {
+    setLoggingEnabled(true);
+    setLogLevel(QStringLiteral("Info"));
+    setCrashReportingEnabled(true);
     setLanguage(QStringLiteral("system"));
     setTheme(QStringLiteral("system"));
     setRestoreLastDirectory(true);
@@ -637,6 +670,8 @@ void AppSettings::setUpdateState(const QString& state, const QString& latestVers
                                  const QUrl& releaseUrl) {
     if (updateState_ == state && latestVersion_ == latestVersion && releaseUrl_ == releaseUrl)
         return;
+    diagnostics::event(state == QStringLiteral("error") ? diagnostics::Level::Error : diagnostics::Level::Info,
+                       diagnostics::updates(), QStringLiteral("update.state"), {{"state", state}}, true);
     updateState_ = state;
     latestVersion_ = latestVersion;
     releaseUrl_ = releaseUrl;

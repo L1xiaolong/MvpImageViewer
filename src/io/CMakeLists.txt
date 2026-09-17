@@ -75,7 +75,7 @@ target_include_directories(ispview_io PUBLIC ${PROJECT_SOURCE_DIR}/src)
 # Optional third-party implementations are separate static adapters. Their library headers and
 # compile options do not leak into the generic IO sources or UI target.
 target_link_libraries(ispview_io
-    PUBLIC ispview_core Qt6::Core Qt6::Gui
+    PUBLIC ispview_core ispview_diagnostics Qt6::Core Qt6::Gui
     PRIVATE
         ispview_io_libraw_adapter
         ispview_io_exiv2_adapter

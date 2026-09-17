@@ -71,3 +71,24 @@ qt_add_executable(ispview_render_tests
 target_link_libraries(ispview_render_tests PRIVATE ispview_io ispview_render_backend Qt6::Test)
 ispview_enable_warnings(ispview_render_tests)
 add_test(NAME ispview_render_tests COMMAND ispview_render_tests)
+
+qt_add_executable(ispview_diagnostics_crash_fixture diagnostics_crash_fixture.cpp)
+target_link_libraries(ispview_diagnostics_crash_fixture PRIVATE ispview_diagnostics)
+qt_add_executable(ispview_diagnostics_tests diagnostics_tests.cpp)
+target_link_libraries(ispview_diagnostics_tests PRIVATE ispview_diagnostics ispview_miniz Qt6::Test)
+if(WIN32)
+    add_dependencies(ispview_diagnostics_crash_fixture ispview_crash_handler)
+    add_custom_command(TARGET ispview_diagnostics_crash_fixture POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ispview_crash_handler>
+            $<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>)
+endif()
+if(APPLE)
+    add_custom_command(TARGET ispview_diagnostics_crash_fixture POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>/../Helpers"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ISPVIEW_CRASHPAD_HANDLER}"
+            "$<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>/../Helpers/crashpad_handler")
+endif()
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME ispview_diagnostics_tests COMMAND ${Python3_EXECUTABLE}
+    "${PROJECT_SOURCE_DIR}/tests/run_diagnostics_tests.py" $<TARGET_FILE:ispview_diagnostics_tests>)
+set_tests_properties(ispview_diagnostics_tests PROPERTIES TIMEOUT 180)

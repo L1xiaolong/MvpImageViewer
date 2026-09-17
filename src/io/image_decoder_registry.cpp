@@ -1,5 +1,10 @@
 #include "io/image_decoder_registry.h"
 
+#include "diagnostics/diagnostics.h"
+
+#include <QElapsedTimer>
+#include <QFileInfo>
+#include <QJsonObject>
 #include <QStringList>
 
 namespace ispview {
@@ -39,9 +44,36 @@ bool ImageDecoderRegistry::canDecode(const QString& path) const {
 
 DecodeResult ImageDecoderRegistry::decode(const DecodeRequest& request) const {
     for (const auto& decoder : decoders_) {
-        if (decoder->canDecode(request.path)) {
-            return decoder->decode(request);
+        if (!decoder->canDecode(request.path)) {
+            continue;
         }
+        using namespace diagnostics;
+        const QString operation = operationId();
+        const bool breadcrumb = request.purpose != DecodePurpose::Thumbnail;
+        QJsonObject context{
+            {QStringLiteral("operation"), operation},
+            {QStringLiteral("file"), fileId(request.path)},
+            {QStringLiteral("format"), QFileInfo(request.path).suffix().toLower()},
+            {QStringLiteral("decoder"), decoder->cacheIdentity()},
+            {QStringLiteral("purpose"), static_cast<int>(request.purpose)}};
+        event(Level::Debug, diagnostics::decode(), QStringLiteral("decode.begin"), context,
+              breadcrumb);
+        QElapsedTimer timer;
+        timer.start();
+        const DecodeResult result = decoder->decode(request);
+        context.insert(QStringLiteral("elapsedMs"), timer.elapsed());
+        if (result.frame) {
+            context.insert(QStringLiteral("width"), result.frame->descriptor.size.width());
+            context.insert(QStringLiteral("height"), result.frame->descriptor.size.height());
+            context.insert(QStringLiteral("bits"), result.frame->descriptor.validBits);
+        } else {
+            context.insert(QStringLiteral("reason"), result.error);
+        }
+        const bool succeeded = result.succeeded();
+        event(succeeded ? Level::Debug : Level::Error, diagnostics::decode(),
+              succeeded ? QStringLiteral("decode.complete") : QStringLiteral("decode.failed"),
+              context, breadcrumb);
+        return result;
     }
     return {{}, QStringLiteral("Unsupported image format")};
 }

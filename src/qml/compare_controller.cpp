@@ -1,3 +1,4 @@
+#include "diagnostics/diagnostics.h"
 #include "qml/compare_controller.h"
 #include "qml/qml_image_canvas.h"
 
@@ -10,6 +11,7 @@
 #include "platform/platform_services.h"
 
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QPointer>
 #include <QQuickWindow>
 #include <QSettings>
@@ -132,6 +134,13 @@ void CompareController::setPaths(const QStringList& requested) {
     fullRequested_.fill(false, paths_.size());
     fullResolution_.fill(false, paths_.size());
     holdCandidate_ = false;
+    QJsonArray files;
+    for (const QString& path : paths_) files.append(diagnostics::fileId(path));
+    diagnostics::event(diagnostics::Level::Info, diagnostics::browse(),
+                       QStringLiteral("compare.session_open"),
+                       {{QStringLiteral("slots"), static_cast<int>(paths_.size())},
+                        {QStringLiteral("files"), files}},
+                       true);
     emit pathsChanged();
     emit holdCandidateChanged();
     refreshCanvas(-1, true);
@@ -139,7 +148,12 @@ void CompareController::setPaths(const QStringList& requested) {
 }
 
 void CompareController::closeSession() {
+    const int slotCount = static_cast<int>(paths_.size());
     setPaths({});
+    if (slotCount > 0)
+        diagnostics::event(diagnostics::Level::Info, diagnostics::browse(),
+                           QStringLiteral("compare.session_close"),
+                           {{QStringLiteral("slots"), slotCount}}, true);
     if (canvas_) canvas_->setFrames({}, -1, true);
     if (loader_) loader_->clearTransientCaches();
     QTimer::singleShot(500, this, [] { PlatformServices::releaseUnusedMemory(); });
@@ -290,6 +304,11 @@ void CompareController::setPresentationMode(int mode) {
     presentationMode_ = mode;
     if (canvas_) canvas_->setPresentationMode(mode);
     emit presentationModeChanged();
+    diagnostics::event(diagnostics::Level::Info, diagnostics::render(),
+                       QStringLiteral("compare.presentation_mode"),
+                       {{QStringLiteral("mode"), mode},
+                        {QStringLiteral("slots"), static_cast<int>(paths_.size())}},
+                       true);
 }
 void CompareController::setSplitAmount(qreal amount) {
     amount = std::clamp(amount, qreal(0), qreal(1)); if (qFuzzyCompare(splitAmount_, amount)) return;
@@ -310,6 +329,9 @@ void CompareController::setHoldCandidate(bool active) {
     holdCandidate_ = active;
     applyHoldFrame();
     emit holdCandidateChanged();
+    diagnostics::event(diagnostics::Level::Info, diagnostics::render(),
+                       QStringLiteral("compare.hold_compare"),
+                       {{QStringLiteral("active"), active}}, true);
 }
 
 void CompareController::setFileInformationVisible(bool visible) {

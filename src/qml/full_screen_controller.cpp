@@ -1,3 +1,4 @@
+#include "diagnostics/diagnostics.h"
 #include "qml/full_screen_controller.h"
 
 #include "io/image_loader.h"
@@ -59,6 +60,13 @@ QString FullScreenController::positionText() const {
 
 void FullScreenController::open(const QStringList& requestedPaths, int initialIndex) {
     paths_ = requestedPaths;
+    if (!paths_.isEmpty()) {
+        diagnostics::event(diagnostics::Level::Info, diagnostics::browse(),
+                           QStringLiteral("fullscreen.session_open"),
+                           {{QStringLiteral("slots"), static_cast<int>(paths_.size())},
+                            {QStringLiteral("index"), initialIndex}},
+                           true);
+    }
     if (paths_.isEmpty()) {
         currentIndex_ = -1;
         frame_.reset();
@@ -71,6 +79,10 @@ void FullScreenController::open(const QStringList& requestedPaths, int initialIn
 }
 
 void FullScreenController::closeSession() {
+    if (!paths_.isEmpty())
+        diagnostics::event(diagnostics::Level::Info, diagnostics::browse(),
+                           QStringLiteral("fullscreen.session_close"),
+                           {{QStringLiteral("slots"), static_cast<int>(paths_.size())}}, true);
     fullLoadTimer_.stop();
     previewHandle_.cancel();
     fullHandle_.cancel();
@@ -171,6 +183,11 @@ QString FullScreenController::revealCurrent() {
 
 void FullScreenController::showIndex(int index) {
     if (index < 0 || index >= paths_.size()) return;
+    // Navigation stays out of the crash breadcrumbs: paging through a large folder would flush
+    // every other operator out of the fixed-size ring.
+    diagnostics::event(diagnostics::Level::Debug, diagnostics::browse(),
+                       QStringLiteral("fullscreen.index_change"),
+                       {{QStringLiteral("index"), index}}, false);
     fullLoadTimer_.stop();
     previewHandle_.cancel();
     fullHandle_.cancel();

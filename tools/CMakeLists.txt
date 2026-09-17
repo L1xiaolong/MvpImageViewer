@@ -43,3 +43,7 @@ if(WIN32)
     target_link_libraries(ispview_browser_benchmark PRIVATE psapi)
 endif()
 ispview_enable_warnings(ispview_browser_benchmark)
+
+qt_add_executable(ispview_diagnostics_benchmark diagnostics_benchmark.cpp)
+target_link_libraries(ispview_diagnostics_benchmark PRIVATE ispview_io Qt6::Core Qt6::Gui)
+ispview_enable_warnings(ispview_diagnostics_benchmark)

@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(ISPImageViewer VERSION 0.2.10 LANGUAGES CXX)
+enable_language(C)
 
 option(ISPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
 option(ISPVIEW_ENABLE_LIBRAW "Enable camera RAW decoding when LibRaw is available" ON)
 option(ISPVIEW_ENABLE_EXIV2 "Enable EXIF/IPTC/XMP metadata when Exiv2 is available" ON)
 option(ISPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
+option(ISPVIEW_ENABLE_CRASHPAD "Enable macOS Crashpad crash capture when the pinned build succeeds" ON)
 set(ISPVIEW_GITHUB_REPOSITORY "" CACHE STRING
     "GitHub owner/repository used for update checks and project links")
 
@@ -74,10 +76,24 @@ if(ISPVIEW_ENABLE_LCMS2)
     endif()
 endif()
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS
+# macOS Crashpad is built by its own GN pipeline (cmake/Crashpad.cmake) when the diagnostics
+# target is configured. Switching it off keeps the rest of the feature intact: the service
+# reports crash capture as unavailable instead of failing the configuration.
+set(ISPVIEW_HAS_CRASHPAD OFF)
+if(APPLE AND ISPVIEW_ENABLE_CRASHPAD)
+    set(ISPVIEW_HAS_CRASHPAD ON)
+    message(STATUS "Crash capture: Crashpad (macOS)")
+elseif(APPLE)
+    message(STATUS "Crash capture disabled: macOS Crashpad is switched off")
+endif()
+
+# Qt 6.9 is the validated baseline. The QML module policies used below (QTP0004, Qt 6.8+), the
+# QQuickRhiItem compositing behaviour the canvas relies on, and the Qt6::GuiPrivate dependency
+# all require a matched Qt build, so the minimum and the packaged runtime must not diverge.
+find_package(Qt6 6.9 REQUIRED COMPONENTS
     Core Gui Network Quick QuickControls2 QuickLayouts QuickTemplates2 Svg ShaderTools LinguistTools
 )
-find_package(Qt6GuiPrivate 6.7 CONFIG REQUIRED)
+find_package(Qt6GuiPrivate 6.9 CONFIG REQUIRED)
 
 # The production QML renderer uses Qt's QRhi API.  Keep this check close to
 # dependency discovery so an incomplete Qt SDK fails during configuration with
@@ -89,10 +105,10 @@ if(NOT TARGET Qt6::GuiPrivate)
 endif()
 
 if(BUILD_TESTING OR ISPVIEW_BUILD_BENCHMARKS)
-    find_package(Qt6 6.7 REQUIRED COMPONENTS Test)
+    find_package(Qt6 6.9 REQUIRED COMPONENTS Test)
 endif()
 if(BUILD_TESTING)
-    find_package(Qt6 6.7 REQUIRED COMPONENTS QuickTest)
+    find_package(Qt6 6.9 REQUIRED COMPONENTS QuickTest)
 endif()
 
 # macOS 26 keeps the legacy AGL framework directory but removes its binary. Qt 6.9's
@@ -108,6 +124,18 @@ qt_standard_project_setup()
 include(CTest)
 include(cmake/Warnings.cmake)
 
+execute_process(COMMAND git rev-parse --short=12 HEAD WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    OUTPUT_VARIABLE ISPVIEW_BUILD_ID OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT ISPVIEW_BUILD_ID)
+    set(ISPVIEW_BUILD_ID "source-archive")
+endif()
+# Keep release optimization while retaining line tables for matching diagnostic symbols.
+if(MSVC)
+    add_compile_options($<$<NOT:$<CONFIG:Debug>>:/Zi>)
+else()
+    add_compile_options(-g)
+endif()
+add_subdirectory(third_party/miniz)
 add_subdirectory(src)
 
 if(ISPVIEW_BUILD_BENCHMARKS)

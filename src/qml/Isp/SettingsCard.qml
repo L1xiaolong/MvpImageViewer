@@ -29,6 +29,7 @@ Popup {
 
     property int currentSection: 0
     property var settingsController: null
+    property var diagnostics: null
     property string shortcutMessage: ""
 
     function shortcutLabel(action) {
@@ -272,7 +273,8 @@ Popup {
                     { label: qsTr("Color & display"), color: Theme.primaryButton },
                     { label: qsTr("Shortcuts"), color: Theme.success },
                     { label: qsTr("Updates"), color: Theme.danger },
-                    { label: qsTr("Help"), color: Theme.faintInk }
+                    { label: qsTr("Help"), color: Theme.faintInk },
+                    { label: qsTr("Logs & diagnostics"), color: Theme.probeBlue }
                 ]
                 delegate: Button {
                     id: navigationButton
@@ -345,6 +347,7 @@ Popup {
                                     ? pageLoader.y + pageLoader.item.implicitHeight + 30 : 500)
             clip: true
             boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
             Loader {
                 id: pageLoader
@@ -352,7 +355,7 @@ Popup {
                 y: 30
                 width: parent.width - 68
                 sourceComponent: [generalPage, appearancePage, colorDisplayPage, shortcutsPage,
-                                  updatesPage, helpPage][root.currentSection]
+                                  updatesPage, helpPage, diagnosticsPage][root.currentSection]
             }
         }
     }
@@ -440,6 +443,11 @@ Popup {
                 color: doneButton.hovered ? Theme.primaryButtonHover : Theme.primaryButton
             }
         }
+    }
+
+    Component {
+        id: diagnosticsPage
+        DiagnosticsPage { settingsController: root.settingsController; diagnostics: root.diagnostics }
     }
 
     Component {

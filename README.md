@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-111111?style=flat-square&logo=apple">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows11">
-  <img alt="Qt 6" src="https://img.shields.io/badge/Qt-6.7%2B-41CD52?style=flat-square&logo=qt&logoColor=white">
+  <img alt="Qt 6" src="https://img.shields.io/badge/Qt-6.9%2B-41CD52?style=flat-square&logo=qt&logoColor=white">
   <img alt="C++20" src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus">
 </p>
 
@@ -119,7 +119,7 @@ TIFF、WebP、OpenEXR、HEIC/HEIF、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当
 
 - CMake 3.25+
 - 支持 C++20 的编译器
-- Qt 6.7+：Core、Gui、Quick、Quick Controls 2、Quick Layouts、Svg、ShaderTools、LinguistTools 及 Gui 私有头文件
+- Qt 6.9+：Core、Gui、Quick、Quick Controls 2、Quick Layouts、Svg、ShaderTools、LinguistTools 及 Gui 私有头文件
 - macOS：Apple Silicon；Qt 6.9.x 为当前验证版本
 - Windows：x64；推荐 MSYS2/UCRT64 + GCC + Ninja
 
@@ -255,3 +255,9 @@ tools          性能测试和诊断工具
 打包脚本会附带项目许可证和图标声明；这不替代 Qt、Exiv2、LibRaw、LittleCMS 及其传递依赖各自要求的声明和源码交付。启用 Exiv2 的构建仍需按 GPL-2.0-or-later 的要求确定整体分发方案。
 
 打包还需要 Python 3.9+，会生成实际运行时依赖清单并收集许可证和可用的 SBOM；来源无法核实或许可文本缺失时停止生成安装包。MSYS2 支持自动匹配，其他 SDK/自定义构建需提供经核对的来源清单。配置方法与检查范围见 [运行库许可收集说明](packaging/RUNTIME_LICENSES.md)。
+
+## 日志与崩溃诊断
+
+[Diagnostic settings, export, symbols and validation](docs/diagnostics.md)
+
+macOS 构建可用 `-DISPVIEW_ENABLE_CRASHPAD=OFF` 跳过 Crashpad；此时崩溃采集在设置页显示为不可用，其余诊断功能不受影响。

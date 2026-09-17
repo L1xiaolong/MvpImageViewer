@@ -30,6 +30,7 @@ qt_add_qml_module(ISPImageViewerQml
         Main.qml
         Isp/Theme.qml
         Isp/SettingsCard.qml
+        Isp/DiagnosticsPage.qml
         Isp/AppIconButton.qml
         Isp/AppTextInputDialog.qml
         Isp/AppConfirmDialog.qml
@@ -59,7 +60,7 @@ qt_add_qml_module(ISPImageViewerQml
 
 qt_add_translations(ISPImageViewerQml
     IMMEDIATE_CALL
-    SOURCE_TARGETS ISPImageViewerQml
+    SOURCE_TARGETS ISPImageViewerQml ispview_diagnostics
     TS_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/i18n/ispimageviewer_zh_CN.ts"
     RESOURCE_PREFIX "/i18n"
@@ -215,3 +216,18 @@ unset(_ispview_qml_macos_icon)
 unset(_ispview_qml_windows_icon)
 unset(_ispview_qml_windows_icon_rc)
 unset(_ispview_qml_windows_icon_rc_content)
+
+if(WIN32)
+    add_dependencies(ISPImageViewerQml ispview_crash_handler)
+    add_custom_command(TARGET ISPImageViewerQml POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ispview_crash_handler>
+            $<TARGET_FILE_DIR:ISPImageViewerQml>)
+endif()
+if(APPLE)
+    add_custom_command(TARGET ISPImageViewerQml POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:ISPImageViewerQml>/../Helpers"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ISPVIEW_CRASHPAD_HANDLER}"
+            "$<TARGET_FILE_DIR:ISPImageViewerQml>/../Helpers/crashpad_handler")
+endif()
+include(${PROJECT_SOURCE_DIR}/cmake/DiagnosticSymbols.cmake)
+ispview_diagnostic_symbols(ISPImageViewerQml)

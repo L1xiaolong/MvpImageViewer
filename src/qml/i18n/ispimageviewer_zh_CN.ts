@@ -645,6 +645,22 @@ Choose another folder or drop images here</source>
         <source>MVP Image Viewer</source>
         <translation>MVP Image Viewer</translation>
     </message>
+    <message>
+        <source>A crash report from the previous session is available.</source>
+        <translation>检测到上次运行的崩溃报告，可导出用于排查。</translation>
+    </message>
+    <message>
+        <source>The previous session ended unexpectedly. Diagnostic information may be available.</source>
+        <translation>上次运行未正常退出，可查看是否有诊断资料。</translation>
+    </message>
+    <message>
+        <source>Diagnostics / Export</source>
+        <translation>诊断 / 导出</translation>
+    </message>
+    <message>
+        <source>Dismiss</source>
+        <translation>忽略</translation>
+    </message>
 </context>
 <context>
     <name>RawParameterComboBox</name>
@@ -1268,6 +1284,10 @@ Choose another folder or drop images here</source>
         <source>Restore</source>
         <translation>恢复</translation>
     </message>
+    <message>
+        <source>Logs &amp; diagnostics</source>
+        <translation>日志与诊断</translation>
+    </message>
 </context>
 <context>
     <name>ThumbnailTile</name>
@@ -1466,4 +1486,183 @@ Choose another folder or drop images here</source>
         <translation>设置</translation>
     </message>
 </context>
+<context>
+    <name>DiagnosticsPage</name>
+    <message>
+        <source>Logs &amp; diagnostics</source>
+        <translation>日志与诊断</translation>
+    </message>
+    <message>
+        <source>Diagnostics stay on this device. Nothing is uploaded automatically.</source>
+        <translation>诊断资料仅保存在本机，不会自动上传。</translation>
+    </message>
+    <message>
+        <source>Record application logs</source>
+        <translation>记录运行日志</translation>
+    </message>
+    <message>
+        <source>Minimum log level</source>
+        <translation>最低日志等级</translation>
+    </message>
+    <message>
+        <source>Record crash reports (takes effect after restart)</source>
+        <translation>记录崩溃报告（重启后生效）</translation>
+    </message>
+    <message>
+        <source>Diagnostics unavailable</source>
+        <translation>诊断服务不可用</translation>
+    </message>
+    <message>
+        <source>Crash capture is active for this session.</source>
+        <translation>本次运行已启用崩溃采集。</translation>
+    </message>
+    <message>
+        <source>Crash capture is disabled for this session.</source>
+        <translation>本次运行未启用崩溃采集。</translation>
+    </message>
+    <message>
+        <source>Crash capture is unavailable. See the error below.</source>
+        <translation>崩溃采集不可用，请查看下方错误。</translation>
+    </message>
+    <message>
+        <source>Restart the application to apply the crash recording change.</source>
+        <translation>重启软件后应用崩溃记录开关的更改。</translation>
+    </message>
+    <message>
+        <source>Storage: %1 MiB
+%2</source>
+        <translation>占用空间：%1 MiB
+%2</translation>
+    </message>
+    <message>
+        <source>Logs: 7 days / 100 MiB. Crash reports: 30 days / 10 reports / 200 MiB. Active sessions are protected.</source>
+        <translation>运行日志保留 7 天，最多 100 MiB；崩溃报告保留 30 天，最多 10 份、200 MiB。运行中的会话不会被清理。</translation>
+    </message>
+    <message>
+        <source>Open folder</source>
+        <translation>打开目录</translation>
+    </message>
+    <message>
+        <source>Clear history</source>
+        <translation>清理历史资料</translation>
+    </message>
+    <message>
+        <source>Export range</source>
+        <translation>导出范围</translation>
+    </message>
+    <message>
+        <source>Last 24 hours</source>
+        <translation>最近 24 小时</translation>
+    </message>
+    <message>
+        <source>Last 7 days</source>
+        <translation>最近 7 天</translation>
+    </message>
+    <message>
+        <source>Last 30 days</source>
+        <translation>最近 30 天</translation>
+    </message>
+    <message>
+        <source>All retained</source>
+        <translation>全部保留资料</translation>
+    </message>
+    <message>
+        <source>Include crash dumps</source>
+        <translation>包含崩溃转储</translation>
+    </message>
+    <message>
+        <source>Crash dumps may contain file paths and memory fragments. Include them only when you intend to share this information.</source>
+        <translation>崩溃转储可能包含文件路径和内存片段。仅在您愿意分享这些信息时勾选。</translation>
+    </message>
+    <message>
+        <source>Export ZIP</source>
+        <translation>导出 ZIP</translation>
+    </message>
+    <message>
+        <source>Cancel export</source>
+        <translation>取消导出</translation>
+    </message>
+    <message>
+        <source>Show exported file</source>
+        <translation>打开导出位置</translation>
+    </message>
+    <message>
+        <source>Export diagnostics</source>
+        <translation>导出诊断资料</translation>
+    </message>
+    <message>
+        <source>ZIP archives (*.zip)</source>
+        <translation>ZIP 压缩包 (*.zip)</translation>
+    </message>
+    <message>
+        <source>Clear diagnostic history?</source>
+        <translation>清理诊断历史资料？</translation>
+    </message>
+    <message>
+        <source>This removes completed session logs and crash reports. Running sessions are kept.</source>
+        <translation>将删除已结束会话的日志和崩溃报告，保留正在运行的会话。</translation>
+    </message>
+    <message>
+        <source>Recent crash reports: %1. Latest: %2</source>
+        <translation>已保留 %1 份崩溃报告，最近一次：%2</translation>
+    </message>
+    <message>
+        <source>No retained crash reports.</source>
+        <translation>暂无保留的崩溃报告。</translation>
+    </message>
+</context>
+<context>
+    <name>ispview::DiagnosticsController</name>
+    <message>
+        <source>Choose a local ZIP file.</source>
+        <translation>请选择本地 ZIP 文件。</translation>
+    </message>
+    <message>
+        <source>Choose a location outside the diagnostics directory.</source>
+        <translation>请选择诊断目录以外的保存位置。</translation>
+    </message>
+    <message>
+        <source>Cannot create temporary export directory.</source>
+        <translation>无法创建导出临时目录。</translation>
+    </message>
+    <message>
+        <source>Cannot write the ZIP file.</source>
+        <translation>无法写入 ZIP 文件。</translation>
+    </message>
+    <message>
+        <source>Cannot initialize ZIP export.</source>
+        <translation>无法初始化 ZIP 导出。</translation>
+    </message>
+    <message>
+        <source>Cannot write export manifest.</source>
+        <translation>无法写入导出清单。</translation>
+    </message>
+    <message>
+        <source>Cannot compress diagnostic file.</source>
+        <translation>无法压缩诊断文件。</translation>
+    </message>
+    <message>
+        <source>Cannot finalize ZIP export.</source>
+        <translation>无法完成 ZIP 导出。</translation>
+    </message>
+    <message>
+        <source>Export cancelled.</source>
+        <translation>已取消导出。</translation>
+    </message>
+    <message>
+        <source>Cannot save ZIP export.</source>
+        <translation>无法保存 ZIP 导出文件。</translation>
+    </message>
+    <message>
+        <source>Export is running.</source>
+        <translation>正在导出。</translation>
+    </message>
+</context>
+    <context>
+        <name>DiagnosticsController</name>
+        <message>
+            <source>Logs: %1 days / %2 MiB. Crash reports: %3 days / %4 reports / %5 MiB. Active sessions are protected.</source>
+            <translation>日志：%1 天 / %2 MiB。崩溃报告：%3 天 / %4 份 / %5 MiB。运行中的会话受保护。</translation>
+        </message>
+    </context>
 </TS>
