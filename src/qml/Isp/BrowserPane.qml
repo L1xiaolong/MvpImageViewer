@@ -258,6 +258,7 @@ Rectangle {
                 controller: root.controller
                 workspaceController: root.workspaceController
                 settingsController: root.settingsController
+                contentInteractionEnabled: root.contentInteractionEnabled
                 path: parent.path
                 fileName: parent.fileName
                 technicalLabel: parent.technicalLabel

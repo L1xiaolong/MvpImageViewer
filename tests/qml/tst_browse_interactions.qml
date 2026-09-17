@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtTest
 import "../../design"
 import "../../src/qml/Isp"
@@ -41,6 +42,80 @@ TestCase {
         settingsController: mockSettings
         designMode: true
         iconPrefix: Qt.resolvedUrl("../../assets/icons/ui/").toString()
+        externalModalVisible: settingsCard.visible
+    }
+
+    SettingsCard {
+        id: settingsCard
+        parent: Overlay.overlay
+    }
+
+    function test_modalCardsBlockThumbnailInput_data() {
+        const cards = ["imagePropertiesDialog", "rawParametersDialog", "imageResizeDialog",
+                       "newFolderDialog", "renameDialog", "trashConfirmationDialog",
+                       "transferConfirmationDialog", "settingsCard"]
+        const rows = []
+        for (let mode = 0; mode < 3; ++mode) {
+            for (const card of cards)
+                rows.push({ tag: card + "-mode-" + mode, card: card, mode: mode })
+        }
+        return rows
+    }
+
+    function test_modalCardsBlockThumbnailInput(data) {
+        browsePage.displayMode = data.mode
+        mockController.setDisplayMode(data.mode)
+        wait(80)
+        const tile = data.mode === 2
+                ? findChild(browsePage, "galleryDelegate-0")
+                : findChild(findChild(browsePage, "paneContactSheet-0").itemAtIndex(0), "thumbnailMouseArea").parent
+        verify(tile !== null)
+        const handler = tile.dragHandler
+        verify(handler.enabled)
+        const card = data.card === "settingsCard" ? settingsCard : findChild(browsePage, data.card)
+        verify(card !== null)
+        const selectionBefore = mockController.selectedPaths.join("|")
+        card.open()
+        // Input must be blocked already during the opening transition.
+        compare(browsePage.contentInteractionEnabled, false)
+        compare(browsePage.fileShortcutsEnabled, false)
+        compare(handler.enabled, false)
+        tryCompare(card, "opened", true)
+        const oldX = card.x
+        const oldY = card.y
+        mouseDrag(card.contentItem, card.contentItem.width / 2, 20, 60, 45, Qt.LeftButton)
+        compare(handler.active, false)
+        compare(mockController.selectedPaths.join("|"), selectionBefore)
+        card.close()
+        tryCompare(card, "visible", false)
+        card.x = oldX
+        card.y = oldY
+        tryCompare(handler, "enabled", true)
+        verify(browsePage.contentInteractionEnabled)
+        // Exercise the real gesture without entering the OS drag-and-drop loop.
+        const dragType = tile.Drag.dragType
+        tile.Drag.dragType = Drag.None
+        try {
+            mousePress(tile, tile.width / 2, tile.height / 2, Qt.LeftButton)
+            mouseMove(tile, tile.width / 2 + 25, tile.height / 2 + 25, 20)
+            mouseMove(tile, tile.width / 2 + 50, tile.height / 2 + 50, 20)
+            tryCompare(handler, "active", true)
+        } finally {
+            mouseRelease(tile, tile.width / 2 + 50, tile.height / 2 + 50, Qt.LeftButton)
+            tile.Drag.dragType = dragType
+        }
+    }
+
+    function cleanup() {
+        settingsCard.close()
+        for (const name of ["imagePropertiesDialog", "rawParametersDialog", "imageResizeDialog",
+                            "newFolderDialog", "renameDialog", "trashConfirmationDialog",
+                            "transferConfirmationDialog"]) {
+            const card = findChild(browsePage, name)
+            if (card)
+                card.close()
+        }
+        wait(150)
     }
 
     function init() {

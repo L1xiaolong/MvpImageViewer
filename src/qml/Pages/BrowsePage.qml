@@ -29,20 +29,21 @@ Rectangle {
                                        qsTr("Size"), qsTr("Type")]
     signal fullScreenRequested(var paths, int initialIndex)
     signal settingsRequested()
-    readonly property bool contentInteractionEnabled: !propertiesDialog.opened &&
-                                                       !rawParametersDialog.opened &&
-                                                       !imageResizeDialog.opened
+    // Use visible, not opened: block input throughout popup enter/exit transitions.
+    property bool externalModalVisible: false
+    readonly property bool contentInteractionEnabled: root.visible && !externalModalVisible &&
+                                                       !propertiesDialog.visible &&
+                                                       !rawParametersDialog.visible &&
+                                                       !imageResizeDialog.visible &&
+                                                       !newFolderDialog.visible &&
+                                                       !renameDialog.visible &&
+                                                       !trashDialog.visible &&
+                                                       !transferDialog.visible &&
+                                                       !folderPicker.visible
     readonly property bool fileShortcutsEnabled: (workspaceController.hasActivePane === undefined ||
                                                   workspaceController.hasActivePane) &&
                                                   !toolbar.searchControl.activeFocus &&
-                                                  !newFolderDialog.opened &&
-                                                  !renameDialog.opened &&
-                                                  !trashDialog.opened &&
-                                                  !transferDialog.opened &&
-                                                  !propertiesDialog.opened &&
-                                                  !rawParametersDialog.opened &&
-                                                  !imageResizeDialog.opened &&
-                                                  !folderPicker.visible
+                                                  root.contentInteractionEnabled
     function pathIsRaw(path) {
         const lowered = path.toLowerCase();
         return lowered.endsWith(".raw") || lowered.endsWith(".yuv");
@@ -311,6 +312,7 @@ Rectangle {
     Item {
         id: paneWorkspace
         objectName: "paneWorkspace"
+        enabled: root.contentInteractionEnabled
         visible: root.displayMode !== 2 || root.workspaceController.paneCount !== 1
         anchors.left: gutter.right
         anchors.right: parent.right
@@ -588,6 +590,7 @@ Rectangle {
     Item {
         id: galleryWorkspace
         objectName: "galleryWorkspace"
+        enabled: root.contentInteractionEnabled
         property url currentPreviewUrl: ""
         property string currentPreviewPath: ""
         property string currentPreviewName: ""
@@ -1008,6 +1011,7 @@ Rectangle {
                 delegate: Item {
                     id: galleryDelegate
                     objectName: "galleryDelegate-" + galleryDelegate.index
+                    readonly property alias dragHandler: galleryDragHandler
                     required property int index
                     required property string path
                     required property string fileName
@@ -1147,6 +1151,11 @@ Rectangle {
                         }
                         DragHandler {
                             id: galleryDragHandler
+                            enabled: root.contentInteractionEnabled &&
+                                     !galleryFileContextMenu.visible &&
+                                     !galleryRawFileContextMenu.visible &&
+                                     !galleryFolderContextMenu.visible &&
+                                     !workspaceContextMenu.visible
                             acceptedButtons: Qt.LeftButton
                             target: null
                             onActiveChanged: {
@@ -1564,10 +1573,12 @@ Rectangle {
 
     Shortcut {
         sequence: root.configuredShortcut("openFolder", "Ctrl+O")
+        enabled: root.contentInteractionEnabled
         onActivated: root.controller.chooseDirectory()
     }
     Shortcut {
         sequence: root.configuredShortcut("find", "Ctrl+F")
+        enabled: root.contentInteractionEnabled
         onActivated: {
             toolbar.searchControl.forceActiveFocus();
             toolbar.searchControl.selectAll();
@@ -1590,6 +1601,7 @@ Rectangle {
     }
     Shortcut {
         sequence: root.configuredShortcut("toggleNavigator", "Ctrl+B")
+        enabled: root.contentInteractionEnabled
         onActivated: root.navigatorVisible = !root.navigatorVisible
     }
     Shortcut {

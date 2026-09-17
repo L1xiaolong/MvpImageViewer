@@ -242,6 +242,7 @@ ApplicationWindow {
         rawController: rawParametersController
         settingsController: appSettings
         visible: !window.showingCompare && !window.showingFullScreen
+        externalModalVisible: settingsCard.visible
         onFullScreenRequested: function(paths, initialIndex) {
             window.openFullScreen(paths, initialIndex)
         }

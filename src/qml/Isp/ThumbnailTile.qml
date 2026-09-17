@@ -10,6 +10,8 @@ Item {
     required property var controller
     property var workspaceController: controller
     property var settingsController: null
+    property bool contentInteractionEnabled: true
+    readonly property alias dragHandler: tileDragHandler
     property string path
     property string fileName
     property string technicalLabel
@@ -385,7 +387,9 @@ Item {
         id: tileDragHandler
         acceptedButtons: Qt.LeftButton
         target: null
-        enabled: root.path.length > 0
+        enabled: root.contentInteractionEnabled && root.path.length > 0 &&
+                 !imageContextMenu.visible && !rawContextMenu.visible &&
+                 !folderContextMenu.visible
         onActiveChanged: {
             if (active && !root.selected)
                 root.selectionRequested(false, false);

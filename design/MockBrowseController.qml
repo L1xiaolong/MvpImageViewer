@@ -39,95 +39,106 @@ QtObject {
                                selectedPaths[0].toLowerCase().endsWith(".yuv"))
 
     property ListModel thumbnails: ListModel {
-        ListElement {
-            path: "/Images/Demo/sample_0001.jpg"
-            fileName: "sample_0001.jpg"
-            technicalLabel: "4000×3000 · JPG · 14,221 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: true
-            selectionOrdinal: 1
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0002.jpg"
-            fileName: "sample_0002.jpg"
-            technicalLabel: "4000×3000 · JPG · 4,262 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: true
-            selectionOrdinal: 2
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0003.jpg"
-            fileName: "sample_0003.jpg"
-            technicalLabel: "4000×3000 · JPG · 4,226 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0004.png"
-            fileName: "sample_0004.png"
-            technicalLabel: "4000×3000 · PNG · 11,353 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0005.png"
-            fileName: "sample_0005.png"
-            technicalLabel: "4000×3000 · PNG · 11,109 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0006.jpg"
-            fileName: "sample_0006.jpg"
-            technicalLabel: "6144×4096 · JPG · 2,459 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0007.dng"
-            fileName: "sample_0007.dng"
-            technicalLabel: "5464×3070 · DNG · 24,572 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0008.png"
-            fileName: "sample_0008.png"
-            technicalLabel: "4000×3000 · PNG · 9,713 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0009.png"
-            fileName: "sample_0009.png"
-            technicalLabel: "4000×3000 · PNG · 13,193 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
-        }
-        ListElement {
-            path: "/Images/Demo/sample_0010.raw"
-            fileName: "sample_0010.raw"
-            technicalLabel: "6236×4178 · RAW · 50,886 KB"
-            thumbnailUrl: ""
-            isDirectory: false
-            isSelected: false
-            selectionOrdinal: 0
+        Component.onCompleted: {
+            const rows = [
+                {
+                    path: "/Images/Demo/sample_0001.jpg",
+                    fileName: "sample_0001.jpg",
+                    technicalLabel: "4000×3000 · JPG · 14,221 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: true,
+                    selectionOrdinal: 1
+                },
+                {
+                    path: "/Images/Demo/sample_0002.jpg",
+                    fileName: "sample_0002.jpg",
+                    technicalLabel: "4000×3000 · JPG · 4,262 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: true,
+                    selectionOrdinal: 2
+                },
+                {
+                    path: "/Images/Demo/sample_0003.jpg",
+                    fileName: "sample_0003.jpg",
+                    technicalLabel: "4000×3000 · JPG · 4,226 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0004.png",
+                    fileName: "sample_0004.png",
+                    technicalLabel: "4000×3000 · PNG · 11,353 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0005.png",
+                    fileName: "sample_0005.png",
+                    technicalLabel: "4000×3000 · PNG · 11,109 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0006.jpg",
+                    fileName: "sample_0006.jpg",
+                    technicalLabel: "6144×4096 · JPG · 2,459 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0007.dng",
+                    fileName: "sample_0007.dng",
+                    technicalLabel: "5464×3070 · DNG · 24,572 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0008.png",
+                    fileName: "sample_0008.png",
+                    technicalLabel: "4000×3000 · PNG · 9,713 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0009.png",
+                    fileName: "sample_0009.png",
+                    technicalLabel: "4000×3000 · PNG · 13,193 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                },
+                {
+                    path: "/Images/Demo/sample_0010.raw",
+                    fileName: "sample_0010.raw",
+                    technicalLabel: "6236×4178 · RAW · 50,886 KB",
+                    thumbnailUrl: "",
+                    isDirectory: false,
+                    isSelected: false,
+                    selectionOrdinal: 0
+                }
+            ]
+            for (const row of rows) {
+                row.fileType = row.isDirectory ? "Folder" : row.fileName.split(".").pop().toUpperCase()
+                row.dimensions = Qt.size(4000, 3000)
+                row.bitDepth = 8
+                row.fileSizeText = "12.4 MB"
+                append(row)
+            }
         }
     }
 
