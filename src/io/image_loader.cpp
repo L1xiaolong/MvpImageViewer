@@ -79,6 +79,15 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     }
     const QString key = cacheKey(request, decoder_->cacheIdentity());
     if (auto cached = cacheFor(request.purpose).get(key)) {
+        if (request.purpose == DecodePurpose::Thumbnail) {
+            const QSize sourceSize = cached->metadata.sourceSize.isValid()
+                                         ? cached->metadata.sourceSize
+                                         : cached->descriptor.size;
+            const int validBits = cached->rawParameters
+                                      ? cached->rawParameters->validBits()
+                                      : cached->descriptor.validBits;
+            emit thumbnailMetadataReady(request.path, sourceSize, validBits);
+        }
         callback(requestId, {std::move(cached), {}});
         return {};
     }

@@ -68,6 +68,10 @@ class RawParameterColorDecoder final : public IImageDecoder {
         frame->metadata.path = request.path;
         frame->metadata.sourceSize =
             request.rawParameters ? request.rawParameters->size : image.size();
+        frame->descriptor.validBits = request.rawParameters
+                                          ? request.rawParameters->validBits()
+                                          : 8;
+        frame->rawParameters = request.rawParameters;
         frame->storage = std::move(image);
         return {std::move(frame), {}};
     }
@@ -216,6 +220,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void copiesDropsIntoSubfoldersAndAcrossPanes();
     void emptyPaneOpensDroppedFoldersAndImageLocations();
     void rawParametersRefreshEveryPaneAndQmlProvider();
+    void thumbnailMetadataSurvivesDemosaicCacheRoundTrip();
     void galleryUsesPreviewUntilPixelProbeRequestsFullResolution();
     void browseFileDialogsAreRequestedByQmlAndActionsStayInBackend();
     void imagePropertiesAreExposedWithoutWidgetUi();
@@ -722,6 +727,81 @@ void QmlWorkspaceControllerTests::rawParametersRefreshEveryPaneAndQmlProvider() 
         provider.requestImage(encodedPath + QStringLiteral("?v=second"), nullptr, QSize(16, 16));
     QCOMPARE(refreshedImage.pixelColor(0, 0), QColor(Qt::green));
     QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 2);
+}
+
+void QmlWorkspaceControllerTests::thumbnailMetadataSurvivesDemosaicCacheRoundTrip() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString rawPath = directory.filePath(QStringLiteral("capture.raw"));
+    QFile rawFile(rawPath);
+    QVERIFY(rawFile.open(QIODevice::WriteOnly));
+    QCOMPARE(rawFile.write(QByteArray(256, '\0')), 256);
+    rawFile.close();
+    const QString pngPath = createImage(directory, QStringLiteral("reference.png"));
+    QVERIFY(!pngPath.isEmpty());
+
+    auto decoder = std::make_shared<RawParameterColorDecoder>();
+    BrowseWorkspaceController workspace(decoder, directory.path());
+    BrowseController* pane = paneAt(workspace, 0);
+    const auto indexForPath = [pane](const QString& path) {
+        QAbstractItemModel* model = pane->thumbnails();
+        for (int row = 0; row < model->rowCount(); ++row) {
+            const QModelIndex index = model->index(row, 0);
+            if (index.data(ThumbnailModel::PathRole).toString() == path)
+                return index;
+        }
+        return QModelIndex{};
+    };
+    QTRY_VERIFY_WITH_TIMEOUT(indexForPath(rawPath).isValid(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(indexForPath(pngPath).isValid(), 3000);
+
+    ThumbnailImageProvider provider(decoder, workspace.loader());
+    const QString encodedRaw = QString::fromLatin1(QUrl::toPercentEncoding(rawPath));
+    const QString encodedPng = QString::fromLatin1(QUrl::toPercentEncoding(pngPath));
+    QVERIFY(!provider.requestImage(encodedPng + QStringLiteral("?v=encoded"), nullptr,
+                                   QSize(16, 16)).isNull());
+    const QString encodedLabel =
+        indexForPath(pngPath).data(ThumbnailModel::TechnicalLabelRole).toString();
+    QVERIFY(!encodedLabel.contains(QStringLiteral("Reading")));
+
+    RawImageParameters mosaic;
+    mosaic.size = {4, 4};
+    mosaic.format = RawPixelFormat::Raw16;
+    mosaic.rowStride = 8;
+    mosaic.validBitsOverride = 10;
+    mosaic.demosaic = false;
+    workspace.loader()->setRawParameters(rawPath, mosaic);
+    QVERIFY(!provider.requestImage(encodedRaw + QStringLiteral("?v=mosaic"), nullptr,
+                                   QSize(16, 16)).isNull());
+    QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 2);
+
+    RawImageParameters demosaiced = mosaic;
+    demosaiced.demosaic = true;
+    workspace.loader()->setRawParameters(rawPath, demosaiced);
+    QVERIFY(!provider.requestImage(encodedRaw + QStringLiteral("?v=demosaiced"), nullptr,
+                                   QSize(16, 16)).isNull());
+    QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 3);
+
+    workspace.loader()->setRawParameters(rawPath, mosaic);
+    const QString rawLabel =
+        indexForPath(rawPath).data(ThumbnailModel::TechnicalLabelRole).toString();
+    QVERIFY(!rawLabel.contains(QStringLiteral("Reading")));
+    QVERIFY(rawLabel.contains(QStringLiteral("4")));
+    QVERIFY(rawLabel.contains(QStringLiteral("10 bit")));
+    QCOMPARE(indexForPath(pngPath).data(ThumbnailModel::TechnicalLabelRole).toString(),
+             encodedLabel);
+
+    QSignalSpy metadataReady(workspace.loader(), &ImageLoader::thumbnailMetadataReady);
+    QVERIFY(!provider.requestImage(encodedRaw + QStringLiteral("?v=mosaic-again"), nullptr,
+                                   QSize(16, 16)).isNull());
+    // Returning to the first configuration reuses its cached pixels and must still republish
+    // metadata so a newly created or reset model can populate its information roles.
+    QCOMPARE(decoder->calls.load(std::memory_order_relaxed), 3);
+    QCOMPARE(metadataReady.count(), 1);
+    QVERIFY(!indexForPath(rawPath)
+                 .data(ThumbnailModel::TechnicalLabelRole)
+                 .toString()
+                 .contains(QStringLiteral("Reading")));
 }
 
 void QmlWorkspaceControllerTests::galleryUsesPreviewUntilPixelProbeRequestsFullResolution() {

@@ -349,8 +349,16 @@ QString ThumbnailModel::pathAt(int row) const {
 }
 
 void ThumbnailModel::invalidateThumbnail(const QString& path) {
-    dimensions_.remove(path);
-    bitDepths_.remove(path);
+    // RAW parameter changes invalidate pixels, but their dimensions and bit depth are already
+    // known synchronously. Keeping these roles populated also covers a thumbnail request that
+    // immediately hits an earlier demosaic configuration in the memory cache.
+    if (const auto parameters = loader_->rawParameters(path)) {
+        dimensions_.insert(path, orientedImageSize(parameters->size, parameters->orientation));
+        bitDepths_.insert(path, parameters->validBits());
+    } else {
+        dimensions_.remove(path);
+        bitDepths_.remove(path);
+    }
     const int row = pathToRow_.value(path, -1);
     if (row >= 0) {
         const QModelIndex changed = index(row);
