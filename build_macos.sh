@@ -22,6 +22,7 @@ Options:
   --test       Run CTest when using a Debug build.
   --rhi        Run the native Metal RHI acceptance test.
   --clean      Remove the selected build directory before configuring.
+  --no-crashpad  Disable macOS Crashpad when its pinned source is unavailable.
   --qt-prefix  Build with a custom Qt installation instead of the Qt on PATH.
   --sign ID    Code-sign a package with ID. Default is an ad-hoc local signature.
   --no-zip     Do not also create the optional portable ZIP in package mode.
@@ -45,6 +46,7 @@ run_tests=0
 run_rhi=0
 clean=0
 create_zip=1
+enable_crashpad="OFF"
 sign_identity="${ISPVIEW_CODESIGN_IDENTITY:--}"
 qt_prefix="${ISPVIEW_QT_PREFIX:-}"
 jobs="$(sysctl -n hw.ncpu 2>/dev/null || echo 6)"
@@ -85,6 +87,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --clean)
             clean=1
+            shift
+            ;;
+        --no-crashpad)
+            enable_crashpad="OFF"
             shift
             ;;
         --qt-prefix)
@@ -164,6 +170,7 @@ if [[ -n "$qt_prefix" ]]; then
         -DCMAKE_OSX_ARCHITECTURES=arm64 \
         -DBUILD_TESTING="$build_testing" \
         -DISPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
+        -DISPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
         -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}" \
         -DCMAKE_PREFIX_PATH="$qt_prefix" \
         -DQt6_DIR="$qt_prefix/lib/cmake/Qt6"
@@ -173,6 +180,7 @@ else
     echo "Configuring preset: $preset"
     cmake --preset "$preset" \
         -DISPVIEW_BUILD_BENCHMARKS=OFF \
+        -DISPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
         -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}"
     echo "Building preset: $preset (-j $jobs)"
     cmake --build --preset "$preset" -j "$jobs"

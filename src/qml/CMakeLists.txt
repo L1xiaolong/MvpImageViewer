@@ -223,7 +223,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ispview_crash_handler>
             $<TARGET_FILE_DIR:ISPImageViewerQml>)
 endif()
-if(APPLE)
+if(APPLE AND ISPVIEW_HAS_CRASHPAD)
     add_custom_command(TARGET ISPImageViewerQml POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:ISPImageViewerQml>/../Helpers"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ISPVIEW_CRASHPAD_HANDLER}"
