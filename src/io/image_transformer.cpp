@@ -228,9 +228,12 @@ quint16 unpackBayer(const char* row, int x, const RawImageParameters& parameters
     }
     case RawPixelFormat::Raw16: {
         quint16 value = read16(row + x * 2, parameters.littleEndian);
-        if (parameters.validBits() < 16)
-            value = parameters.msbAligned ? value >> (16 - parameters.validBits())
-                                          : value & ((1 << parameters.validBits()) - 1);
+        if (parameters.validBits() < 16) {
+            const quint16 mask = static_cast<quint16>((1U << parameters.validBits()) - 1U);
+            value = parameters.msbAligned
+                        ? static_cast<quint16>(value >> (16 - parameters.validBits()))
+                        : static_cast<quint16>(value & mask);
+        }
         return value;
     }
     default: return 0;

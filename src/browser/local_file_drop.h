@@ -15,8 +15,4 @@ namespace ispview {
 // pasteboard data has been promoted to QMimeData::urls().
 [[nodiscard]] QStringList localFileDropPaths(const QMimeData* mimeData);
 
-// Returns a bounded, content-free description suitable for status diagnostics.  File names and
-// text payloads are intentionally not included.
-[[nodiscard]] QString localFileDropFormats(const QMimeData* mimeData);
-
 } // namespace ispview

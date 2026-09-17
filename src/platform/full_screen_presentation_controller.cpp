@@ -35,7 +35,7 @@ struct FullScreenPresentationController::WindowsState {
     HWND nativeWindow = nullptr;
     LONG_PTR style = 0;
     LONG_PTR extendedStyle = 0;
-    WINDOWPLACEMENT placement{static_cast<UINT>(sizeof(WINDOWPLACEMENT))};
+    WINDOWPLACEMENT placement{};
     RECT frame{};
 };
 
@@ -147,13 +147,16 @@ bool FullScreenPresentationController::begin(QWindow* window) {
         state->nativeWindow = nativeWindow;
         state->style = GetWindowLongPtrW(nativeWindow, GWL_STYLE);
         state->extendedStyle = GetWindowLongPtrW(nativeWindow, GWL_EXSTYLE);
+        // GetWindowPlacement requires the caller to set the structure size first.
+        state->placement.length = sizeof(WINDOWPLACEMENT);
         if (!GetWindowPlacement(nativeWindow, &state->placement) ||
             !GetWindowRect(nativeWindow, &state->frame)) {
             return false;
         }
 
         const HMONITOR monitor = MonitorFromWindow(nativeWindow, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO monitorInfo{static_cast<DWORD>(sizeof(MONITORINFO))};
+        MONITORINFO monitorInfo{};
+        monitorInfo.cbSize = sizeof(MONITORINFO);
         if (!monitor || !GetMonitorInfoW(monitor, &monitorInfo))
             return false;
 

@@ -651,7 +651,6 @@ Rectangle {
         anchors.margins: 16
 
         Rectangle {
-            id: galleryPreview
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom

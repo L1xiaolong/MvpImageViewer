@@ -21,6 +21,10 @@ namespace {
 constexpr auto kNamedPresetsKey = "rawPresets/named";
 constexpr auto kFilenameRulesKey = "rawPresets/filenameRules";
 
+// Settings fallback used when a file has no sidecar. The key deliberately covers one directory
+// and suffix instead of a single file: RawParametersController::applyToFolder() persists one
+// layout for every file of that suffix in the folder. Per-file parameters always win, because
+// loadForFile() prefers the sidecar written by saveSidecar().
 QString keyForFile(const QString& path) {
     const QFileInfo info(path);
     const QByteArray identity =

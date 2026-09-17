@@ -67,23 +67,4 @@ QStringList localFileDropPaths(const QMimeData* mimeData) {
     return paths;
 }
 
-QString localFileDropFormats(const QMimeData* mimeData) {
-    if (!mimeData) {
-        return QStringLiteral("none");
-    }
-    QStringList formats = mimeData->formats();
-    constexpr qsizetype kMaximumFormats = 4;
-    const bool truncated = formats.size() > kMaximumFormats;
-    formats = formats.sliced(0, qMin(formats.size(), kMaximumFormats));
-    QString description = formats.isEmpty() ? QStringLiteral("none") : formats.join(QStringLiteral(", "));
-    if (truncated) {
-        description += QStringLiteral(", …");
-    }
-    constexpr qsizetype kMaximumLength = 160;
-    if (description.size() > kMaximumLength) {
-        description = description.left(kMaximumLength - 1) + QChar(0x2026);
-    }
-    return description;
-}
-
 } // namespace ispview
