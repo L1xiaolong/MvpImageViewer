@@ -89,6 +89,20 @@ struct LcmsTransform {
     [[nodiscard]] bool isValid() const { return transform != nullptr; }
 };
 
+enum class TransformSampleFormat : char { Rgba8 = '8', Rgba16 = '6', RgbaFloat = 'f' };
+
+cmsUInt32Number lcmsPixelType(TransformSampleFormat format) {
+    switch (format) {
+    case TransformSampleFormat::Rgba16:
+        return TYPE_RGBA_16;
+    case TransformSampleFormat::RgbaFloat:
+        return TYPE_RGBA_FLT;
+    case TransformSampleFormat::Rgba8:
+    default:
+        return TYPE_RGBA_8;
+    }
+}
+
 QString profileDescription(cmsHPROFILE profile, const QString& fallback) {
     const cmsUInt32Number required =
         cmsGetProfileInfoUTF8(profile, cmsInfoDescription, "en", "US", nullptr, 0);
@@ -103,8 +117,33 @@ QString profileDescription(cmsHPROFILE profile, const QString& fallback) {
     return boundedProfileText(QString::fromUtf8(buffer.constData()));
 }
 
+// Opens the destination profile of a display space. sRGB keeps LittleCMS' own profile, which is
+// what the viewer used before the display space became configurable; the wider spaces come from
+// Qt so the ICC data matches the QColorSpace the decoders tag their images with.
+cmsHPROFILE createDestinationProfile(cmsContext context, DisplayColorSpace target,
+                                     LcmsErrorState& errorState) {
+    if (target == DisplayColorSpace::Srgb) {
+        return cmsCreate_sRGBProfileTHR(context);
+    }
+    const QByteArray profile = displayQColorSpace(target).iccProfile();
+    if (profile.isEmpty()) {
+        errorState.message =
+            QStringLiteral("No ICC profile is available for %1").arg(displayColorSpaceName(target));
+        return nullptr;
+    }
+    cmsHPROFILE opened = cmsOpenProfileFromMemTHR(
+        context, profile.constData(), static_cast<cmsUInt32Number>(profile.size()));
+    if (!opened) {
+        errorState.message = QStringLiteral("LittleCMS rejected the %1 display profile")
+                                 .arg(displayColorSpaceName(target));
+    }
+    return opened;
+}
+
 std::shared_ptr<LcmsTransform> createTransform(const QByteArray& profile,
-                                              const QString& fallbackDescription) {
+                                              const QString& fallbackDescription,
+                                              TransformSampleFormat sampleFormat,
+                                              DisplayColorSpace target) {
     auto result = std::make_shared<LcmsTransform>();
     result->context = cmsCreateContext(nullptr, &result->errorState);
     if (!result->context) {
@@ -127,14 +166,18 @@ std::shared_ptr<LcmsTransform> createTransform(const QByteArray& profile,
         result->creationError = QStringLiteral("Only embedded RGB ICC profiles are supported");
         return result;
     }
-    result->destinationProfile = cmsCreate_sRGBProfileTHR(result->context);
+    result->destinationProfile = createDestinationProfile(result->context, target, result->errorState);
     if (!result->destinationProfile) {
-        result->creationError = QStringLiteral("LittleCMS could not create the sRGB profile");
+        result->creationError =
+            result->errorState.message.isEmpty()
+                ? QStringLiteral("LittleCMS could not create the display profile")
+                : result->errorState.message;
         return result;
     }
+    const cmsUInt32Number pixelType = lcmsPixelType(sampleFormat);
     result->transform = cmsCreateTransformTHR(
-        result->context, result->sourceProfile, TYPE_RGBA_8, result->destinationProfile,
-        TYPE_RGBA_8, INTENT_RELATIVE_COLORIMETRIC, cmsFLAGS_COPY_ALPHA);
+        result->context, result->sourceProfile, pixelType, result->destinationProfile,
+        pixelType, INTENT_RELATIVE_COLORIMETRIC, cmsFLAGS_COPY_ALPHA);
     if (!result->transform) {
         result->creationError =
             result->errorState.message.isEmpty()
@@ -156,9 +199,15 @@ TransformCache& transformCache() {
 }
 
 std::shared_ptr<LcmsTransform> cachedTransform(const QByteArray& profile,
-                                              const QString& fallbackDescription) {
-    constexpr qsizetype kMaximumCachedTransforms = 8;
-    const QByteArray key = QCryptographicHash::hash(profile, QCryptographicHash::Sha256);
+                                              const QString& fallbackDescription,
+                                              TransformSampleFormat sampleFormat,
+                                              DisplayColorSpace target) {
+    constexpr qsizetype kMaximumCachedTransforms = 12;
+    QByteArray key = QCryptographicHash::hash(profile, QCryptographicHash::Sha256);
+    key.append(static_cast<char>(sampleFormat));
+    // The same source profile produces different pixels per target, so the display space is part
+    // of the key.
+    key.append(displayColorSpaceKey(target).toLatin1());
     TransformCache& cache = transformCache();
     {
         const QMutexLocker lock(&cache.mutex);
@@ -170,7 +219,7 @@ std::shared_ptr<LcmsTransform> cachedTransform(const QByteArray& profile,
     }
 
     const std::shared_ptr<LcmsTransform> created =
-        createTransform(profile, fallbackDescription);
+        createTransform(profile, fallbackDescription, sampleFormat, target);
     if (!created->isValid()) {
         return created;
     }
@@ -219,9 +268,19 @@ QString EncodedColorManagement::version() {
 #endif
 }
 
-void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metadata) {
-    const QColorSpace sourceColorSpace = image.colorSpace();
-    if (!sourceColorSpace.isValid()) {
+void EncodedColorManagement::normalizeToDisplay(QImage& image, ImageMetadata& metadata) {
+    normalizeToDisplay(image, metadata, currentDisplayColorSpace());
+}
+
+void EncodedColorManagement::normalizeToDisplay(QImage& image, ImageMetadata& metadata,
+                                                DisplayColorSpace target) {
+    const QColorSpace targetColorSpace = displayQColorSpace(target);
+    // Untagged encoded images follow the viewer's documented sRGB assumption, so an untagged
+    // image still needs conversion when the display space is wider than sRGB.
+    const bool tagged = image.colorSpace().isValid();
+    const QColorSpace sourceColorSpace =
+        tagged ? image.colorSpace() : QColorSpace(QColorSpace::SRgb);
+    if (sourceColorSpace == targetColorSpace) {
         return;
     }
     const QByteArray embeddedProfile = sourceColorSpace.iccProfile();
@@ -230,7 +289,8 @@ void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metad
     }
 
     ImageMetadata::ColorProfile colorProfile;
-    colorProfile.sourceDescription = boundedProfileText(sourceColorSpace.description());
+    colorProfile.sourceDescription = tagged ? boundedProfileText(sourceColorSpace.description())
+                                            : QStringLiteral("Assumed sRGB (no embedded profile)");
     if (colorProfile.sourceDescription.isEmpty()) {
         colorProfile.sourceDescription = QStringLiteral("Embedded ICC profile");
     }
@@ -248,21 +308,42 @@ void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metad
     }
 
 #if ISPVIEW_HAS_LCMS2
+    TransformSampleFormat sampleFormat = TransformSampleFormat::Rgba8;
+    QImage::Format targetFormat = QImage::Format_RGBA8888;
+    qsizetype bytesPerPixel = 4;
+    if (image.depth() > 32) {
+        if (image.format() == QImage::Format_RGBA16FPx4 ||
+            image.format() == QImage::Format_RGBA32FPx4) {
+            // LittleCMS consumes native float32 values. Promote half-float images so the
+            // conversion itself does not introduce an intermediate 8-bit quantization.
+            sampleFormat = TransformSampleFormat::RgbaFloat;
+            targetFormat = QImage::Format_RGBA32FPx4;
+            bytesPerPixel = 4 * static_cast<qsizetype>(sizeof(float));
+        } else {
+            sampleFormat = TransformSampleFormat::Rgba16;
+            targetFormat = QImage::Format_RGBA64;
+            bytesPerPixel = 4 * static_cast<qsizetype>(sizeof(quint16));
+        }
+    }
     const std::shared_ptr<LcmsTransform> transform =
-        cachedTransform(embeddedProfile, colorProfile.sourceDescription);
+        cachedTransform(embeddedProfile, colorProfile.sourceDescription, sampleFormat, target);
     if (!transform->isValid()) {
         metadata.colorWarning = transform->creationError;
         metadata.colorProfile = std::move(colorProfile);
         return;
     }
     colorProfile.sourceDescription = transform->sourceDescription;
+    if (!tagged) {
+        // Say that the source space is an assumption rather than the profile's own description.
+        colorProfile.sourceDescription = QStringLiteral("Assumed sRGB (no embedded profile)");
+    }
     colorProfile.renderingIntent = QStringLiteral("Relative colorimetric");
 
-    if (image.format() != QImage::Format_RGBA8888) {
-        image = image.convertToFormat(QImage::Format_RGBA8888);
+    if (image.format() != targetFormat) {
+        image = image.convertToFormat(targetFormat);
     }
     image.detach();
-    const qsizetype rowBytes = static_cast<qsizetype>(image.width()) * 4;
+    const qsizetype rowBytes = static_cast<qsizetype>(image.width()) * bytesPerPixel;
     const int maximumChunkRows = std::min(kTransformRowsPerChunk, image.height());
     QByteArray sourceChunk(rowBytes * maximumChunkRows, Qt::Uninitialized);
     if (image.bytesPerLine() != rowBytes ||
@@ -291,8 +372,8 @@ void EncodedColorManagement::normalizeToSrgb(QImage& image, ImageMetadata& metad
                            static_cast<cmsUInt32Number>(chunkPixels));
         }
     }
-    image.setColorSpace(QColorSpace(QColorSpace::SRgb));
-    colorProfile.destinationColorSpace = QStringLiteral("sRGB");
+    image.setColorSpace(targetColorSpace);
+    colorProfile.destinationColorSpace = displayColorSpaceName(target);
     colorProfile.transformEngine = QStringLiteral("LittleCMS %1").arg(version());
     colorProfile.converted = true;
 #else

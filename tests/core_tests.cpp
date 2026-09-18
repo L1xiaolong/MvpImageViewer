@@ -1,4 +1,5 @@
 #include "core/comparison_pixel_probe.h"
+#include "core/color_conversion.h"
 #include "core/display_histogram.h"
 #include "core/raw_image_parameters.h"
 #include "core/raw_plane_access.h"
@@ -8,9 +9,12 @@
 #include "core/weighted_lru_cache.h"
 
 #include <QTest>
+#include <QColorSpace>
+#include <QImage>
 #include <QtCore/qfloat16.h>
 #include <QtEndian>
 
+#include <array>
 #include <cmath>
 #include <limits>
 
@@ -30,6 +34,9 @@ class CoreTests final : public QObject {
     void rawFrameSizeRejectsInvalidGeometry();
     void rawFrameCountAndOddChromaStrideAreSafe();
     void rawDisplayTransformValidationAndCacheIdentity();
+    void yuvColorConversionMapsBt2020IntoSrgb();
+    void yuvColorConversionTracksTheDisplaySpace();
+    void displayColorSpaceForSurfaceMapsPlatformSpaces();
     void rawOrientationMapsCoordinatesAndCacheIdentity();
     void displayHistogramComputesChannelsAndBoundedSampling();
     void displayHistogramRestrictsNormalizedRegion();
@@ -657,6 +664,116 @@ void CoreTests::rawDisplayTransformValidationAndCacheIdentity() {
     const QString yuvKey = yuv.cacheKey();
     yuv.whiteBalanceGains[0] = 2.0;
     QCOMPARE(yuv.cacheKey(), yuvKey);
+    yuv.yuvPrimaries = YuvPrimaries::BT2020;
+    QVERIFY(yuv.cacheKey() != yuvKey);
+    const QString bt2020Key = yuv.cacheKey();
+    yuv.yuvTransfer = YuvTransfer::Linear;
+    QVERIFY(yuv.cacheKey() != bt2020Key);
+    const QString linearKey = yuv.cacheKey();
+    yuv.chromaLocation = ChromaLocation::Left;
+    QVERIFY(yuv.cacheKey() != linearKey);
+    QVERIFY(yuv.hasValidYuvColorDescription());
+}
+
+void CoreTests::yuvColorConversionMapsBt2020IntoSrgb() {
+    RawImageParameters parameters;
+    parameters.yuvPrimaries = YuvPrimaries::BT2020;
+    parameters.yuvTransfer = YuvTransfer::Linear;
+    const auto converted = yuvRgbToDisplaySrgb({0.5, 0.4, 0.3}, parameters);
+    QVERIFY(std::abs(converted[0] - 0.7817) < 0.002);
+    QVERIFY(std::abs(converted[1] - 0.6563) < 0.002);
+    QVERIFY(std::abs(converted[2] - 0.5713) < 0.002);
+}
+
+// The display space is configurable, so the CPU conversion has to agree with Qt's own colour
+// management for every target: both describe the same buffer the GPU writes.
+void CoreTests::yuvColorConversionTracksTheDisplaySpace() {
+    RawImageParameters parameters;
+    parameters.yuvPrimaries = YuvPrimaries::BT2020;
+    parameters.yuvTransfer = YuvTransfer::Linear;
+    const QColorSpace sourceSpace(QColorSpace::Primaries::Bt2020,
+                                  QColorSpace::TransferFunction::Linear);
+
+    const auto referencePixel = [&sourceSpace](const std::array<double, 3>& rgb,
+                                               DisplayColorSpace target) {
+        QImage image(1, 1, QImage::Format_RGBA64);
+        image.setColorSpace(sourceSpace);
+        image.setPixelColor(0, 0, QColor::fromRgbF(rgb[0], rgb[1], rgb[2]));
+        return image.convertedToColorSpace(displayQColorSpace(target), QImage::Format_RGBA64)
+            .pixelColor(0, 0);
+    };
+
+    const std::array<std::array<double, 3>, 5> samples{{{0.5, 0.4, 0.3},
+                                                        {0.8, 0.2, 0.1},
+                                                        {0.05, 0.05, 0.05},
+                                                        {1.0, 1.0, 1.0},
+                                                        {0.0, 0.0, 0.0}}};
+    for (const DisplayColorSpace target : availableDisplayColorSpaces()) {
+        for (const auto& sample : samples) {
+            const auto converted = yuvRgbToDisplay(sample, parameters, target);
+            const QColor reference = referencePixel(sample, target);
+            QVERIFY2(std::abs(converted[0] * 255.0 - reference.redF() * 255.0) < 2.0,
+                     qPrintable(QStringLiteral("%1/%2 at %3")
+                                    .arg(displayColorSpaceName(target), QString::number(sample[0]))
+                                    .arg(converted[0] * 255.0, 0, 'f', 2)));
+            QVERIFY(std::abs(converted[1] * 255.0 - reference.greenF() * 255.0) < 2.0);
+            QVERIFY(std::abs(converted[2] * 255.0 - reference.blueF() * 255.0) < 2.0);
+        }
+    }
+
+    // The default space is still sRGB, so the historical result is what an untouched session
+    // renders.
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
+    const auto unchanged = yuvRgbToDisplay({0.5, 0.4, 0.3}, parameters);
+    const auto explicitSrgb = yuvRgbToDisplaySrgb({0.5, 0.4, 0.3}, parameters);
+    QCOMPARE(unchanged[0], explicitSrgb[0]);
+    QCOMPARE(unchanged[1], explicitSrgb[1]);
+    QCOMPARE(unchanged[2], explicitSrgb[2]);
+
+    // Switching the space changes the encoding and keeps the settings round-trip honest.
+    setCurrentDisplayColorSpace(DisplayColorSpace::DisplayP3);
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::DisplayP3);
+    QCOMPARE(displayColorSpaceFromKey(displayColorSpaceKey(DisplayColorSpace::DisplayP3)),
+             DisplayColorSpace::DisplayP3);
+    QCOMPARE(displayColorSpaceFromKey(QStringLiteral("nonsense")), DisplayColorSpace::Srgb);
+    const auto wideGamut = yuvRgbToDisplay({0.5, 0.4, 0.3}, parameters);
+    QVERIFY(std::abs(wideGamut[0] - unchanged[0]) > 0.02);
+    setCurrentDisplayColorSpace(DisplayColorSpace::Srgb);
+}
+
+// "auto" maps the colour space the platform reports for a window surface onto a space the viewer
+// can encode, and refuses to guess for anything else.
+void CoreTests::displayColorSpaceForSurfaceMapsPlatformSpaces() {
+    for (const DisplayColorSpace space : availableDisplayColorSpaces()) {
+        QVERIFY(displayColorSpacesAgree(displayQColorSpace(space), displayQColorSpace(space)));
+        QCOMPARE(displayColorSpaceForSurface(displayQColorSpace(space)), space);
+    }
+
+    // The supported spaces stay distinguishable, which is what makes the tolerance safe.
+    for (const DisplayColorSpace first : availableDisplayColorSpaces()) {
+        for (const DisplayColorSpace second : availableDisplayColorSpaces()) {
+            if (first != second) {
+                QVERIFY(!displayColorSpacesAgree(displayQColorSpace(first),
+                                                 displayQColorSpace(second)));
+            }
+        }
+    }
+
+    // An Apple-style P3 profile (same primaries and curve, different ICC payload) still matches.
+    const QColorSpace appleStyleP3(QColorSpace::Primaries::DciP3D65,
+                                   QColorSpace::TransferFunction::SRgb);
+    QVERIFY(appleStyleP3.isValid());
+    QCOMPARE(displayColorSpaceForSurface(appleStyleP3), DisplayColorSpace::DisplayP3);
+
+    // Unsupported surfaces keep the documented fallback.
+    QCOMPARE(displayColorSpaceForSurface(QColorSpace()), DisplayColorSpace::Srgb);
+    QCOMPARE(displayColorSpaceForSurface(QColorSpace(QColorSpace::SRgbLinear)),
+             DisplayColorSpace::Srgb);
+    QCOMPARE(displayColorSpaceForSurface(QColorSpace(QColorSpace::ProPhotoRgb)),
+             DisplayColorSpace::Srgb);
+    QCOMPARE(displayColorSpaceForSurface(QColorSpace(QColorSpace::ProPhotoRgb),
+                                         DisplayColorSpace::DisplayP3),
+             DisplayColorSpace::DisplayP3);
 }
 
 void CoreTests::rawOrientationMapsCoordinatesAndCacheIdentity() {
@@ -1049,6 +1166,7 @@ void CoreTests::unifiedHistogramUsesExactPixelsAndBayerColors() {
                 planes->storage[4] = static_cast<char>(format == RawPixelFormat::NV21 ? 255 : 0);
                 planes->storage[5] = static_cast<char>(format == RawPixelFormat::NV21 ? 0 : 255);
                 parameters.yuvMatrix = YuvMatrix::BT601;
+                parameters.yuvTransfer = YuvTransfer::SRgb;
                 frame.rawParameters = parameters;
                 const auto colored = DisplayHistogramAnalyzer::analyze(frame);
                 QCOMPARE(colored.red.bins.at(255), quint64{4});
@@ -1063,6 +1181,7 @@ void CoreTests::unifiedHistogramUsesExactPixelsAndBayerColors() {
     interpolatedParameters.format = RawPixelFormat::NV12;
     interpolatedParameters.range = QuantizationRange::Full;
     interpolatedParameters.yuvMatrix = YuvMatrix::BT601;
+    interpolatedParameters.yuvTransfer = YuvTransfer::SRgb;
     auto interpolatedPlanes = std::make_shared<PlaneBufferSet>();
     interpolatedPlanes->storage = QByteArray(8, static_cast<char>(128));
     interpolatedPlanes->storage.append(QByteArray::fromRawData("\x80\x80\x80\xFF", 4));

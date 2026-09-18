@@ -67,7 +67,7 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 | Inspect | Fit, 100%, cursor-centered zoom, pan, coordinates, RGB values, file details, EXIF, and luma histograms |
 | Compare | Synchronized two-to-four-image zoom/pan, horizontal or vertical split, hold-B-over-A, and per-pane details |
 | Manage files | Copy, cut, paste, rename, drag and drop, reveal in file manager, and system Trash integration |
-| Extended formats | Optional RAW/YUV interpretation, camera RAW, metadata extraction, and ICC-to-sRGB conversion |
+| Extended formats | Optional RAW/YUV interpretation, camera RAW, metadata extraction, and ICC conversion into the display colour space |
 
 ### Experience highlights
 
@@ -82,7 +82,7 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 - Copy, cut, paste, rename, drag and drop, file-manager reveal, and system Trash integration
 - Settings for language, light/dark appearance, custom shortcuts, daily update checks, and an in-app guide
 - Optional RAW/YUV interpretation, source-plane pixel inspection, histograms, and ROI statistics
-- Optional camera RAW decoding, EXIF/IPTC/XMP metadata, and embedded ICC-to-sRGB conversion
+- Optional camera RAW, EXIF/IPTC/XMP metadata, and ICC conversion; the display colour space follows the display by default (or can be pinned to sRGB, Display P3, Adobe RGB (1998), or BT.2020), with ICC destinations, panel readouts, and decode caches following it
 
 ## Download and run
 
@@ -109,11 +109,17 @@ The app checks GitHub Releases at most once every 24 hours when automatic checks
 | PNG | Built in | Browsing, thumbnails, full screen, and comparison with Alpha preserved |
 | BMP / DIB | Built in | Standard Windows Bitmap; `.dib` uses the BMP decoder |
 | HEIC / HEIF | System-dependent | Enabled when the current Qt/OS HEIF plugin is available; reads the primary image without sequence playback |
-| NV12 / NV21 / I420 / P010 | Built-in advanced feature | Headerless data; width, height, stride, and related parameters are required |
+| NV12 / NV21 / I420 / P010 | Built-in advanced feature | Headerless data; matrix, primaries, transfer, range, and chroma location are interpreted and converted into the sRGB display buffer |
 | Bayer RAW10 / RAW12 / RAW16 | Built-in advanced feature | Standard 2×2 Bayer and 4×4 Quad Bayer, CFA, valid bits, byte order, black/white levels, white balance, CCM, and gamma parameters |
-| DNG / camera RAW | Optional | Requires LibRaw 0.21+; decoded at 16-bit with the sensor mosaic retained for exact pixel inspection |
+| DNG / camera RAW | Optional | Requires LibRaw 0.21+; decoded at 16-bit with the sensor mosaic retained; full images use the app's white-balance, CCM, and gamma parameters |
 | EXIF / IPTC / XMP | Optional | JPEG/PNG metadata requires Exiv2 0.28+ |
-| Embedded RGB ICC | Optional | Requires LittleCMS 2.x and converts into an sRGB display buffer |
+| Embedded RGB ICC | Optional | Requires LittleCMS 2.x; 8-bit, 16-bit, and floating-point RGB are converted into the display interchange space |
+
+The display interchange space offers four encodings: **sRGB, Display P3, Adobe RGB (1998), and BT.2020**, plus **Auto (follow display)**, which is the default: it reads the colour space the platform reports for the window surface and picks the matching encoding, falling back to sRGB when it cannot be recognised. Switch it at any time under Settings → Color & display; the card shows the space that is actually in effect. The selected space decides how YUV and Bayer frames are encoded for the canvas, the destination of embedded ICC conversion, the colour space tagged on decoded frames, and the colour readouts of the histogram and pixel probe. Decode caches are invalidated per space, so frames from different spaces are never mixed.
+
+Auto is the default because the compositor interprets the canvas buffer in the colour space the platform tags the window surface with, and that space follows the display configuration (Display P3 on a P3 panel, for example). Following it keeps on-screen colours consistent with the colour-managed reference; pinning sRGB or another space instead makes the presented result drift on a display that does not match it (see the limitations below).
+
+The app does not write the developed display buffer back as the source file. Rotate and resize preserve the source colour space when the format can embed it; formats such as BMP/DIB that cannot reliably retain arbitrary ICC profiles are converted to sRGB first. The demosaiced Bayer view (the CCM and display gamma of the RAW parameters) is a user-defined transform: its primaries stay sRGB/BT.709 with the requested power gamma, independent of the display space, and the properties panel states exactly that.
 
 TIFF, WebP, OpenEXR, AVIF, JPEG XL, PSD, SVG, PDF, and GIF are currently outside the supported scope. Actual HEIC/HEIF availability depends on the runtime; files are hidden from the gallery when the corresponding Qt image plugin is unavailable.
 

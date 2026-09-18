@@ -49,6 +49,9 @@ QVariantMap toMap(const RawImageParameters& parameters) {
     values.insert(QStringLiteral("bayerPattern"), static_cast<int>(parameters.bayerPattern));
     values.insert(QStringLiteral("bayerSampling"), static_cast<int>(parameters.bayerSampling));
     values.insert(QStringLiteral("matrix"), static_cast<int>(parameters.yuvMatrix));
+    values.insert(QStringLiteral("primaries"), static_cast<int>(parameters.yuvPrimaries));
+    values.insert(QStringLiteral("transfer"), static_cast<int>(parameters.yuvTransfer));
+    values.insert(QStringLiteral("chromaLocation"), static_cast<int>(parameters.chromaLocation));
     values.insert(QStringLiteral("range"), static_cast<int>(parameters.range));
     values.insert(QStringLiteral("orientation"), static_cast<int>(parameters.orientation));
     values.insert(QStringLiteral("blackLevel"), parameters.blackLevel);
@@ -90,7 +93,7 @@ bool parametersAreValid(const RawImageParameters& result) {
            (result.whiteLevel == 0 || (result.whiteLevel > result.blackLevel &&
                                        result.whiteLevel <= result.maximumSampleValue())) &&
            result.hasValidDisplayTransform() && result.hasValidOrientation() &&
-           result.hasValidBayerSampling() &&
+           result.hasValidBayerSampling() && result.hasValidYuvColorDescription() &&
            frameByteSize(result) > 0;
 }
 
@@ -114,6 +117,12 @@ std::optional<RawImageParameters> fromMap(const QVariantMap& values) {
     result.bayerSampling = static_cast<BayerSampling>(
         values.value(QStringLiteral("bayerSampling"), 0).toInt());
     result.yuvMatrix = static_cast<YuvMatrix>(values.value(QStringLiteral("matrix"), 1).toInt());
+    result.yuvPrimaries =
+        static_cast<YuvPrimaries>(values.value(QStringLiteral("primaries"), 0).toInt());
+    result.yuvTransfer =
+        static_cast<YuvTransfer>(values.value(QStringLiteral("transfer"), 0).toInt());
+    result.chromaLocation = static_cast<ChromaLocation>(
+        values.value(QStringLiteral("chromaLocation"), 0).toInt());
     result.range = static_cast<QuantizationRange>(values.value(QStringLiteral("range"), 1).toInt());
     result.orientation =
         static_cast<ImageOrientation>(values.value(QStringLiteral("orientation"), 0).toInt());

@@ -1,5 +1,6 @@
 #include "render/bayer_render_parameters.h"
 #include "render/yuv_render_parameters.h"
+#include "core/display_color_space.h"
 
 #include <QTest>
 
@@ -10,13 +11,62 @@ class RenderTests final : public QObject {
 
   private slots:
     void yuvUniformsDescribeMatrixRangeAndLayout();
+    void yuvUniformsFollowTheDisplaySpace();
     void bayerUniformsDescribePackingAndDisplayTransform();
 };
+
+void RenderTests::yuvUniformsFollowTheDisplaySpace() {
+    RawImageParameters parameters;
+    parameters.format = RawPixelFormat::NV21;
+    parameters.yuvMatrix = YuvMatrix::BT709;
+    parameters.yuvPrimaries = YuvPrimaries::BT709;
+    parameters.yuvTransfer = YuvTransfer::Linear;
+    parameters.size = {1920, 1080};
+
+    // The default space keeps the identity gamut matrix and the sRGB encoding curve.
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
+    auto values = makeYuvRenderUniformData(parameters);
+    QCOMPARE(values[12], 1.0F);
+    QCOMPARE(values[13], 0.0F);
+    QCOMPARE(values[14], 0.0F);
+    QCOMPARE(values[27], 0.0F);
+
+    setCurrentDisplayColorSpace(DisplayColorSpace::DisplayP3);
+    values = makeYuvRenderUniformData(parameters);
+    QCOMPARE(values[12], 0.822462F);
+    QCOMPARE(values[13], 0.033194F);
+    QCOMPARE(values[14], 0.017083F);
+    // Display P3 keeps the sRGB transfer curve.
+    QCOMPARE(values[27], 0.0F);
+
+    setCurrentDisplayColorSpace(DisplayColorSpace::AdobeRgb);
+    values = makeYuvRenderUniformData(parameters);
+    QCOMPARE(values[12], 0.715126F);
+    QCOMPARE(values[13], 0.0F);
+    QCOMPARE(values[14], 0.0F);
+    QCOMPARE(values[27], static_cast<float>(DisplayTransfer::AdobeGamma1998));
+
+    setCurrentDisplayColorSpace(DisplayColorSpace::Bt2020);
+    values = makeYuvRenderUniformData(parameters);
+    QCOMPARE(values[12], 0.627404F);
+    QCOMPARE(values[13], 0.069097F);
+    QCOMPARE(values[14], 0.016391F);
+    QCOMPARE(values[27], static_cast<float>(DisplayTransfer::Bt2020));
+    setCurrentDisplayColorSpace(DisplayColorSpace::Srgb);
+
+    values = makeYuvRenderUniformData(parameters);
+    QCOMPARE(values[12], 1.0F);
+    QCOMPARE(values[27], 0.0F);
+}
 
 void RenderTests::yuvUniformsDescribeMatrixRangeAndLayout() {
     RawImageParameters parameters;
     parameters.format = RawPixelFormat::NV21;
     parameters.yuvMatrix = YuvMatrix::BT709;
+    parameters.yuvPrimaries = YuvPrimaries::BT2020;
+    parameters.yuvTransfer = YuvTransfer::Linear;
+    parameters.chromaLocation = ChromaLocation::Left;
+    parameters.size = {1920, 1080};
     parameters.range = QuantizationRange::Limited;
     auto values = makeYuvRenderUniformData(parameters);
     QCOMPARE(values[0], 1.5748F);
@@ -26,6 +76,13 @@ void RenderTests::yuvUniformsDescribeMatrixRangeAndLayout() {
     QCOMPARE(values[7], 224.0F / 255.0F);
     QCOMPARE(values[8], 0.0F);
     QCOMPARE(values[9], 1.0F);
+    QCOMPARE(values[11], 2.0F);
+    QCOMPARE(values[12], 1.660491F);
+    QCOMPARE(values[13], -0.124551F);
+    QCOMPARE(values[14], -0.018151F);
+    QCOMPARE(values[24], 1.0F);
+    QCOMPARE(values[25], 1920.0F);
+    QCOMPARE(values[26], 1080.0F);
 
     parameters.format = RawPixelFormat::P010;
     parameters.msbAligned = true;

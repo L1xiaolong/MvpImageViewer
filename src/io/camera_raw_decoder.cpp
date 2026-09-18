@@ -1,6 +1,9 @@
 #include "io/camera_raw_decoder.h"
+#include "io/encoded_color_management.h"
+#include "io/raw_image_decoder.h"
 
 #include <QBuffer>
+#include <QColorSpace>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -109,8 +112,19 @@ QImage processedImageToQImage(const libraw_processed_image_t& processed, QString
     const qsizetype sourceStride = static_cast<qsizetype>(processed.width) * bytesPerPixel;
     const QImage source(processed.data, processed.width, processed.height,
                         static_cast<qsizetype>(sourceStride), sourceFormat);
-    return source.convertToFormat(highBitDepth ? QImage::Format_RGBA64
-                                               : QImage::Format_RGBA8888);
+    QImage result = source.convertToFormat(highBitDepth ? QImage::Format_RGBA64
+                                                        : QImage::Format_RGBA8888);
+    // LibRaw output_color=1 is sRGB. Tag the bitmap explicitly because the memory image does
+    // not carry an embedded profile of its own, then move it into the application display space.
+    result.setColorSpace(QColorSpace(QColorSpace::SRgb));
+    const QColorSpace displaySpace = displayQColorSpace(currentDisplayColorSpace());
+    if (result.colorSpace() != displaySpace) {
+        const QImage converted = result.convertedToColorSpace(displaySpace);
+        if (!converted.isNull()) {
+            return converted;
+        }
+    }
+    return result;
 }
 
 ImageMetadata metadataFor(const QString& path, const LibRaw& processor) {
@@ -242,7 +256,8 @@ DecodeResult frameFromImage(QImage image, ImageMetadata metadata,
                             std::optional<RawImageParameters> rawParameters,
                             const QSize& maximumSize,
                             const std::shared_ptr<const PlaneBufferSet>& mosaic = {},
-                            bool sourceSamplesPending = false) {
+                            bool sourceSamplesPending = false,
+                            bool applicationDeveloped = false) {
     if (image.isNull()) {
         return {{}, QStringLiteral("LibRaw produced an empty image")};
     }
@@ -272,6 +287,35 @@ DecodeResult frameFromImage(QImage image, ImageMetadata metadata,
     frame->descriptor.channelOrder = mosaic ? ChannelOrder::Bayer : ChannelOrder::RGBA;
     frame->metadata = std::move(metadata);
     frame->rawParameters = std::move(rawParameters);
+    const bool rendersSensorMosaic = frame->rawParameters && !frame->rawParameters->demosaic;
+    const bool rendersApplicationRgb = applicationDeveloped;
+    if (rendersSensorMosaic) {
+        frame->descriptor.sourceColor.colorSpace = QStringLiteral("CFA sensor samples");
+        frame->descriptor.sourceColor.primaries = QStringLiteral("Sensor CFA");
+        frame->descriptor.sourceColor.transferFunction = QStringLiteral("Linear sensor values");
+        frame->descriptor.sourceColor.matrixCoefficients = QStringLiteral("None");
+        applyDisplayColor(frame->descriptor.displayColor, true);
+        frame->descriptor.displayColor.matrixCoefficients =
+            QStringLiteral("CFA false-colour channel mapping");
+    } else if (rendersApplicationRgb) {
+        frame->descriptor.sourceColor.colorSpace = QStringLiteral("CFA sensor samples");
+        frame->descriptor.sourceColor.primaries = QStringLiteral("Sensor CFA");
+        frame->descriptor.sourceColor.transferFunction = QStringLiteral("Linear sensor values");
+        frame->descriptor.sourceColor.matrixCoefficients = QStringLiteral("None");
+        // User-defined develop transform: CCM contract primaries with the requested gamma.
+        frame->descriptor.displayColor.colorSpace = QStringLiteral("User-defined RGB");
+        frame->descriptor.displayColor.primaries = QStringLiteral("sRGB / BT.709 (CCM contract)");
+        frame->descriptor.displayColor.transferFunction = QStringLiteral("Power %1")
+            .arg(frame->rawParameters->displayGamma, 0, 'g', 6);
+        frame->descriptor.displayColor.matrixCoefficients = QStringLiteral("RGB");
+    } else {
+        frame->descriptor.sourceColor.colorSpace = QStringLiteral("Camera RAW");
+        frame->descriptor.sourceColor.primaries = QStringLiteral("Camera native");
+        frame->descriptor.sourceColor.transferFunction = QStringLiteral("Linear sensor values");
+        frame->descriptor.sourceColor.matrixCoefficients = QStringLiteral("Camera matrix");
+        applyDisplayColor(frame->descriptor.displayColor);
+        frame->descriptor.displayColor.matrixCoefficients = QStringLiteral("Camera matrix");
+    }
     frame->sourceSamplesPending = sourceSamplesPending;
     if (mosaic) {
         auto planes = std::make_shared<PlaneBufferSet>(*mosaic);
@@ -347,8 +391,12 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     // keep the fast embedded preview.
     const bool mosaicDisplay = rawParameters && !rawParameters->demosaic;
     const bool mosaicPreview = mosaicDisplay && request.purpose == DecodePurpose::Preview;
+    const bool applicationDevelopPreview =
+        rawParameters && rawParameters->demosaic && request.rawParameters &&
+        request.purpose == DecodePurpose::Preview;
 
-    if (request.purpose != DecodePurpose::Full && !mosaicPreview) {
+    if (request.purpose != DecodePurpose::Full && !mosaicPreview &&
+        !applicationDevelopPreview) {
         code = processor->unpack_thumb();
         if (code == LIBRAW_SUCCESS) {
             int imageError = LIBRAW_SUCCESS;
@@ -357,6 +405,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                 QString conversionError;
                 QImage image = processedImageToQImage(*processed, &conversionError);
                 if (!image.isNull()) {
+                    EncodedColorManagement::normalizeToDisplay(image, metadata);
                     return frameFromImage(std::move(image), std::move(metadata),
                                           std::move(rawParameters), request.maximumSize, {},
                                           request.purpose == DecodePurpose::Preview);
@@ -399,7 +448,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     code = processor->unpack();
     std::shared_ptr<PlaneBufferSet> mosaic;
     if (code == LIBRAW_SUCCESS && rawParameters &&
-        (request.purpose == DecodePurpose::Full || mosaicPreview)) {
+        (request.purpose == DecodePurpose::Full || mosaicPreview || applicationDevelopPreview)) {
         mosaic = mosaicPlanes(*processor, *rawParameters);
         if (mosaic) {
             // The mosaic plane is the processed crop, so the parameters must address exactly
@@ -429,6 +478,24 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                                   std::move(rawParameters), {},
                                   attachMosaic ? mosaic : nullptr,
                                   request.purpose != DecodePurpose::Full);
+        }
+    }
+
+    if (code == LIBRAW_SUCCESS && mosaic && rawParameters && rawParameters->demosaic &&
+        (request.purpose == DecodePurpose::Full || applicationDevelopPreview)) {
+        const QSize maximum = request.maximumSize.isEmpty() ? QSize(960, 720)
+                                                             : request.maximumSize;
+        const QSize fallbackSize = rawParameters->size.scaled(maximum, Qt::KeepAspectRatio);
+        QImage developed = renderBayerImage(mosaic->storage, *rawParameters, fallbackSize);
+        if (!developed.isNull()) {
+            // Keep a bounded CPU fallback, but let the full-resolution GPU path consume the
+            // same sensor plane and parameters. Unlike dcraw_process(), this honors edits to
+            // white balance, CCM, black/white levels, and display gamma.
+            const bool attachMosaic = request.purpose == DecodePurpose::Full;
+            mosaic->renderFromDisplayImage = !attachMosaic;
+            return frameFromImage(std::move(developed), std::move(metadata),
+                                  std::move(rawParameters), {}, attachMosaic ? mosaic : nullptr,
+                                  !attachMosaic, true);
         }
     }
 
@@ -478,8 +545,10 @@ QStringList CameraRawDecoder::supportedSuffixes() {
 QString CameraRawDecoder::cacheIdentity() const {
 #if ISPVIEW_HAS_LIBRAW
     // v3: 16-bit output, orientation applied during decode, and the retained sensor mosaic.
-    return QStringLiteral("camera-raw-v5|libraw-%1")
-        .arg(QString::fromLatin1(libraw_version()));
+    // v7: the develop target follows the application display space.
+    return QStringLiteral("camera-raw-v7|libraw-%1|display-%2")
+        .arg(QString::fromLatin1(libraw_version()),
+             displayColorSpaceKey(currentDisplayColorSpace()));
 #else
     return QStringLiteral("camera-raw-disabled");
 #endif

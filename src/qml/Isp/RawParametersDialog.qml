@@ -22,6 +22,10 @@ Dialog {
     readonly property var bayerNames: ["RGGB", "GRBG", "GBRG", "BGGR"]
     readonly property var bayerSamplingNames: [qsTr("2 × 2 Bayer"), qsTr("4 × 4 Quad Bayer")]
     readonly property var matrixNames: ["BT.601", "BT.709", "BT.2020"]
+    readonly property var primariesNames: ["BT.709 / sRGB", "BT.2020",
+        "BT.601 625-line / BT.470 BG", "BT.601 525-line / SMPTE-C"]
+    readonly property var transferNames: ["BT.709", "sRGB", "Linear"]
+    readonly property var chromaLocationNames: ["Center", "Left / cosited"]
     readonly property var rangeNames: ["Full", "Limited"]
     readonly property var orientationNames: ["Normal", "Rotate 90° clockwise",
         "Rotate 180°", "Rotate 270° clockwise"]
@@ -265,6 +269,12 @@ Dialog {
                         rowSpacing: 6
                         Text { text: qsTr("Color matrix"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawParameterComboBox { Layout.fillWidth: true; model: root.matrixNames; currentIndex: Number(root.value("yuvMatrix", 1)); onActivated: root.controller.setValue("yuvMatrix", index) }
+                        Text { text: qsTr("Color primaries"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        RawParameterComboBox { Layout.fillWidth: true; model: root.primariesNames; currentIndex: Number(root.value("yuvPrimaries", 0)); onActivated: root.controller.setValue("yuvPrimaries", index) }
+                        Text { text: qsTr("Transfer function"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        RawParameterComboBox { Layout.fillWidth: true; model: root.transferNames; currentIndex: Number(root.value("yuvTransfer", 0)); onActivated: root.controller.setValue("yuvTransfer", index) }
+                        Text { text: qsTr("Chroma location"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        RawParameterComboBox { Layout.fillWidth: true; model: root.chromaLocationNames; currentIndex: Number(root.value("chromaLocation", 0)); onActivated: root.controller.setValue("chromaLocation", index) }
                         Text { text: qsTr("Quantization range"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawParameterComboBox { Layout.fillWidth: true; model: root.rangeNames; currentIndex: Number(root.value("range", 1)); onActivated: root.controller.setValue("range", index) }
                     }

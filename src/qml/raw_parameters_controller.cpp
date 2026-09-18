@@ -30,6 +30,9 @@ QVariantMap valuesFor(const RawImageParameters& value) {
             {QStringLiteral("bayerPattern"), static_cast<int>(value.bayerPattern)},
             {QStringLiteral("bayerSampling"), static_cast<int>(value.bayerSampling)},
             {QStringLiteral("yuvMatrix"), static_cast<int>(value.yuvMatrix)},
+            {QStringLiteral("yuvPrimaries"), static_cast<int>(value.yuvPrimaries)},
+            {QStringLiteral("yuvTransfer"), static_cast<int>(value.yuvTransfer)},
+            {QStringLiteral("chromaLocation"), static_cast<int>(value.chromaLocation)},
             {QStringLiteral("range"), static_cast<int>(value.range)},
             {QStringLiteral("orientation"), static_cast<int>(value.orientation)},
             {QStringLiteral("littleEndian"), value.littleEndian},
@@ -188,6 +191,12 @@ RawImageParameters RawParametersController::parameters() const {
     value.bayerSampling = static_cast<BayerSampling>(
         values_.value(QStringLiteral("bayerSampling")).toInt());
     value.yuvMatrix = static_cast<YuvMatrix>(values_.value(QStringLiteral("yuvMatrix")).toInt());
+    value.yuvPrimaries = static_cast<YuvPrimaries>(
+        values_.value(QStringLiteral("yuvPrimaries")).toInt());
+    value.yuvTransfer = static_cast<YuvTransfer>(
+        values_.value(QStringLiteral("yuvTransfer")).toInt());
+    value.chromaLocation = static_cast<ChromaLocation>(
+        values_.value(QStringLiteral("chromaLocation")).toInt());
     value.range = static_cast<QuantizationRange>(values_.value(QStringLiteral("range")).toInt());
     value.orientation = static_cast<ImageOrientation>(
         values_.value(QStringLiteral("orientation")).toInt());

@@ -8,8 +8,8 @@ namespace ispview {
 
 // Matches the std140 YuvParameters block in yuv.frag. Keeping the conversion in
 // a testable function prevents the CPU reference path and the GPU path from
-// silently drifting when a new matrix, range, or bit alignment is added.
-[[nodiscard]] std::array<float, 12>
+// silently drifting when a new matrix, range, bit alignment, or display space is added.
+[[nodiscard]] std::array<float, 28>
 makeYuvRenderUniformData(const RawImageParameters& parameters);
 
 } // namespace ispview

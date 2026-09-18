@@ -563,7 +563,7 @@ class Renderer final : public QQuickRhiItemRenderer {
                     rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64));
                 if (!slot.matrix->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.matrix"}}, true);
                 slot.yuvUniform.reset(
-                    rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 48));
+                    rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 112));
                 if (!slot.yuvUniform->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.yuvUniform"}}, true);
                 slot.bayerUniform.reset(
                     rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 112));

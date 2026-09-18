@@ -92,12 +92,13 @@ QString QtImageDecoder::cacheIdentity() const {
         EncodedColorManagement::isAvailable()
             ? QStringLiteral("lcms-%1").arg(EncodedColorManagement::version())
             : QStringLiteral("lcms-disabled");
-    return QStringLiteral("qt-image-v5|qt-%1|formats-%2|%3|icc-%4|orientation-%5|depth-%6")
+    return QStringLiteral("qt-image-v7|qt-%1|formats-%2|%3|icc-%4|orientation-%5|depth-%6|display-%7")
         .arg(QString::fromLatin1(qVersion()), supportedSuffixes().join(QLatin1Char(',')),
              colorIdentity,
              EncodedColorManagement::isEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
              autoOrientationEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
-             preserveHighBitDepth() ? QStringLiteral("native") : QStringLiteral("8"));
+             preserveHighBitDepth() ? QStringLiteral("native") : QStringLiteral("8"),
+             displayColorSpaceKey(currentDisplayColorSpace()));
 }
 
 bool QtImageDecoder::canDecode(const QString& path) const {
@@ -148,10 +149,7 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
     auto frame = std::make_shared<ImageFrame>();
     frame->descriptor.size = image.size();
     frame->descriptor.layout = PixelLayout::Interleaved;
-    frame->descriptor.sampleType = SampleType::UInt;
     frame->descriptor.channelOrder = ChannelOrder::RGBA;
-    frame->descriptor.storageBits = highBitDepth ? 16 : 8;
-    frame->descriptor.validBits = highBitDepth ? 16 : 8;
     frame->metadata.path = fileInfo.absoluteFilePath();
     frame->metadata.fileName = fileInfo.fileName();
     frame->metadata.format = fileFormat;
@@ -160,25 +158,26 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
     frame->metadata.modifiedAt = fileInfo.lastModified();
     frame->metadata.decoderName = QStringLiteral("Qt Image Formats");
     frame->metadata.decoderVersion = QString::fromLatin1(qVersion());
-    // The current LittleCMS adapter is deliberately RGBA8-only. Preserve high-bit source
-    // samples until a true 16-bit transform is available instead of silently quantizing them.
-    if (highBitDepth && image.colorSpace().isValid()) {
-        ImageMetadata::ColorProfile profile;
-        profile.sourceDescription = image.colorSpace().description();
-        profile.destinationColorSpace = QStringLiteral("Unchanged");
-        profile.transformEngine = QStringLiteral("Not applied — high-bit ICC path pending");
-        frame->metadata.colorProfile = std::move(profile);
-        frame->metadata.colorWarning =
-            QStringLiteral("Embedded profile retained; 16-bit ICC conversion is not implemented");
-    } else {
-        EncodedColorManagement::normalizeToSrgb(image, frame->metadata);
-    }
-    if (frame->metadata.colorProfile && !frame->metadata.colorProfile->converted) {
-        frame->descriptor.color.colorSpace = frame->metadata.colorProfile->sourceDescription;
-        frame->descriptor.color.transferFunction = QStringLiteral("ICC");
-    } else {
-        frame->descriptor.color.colorSpace = QStringLiteral("sRGB");
-        frame->descriptor.color.transferFunction = QStringLiteral("sRGB");
+    EncodedColorManagement::normalizeToDisplay(image, frame->metadata);
+    frame->descriptor.sampleType =
+        image.format() == QImage::Format_RGBA16FPx4 ||
+                image.format() == QImage::Format_RGBA32FPx4
+            ? SampleType::Float
+            : SampleType::UInt;
+    frame->descriptor.storageBits = image.format() == QImage::Format_RGBA32FPx4
+                                        ? 32
+                                        : (image.depth() > 32 ? 16 : 8);
+    frame->descriptor.validBits = frame->descriptor.storageBits;
+    // Untagged files keep the documented sRGB assumption as their source space.
+    applyDisplayColor(frame->descriptor.displayColor);
+    if (frame->metadata.colorProfile) {
+        frame->descriptor.sourceColor.colorSpace =
+            frame->metadata.colorProfile->sourceDescription;
+        frame->descriptor.sourceColor.primaries = QStringLiteral("Defined by ICC");
+        frame->descriptor.sourceColor.transferFunction = QStringLiteral("Defined by ICC");
+        if (!frame->metadata.colorProfile->converted) {
+            frame->descriptor.displayColor = frame->descriptor.sourceColor;
+        }
     }
     // Metadata is not needed for browser tiles. Skipping it preserves parallel thumbnail
     // throughput; Preview/Full share the bounded metadata cache in MetadataReader.

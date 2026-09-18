@@ -1,9 +1,10 @@
 #include "render/yuv_render_parameters.h"
+#include "core/color_conversion.h"
 
 namespace ispview {
 
-std::array<float, 12> makeYuvRenderUniformData(const RawImageParameters& parameters) {
-    std::array<float, 12> values{};
+std::array<float, 28> makeYuvRenderUniformData(const RawImageParameters& parameters) {
+    std::array<float, 28> values{};
     switch (parameters.yuvMatrix) {
     case YuvMatrix::BT601:
         values[0] = 1.402F;
@@ -42,6 +43,24 @@ std::array<float, 12> makeYuvRenderUniformData(const RawImageParameters& paramet
     values[8] = parameters.format == RawPixelFormat::I420 ? 1.0F : 0.0F;
     values[9] = parameters.format == RawPixelFormat::NV21 ? 1.0F : 0.0F;
     values[10] = static_cast<float>(parameters.orientation);
+    values[11] = static_cast<float>(parameters.yuvTransfer);
+    const DisplayColorSpace displaySpace = currentDisplayColorSpace();
+    const auto primaryMatrix =
+        yuvPrimariesToDisplayMatrix(parameters.yuvPrimaries, displayPrimaries(displaySpace));
+    for (std::size_t column = 0; column < 3; ++column) {
+        for (std::size_t row = 0; row < 3; ++row) {
+            values[12 + column * 4 + row] =
+                static_cast<float>(primaryMatrix[row * 3 + column]);
+        }
+    }
+    values[24] = static_cast<float>(parameters.chromaLocation);
+    values[25] = static_cast<float>(parameters.size.width());
+    values[26] = static_cast<float>(parameters.size.height());
+    // The shaders switch on this value, so the enum order is part of the uniform contract.
+    static_assert(static_cast<int>(DisplayTransfer::Srgb) == 0, "Shader contract");
+    static_assert(static_cast<int>(DisplayTransfer::AdobeGamma1998) == 1, "Shader contract");
+    static_assert(static_cast<int>(DisplayTransfer::Bt2020) == 2, "Shader contract");
+    values[27] = static_cast<float>(displayTransfer(displaySpace));
     return values;
 }
 

@@ -92,6 +92,12 @@ QVariantList rawFieldRows(const RawImageParameters& parameters) {
     if (parameters.isYuv()) {
         appendField(result, QStringLiteral("Chroma Stride"), QString::number(parameters.chromaStride));
         appendField(result, QStringLiteral("YUV Matrix"), yuvMatrixName(parameters.yuvMatrix));
+        appendField(result, QStringLiteral("Color Primaries"),
+                    yuvPrimariesName(parameters.yuvPrimaries));
+        appendField(result, QStringLiteral("Transfer Function"),
+                    yuvTransferName(parameters.yuvTransfer));
+        appendField(result, QStringLiteral("Chroma Location"),
+                    chromaLocationName(parameters.chromaLocation));
         appendField(result, QStringLiteral("YUV Range"),
                     parameters.range == QuantizationRange::Full ? QStringLiteral("Full")
                                                                 : QStringLiteral("Limited"));
@@ -302,6 +308,32 @@ void ImagePropertiesController::setFrame(ImageFramePtr frame) {
     appendField(basicFields_, QStringLiteral("Bit Depth"),
                 QStringLiteral("%1-bit valid in %2-bit storage")
                     .arg(frame_->descriptor.validBits).arg(frame_->descriptor.storageBits));
+    const ColorDescriptor& sourceColor = frame_->descriptor.sourceColor;
+    const ColorDescriptor& displayColor = frame_->descriptor.displayColor;
+    appendField(basicFields_, QStringLiteral("Source Color Space"), sourceColor.colorSpace);
+    appendField(basicFields_, QStringLiteral("Source Primaries"), sourceColor.primaries);
+    appendField(basicFields_, QStringLiteral("Source Transfer"), sourceColor.transferFunction);
+    appendField(basicFields_, QStringLiteral("Source Matrix"), sourceColor.matrixCoefficients);
+    appendField(basicFields_, QStringLiteral("Source Range"),
+                sourceColor.fullRange ? QStringLiteral("Full") : QStringLiteral("Limited"));
+    appendField(basicFields_, QStringLiteral("Chroma Location"), sourceColor.chromaLocation);
+    appendField(basicFields_, QStringLiteral("Display Color Space"), displayColor.colorSpace);
+    appendField(basicFields_, QStringLiteral("Display Primaries"), displayColor.primaries);
+    appendField(basicFields_, QStringLiteral("Display Transfer"), displayColor.transferFunction);
+    if (metadata.colorProfile) {
+        const ImageMetadata::ColorProfile& profile = *metadata.colorProfile;
+        appendField(basicFields_, QStringLiteral("Source Profile"), profile.sourceDescription);
+        appendField(basicFields_, QStringLiteral("Profile Fingerprint"),
+                    profile.sourceFingerprint);
+        appendField(basicFields_, QStringLiteral("Profile Destination"),
+                    profile.destinationColorSpace);
+        appendField(basicFields_, QStringLiteral("Profile Transform"), profile.transformEngine);
+        appendField(basicFields_, QStringLiteral("Rendering Intent"), profile.renderingIntent);
+        appendField(basicFields_, QStringLiteral("Profile Status"),
+                    profile.converted ? QStringLiteral("Converted")
+                                      : QStringLiteral("Not converted"));
+    }
+    appendField(basicFields_, QStringLiteral("Color Warning"), metadata.colorWarning);
 
     constexpr bool keepEmpty = true;
     if (metadata.camera) {

@@ -1,6 +1,8 @@
 #include "core/raw_image_parameters.h"
+#include "core/display_color_space.h"
 
 #include <QtEndian>
+#include <QColorSpace>
 
 #include <algorithm>
 #include <array>
@@ -160,6 +162,7 @@ QImage cfaMosaicImage(const QByteArray& plane, const RawImageParameters& paramet
             destination[x * 4 + 3] = 255;
         }
     }
+    image.setColorSpace(displayQColorSpace(currentDisplayColorSpace()));
     return image;
 }
 
@@ -215,6 +218,18 @@ bool RawImageParameters::hasValidBayerSampling() const {
            value <= static_cast<int>(BayerSampling::QuadBayer4x4);
 }
 
+bool RawImageParameters::hasValidYuvColorDescription() const {
+    const int primaries = static_cast<int>(yuvPrimaries);
+    const int transfer = static_cast<int>(yuvTransfer);
+    const int chroma = static_cast<int>(chromaLocation);
+    return primaries >= static_cast<int>(YuvPrimaries::BT709) &&
+           primaries <= static_cast<int>(YuvPrimaries::BT601_525) &&
+           transfer >= static_cast<int>(YuvTransfer::BT709) &&
+           transfer <= static_cast<int>(YuvTransfer::Linear) &&
+           chroma >= static_cast<int>(ChromaLocation::Center) &&
+           chroma <= static_cast<int>(ChromaLocation::Left);
+}
+
 QString RawImageParameters::cacheKey() const {
     QString result = QStringLiteral("%1x%2|%3|%4|%5|%6|%7|%8|%9|%10|%11|%12|%13|%14|%15|%16")
                          .arg(size.width())
@@ -234,6 +249,9 @@ QString RawImageParameters::cacheKey() const {
                          .arg(whiteLevel)
                          .arg(static_cast<int>(orientation));
     if (isYuv()) {
+        result += QLatin1Char('|') + QString::number(static_cast<int>(yuvPrimaries));
+        result += QLatin1Char('|') + QString::number(static_cast<int>(yuvTransfer));
+        result += QLatin1Char('|') + QString::number(static_cast<int>(chromaLocation));
         return result;
     }
     result += QLatin1Char('|') + QString::number(static_cast<int>(bayerSampling));
@@ -304,6 +322,33 @@ QString yuvMatrixName(YuvMatrix matrix) {
         return QStringLiteral("BT.709");
     case YuvMatrix::BT2020:
         return QStringLiteral("BT.2020");
+    }
+    return {};
+}
+
+QString yuvPrimariesName(YuvPrimaries primaries) {
+    switch (primaries) {
+    case YuvPrimaries::BT709: return QStringLiteral("BT.709 / sRGB");
+    case YuvPrimaries::BT2020: return QStringLiteral("BT.2020");
+    case YuvPrimaries::BT601_625: return QStringLiteral("BT.601 625-line / BT.470 BG");
+    case YuvPrimaries::BT601_525: return QStringLiteral("BT.601 525-line / SMPTE-C");
+    }
+    return {};
+}
+
+QString yuvTransferName(YuvTransfer transfer) {
+    switch (transfer) {
+    case YuvTransfer::BT709: return QStringLiteral("BT.709");
+    case YuvTransfer::SRgb: return QStringLiteral("sRGB");
+    case YuvTransfer::Linear: return QStringLiteral("Linear");
+    }
+    return {};
+}
+
+QString chromaLocationName(ChromaLocation location) {
+    switch (location) {
+    case ChromaLocation::Center: return QStringLiteral("Center");
+    case ChromaLocation::Left: return QStringLiteral("Left / cosited");
     }
     return {};
 }

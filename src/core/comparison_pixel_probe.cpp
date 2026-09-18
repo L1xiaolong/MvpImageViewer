@@ -1,4 +1,5 @@
 #include "core/comparison_pixel_probe.h"
+#include "core/color_conversion.h"
 
 #include <QtCore/qfloat16.h>
 
@@ -96,12 +97,15 @@ int sourceSampleMaximum(const RawImageParameters& parameters) {
     return parameters.format == RawPixelFormat::P010 ? 1023 : 255;
 }
 
-std::array<double, 2> interpolatedChromaAt(const RawPlaneAccessor& accessor,
+std::array<double, 2> interpolatedChromaAt(const RawImageParameters& parameters,
+                                           const RawPlaneAccessor& accessor,
                                            const QPoint& sourcePixel) {
     const QSize sourceSize = accessor.sourceSize();
     const QSize chromaSize((sourceSize.width() + 1) / 2, (sourceSize.height() + 1) / 2);
     const double chromaX = std::clamp(
-        (sourcePixel.x() + 0.5) * chromaSize.width() / sourceSize.width() - 0.5,
+        parameters.chromaLocation == ChromaLocation::Left
+            ? static_cast<double>(sourcePixel.x()) * chromaSize.width() / sourceSize.width()
+            : (sourcePixel.x() + 0.5) * chromaSize.width() / sourceSize.width() - 0.5,
         0.0, static_cast<double>(chromaSize.width() - 1));
     const double chromaY = std::clamp(
         (sourcePixel.y() + 0.5) * chromaSize.height() / sourceSize.height() - 0.5,
@@ -133,18 +137,7 @@ std::array<double, 2> interpolatedChromaAt(const RawPlaneAccessor& accessor,
 
 std::array<double, 3> yuvRgb(const RawImageParameters& parameters, const RawPlaneAccessor& accessor,
                              const YuvPlaneSample& sample) {
-    std::array<double, 4> coefficients{};
-    switch (parameters.yuvMatrix) {
-    case YuvMatrix::BT601:
-        coefficients = {1.402, 0.344136, 0.714136, 1.772};
-        break;
-    case YuvMatrix::BT2020:
-        coefficients = {1.4746, 0.164553, 0.571353, 1.8814};
-        break;
-    case YuvMatrix::BT709:
-        coefficients = {1.5748, 0.187324, 0.468124, 1.8556};
-        break;
-    }
+    const auto coefficients = yuvCoefficients(parameters.yuvMatrix);
     const int bits = parameters.format == RawPixelFormat::P010 ? 10 : 8;
     const double maximum = static_cast<double>((1 << bits) - 1);
     const double levelScale = static_cast<double>(1 << (bits - 8));
@@ -156,11 +149,14 @@ std::array<double, 3> yuvRgb(const RawImageParameters& parameters, const RawPlan
     const double chromaScale =
         parameters.range == QuantizationRange::Limited ? 224.0 * levelScale : maximum;
     const double y = (sample.y - yOffset) / yScale;
-    const auto chroma = interpolatedChromaAt(accessor, sample.sourcePixel);
+    const auto chroma = interpolatedChromaAt(parameters, accessor, sample.sourcePixel);
     const double u = (chroma[0] - chromaCenter) / chromaScale;
     const double v = (chroma[1] - chromaCenter) / chromaScale;
-    return {y + coefficients[0] * v, y - coefficients[1] * u - coefficients[2] * v,
-            y + coefficients[3] * u};
+    return yuvRgbToDisplay(
+        {y + coefficients.redV * v,
+         y - coefficients.greenU * u - coefficients.greenV * v,
+         y + coefficients.blueU * u},
+        parameters);
 }
 
 QColor yuvDisplayColor(const RawImageParameters& parameters, const RawPlaneAccessor& accessor,

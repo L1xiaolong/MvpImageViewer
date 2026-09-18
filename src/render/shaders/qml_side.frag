@@ -13,6 +13,8 @@ layout(std140, binding = 6) uniform YuvParameters {
     vec4 coefficients;
     vec4 ranges;
     vec4 yuvFlags;
+    mat3 yuvPrimaryToDisplay;
+    vec4 yuvColorGeometry; // chroma location, width, height, display transfer
 };
 
 layout(std140, binding = 7) uniform BayerParameters {
@@ -37,14 +39,38 @@ vec2 orientedUv(vec2 displayUv, float orientation) {
     return displayUv;
 }
 
+float decodeYuvTransfer(float value) {
+    value = clamp(value, 0.0, 1.0);
+    int transfer = int(round(yuvFlags.w));
+    if (transfer == 2) return value;
+    if (transfer == 1)
+        return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4);
+    return value < 0.081 ? value / 4.5 : pow((value + 0.099) / 1.099, 1.0 / 0.45);
+}
+
+// Mirrors encodeForDisplay() in core/color_conversion.cpp so the GPU buffer and the CPU
+// reference paths describe the same display space.
+float encodeDisplay(float value) {
+    value = clamp(value, 0.0, 1.0);
+    int transfer = int(round(yuvColorGeometry.w));
+    if (transfer == 1) return pow(value, 1.0 / 2.19921875);
+    if (transfer == 2)
+        return value <= 0.0181 ? 4.5 * value : 1.0993 * pow(value, 1.0 / 2.2) - 0.0993;
+    return value <= 0.0031308 ? 12.92 * value
+                              : 1.055 * pow(value, 1.0 / 2.4) - 0.055;
+}
+
 vec4 sampleYuv() {
     vec2 sourceUv = orientedUv(uv, yuvFlags.z);
     float y = texture(yTexture, sourceUv).r;
+    vec2 chromaUv = sourceUv;
+    if (yuvColorGeometry.x > 0.5)
+        chromaUv.x += 0.5 / max(yuvColorGeometry.y, 1.0);
     vec2 chroma;
     if (yuvFlags.x > 0.5) {
-        chroma = vec2(texture(uTexture, sourceUv).r, texture(vTexture, sourceUv).r);
+        chroma = vec2(texture(uTexture, chromaUv).r, texture(vTexture, chromaUv).r);
     } else {
-        chroma = texture(uTexture, sourceUv).rg;
+        chroma = texture(uTexture, chromaUv).rg;
         if (yuvFlags.y > 0.5) chroma = chroma.yx;
     }
     float luma = (y - ranges.x) / ranges.y;
@@ -52,7 +78,11 @@ vec4 sampleYuv() {
     vec3 rgb = vec3(luma + coefficients.x * centered.y,
                     luma - coefficients.y * centered.x - coefficients.z * centered.y,
                     luma + coefficients.w * centered.x);
-    return vec4(clamp(rgb, 0.0, 1.0), 1.0);
+    vec3 linear = vec3(decodeYuvTransfer(rgb.r), decodeYuvTransfer(rgb.g),
+                       decodeYuvTransfer(rgb.b));
+    vec3 displayLinear = yuvPrimaryToDisplay * linear;
+    return vec4(encodeDisplay(displayLinear.r), encodeDisplay(displayLinear.g),
+                encodeDisplay(displayLinear.b), 1.0);
 }
 
 int byteAt(int byteX, int y) {

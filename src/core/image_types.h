@@ -22,7 +22,10 @@ enum class ChannelOrder { Gray, RGB, BGR, RGBA, BGRA, YUV, YVU, Bayer };
 
 struct ColorDescriptor {
     QString colorSpace = QStringLiteral("sRGB");
+    QString primaries = QStringLiteral("sRGB / BT.709");
     QString transferFunction = QStringLiteral("sRGB");
+    QString matrixCoefficients = QStringLiteral("RGB");
+    QString chromaLocation;
     bool fullRange = true;
 };
 
@@ -33,7 +36,8 @@ struct ImageDescriptor {
     ChannelOrder channelOrder = ChannelOrder::RGBA;
     int storageBits = 8;
     int validBits = 8;
-    ColorDescriptor color;
+    ColorDescriptor sourceColor;
+    ColorDescriptor displayColor;
 };
 
 struct PlaneBuffer {

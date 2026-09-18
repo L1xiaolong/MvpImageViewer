@@ -230,7 +230,7 @@ private slots:
         }
     }
     void crashCapture() {
-#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+#if defined(Q_OS_WIN) || (defined(Q_OS_MACOS) && ISPVIEW_HAS_CRASHPAD)
         QFETCH(QString, mode); QFETCH(bool, worker); QTemporaryDir root;
         QProcess child; QStringList args{root.path(), mode, "on"}; if (worker) args << "worker";
         child.start(fixture(), args); QVERIFY(child.waitForStarted()); QVERIFY(child.waitForFinished(20000));

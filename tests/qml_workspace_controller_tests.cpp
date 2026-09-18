@@ -398,6 +398,10 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QVERIFY(settings.automaticUpdateChecks());
     QVERIFY(settings.applyEmbeddedColorProfiles());
     QVERIFY(settings.preserveHighBitDepth());
+    QCOMPARE(settings.displayColorSpace(), QStringLiteral("auto"));
+    // With no surface reported yet, auto falls back to sRGB.
+    QCOMPARE(settings.resolvedDisplayColorSpace(), QStringLiteral("sRGB"));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
     QVERIFY(settings.honorExifOrientation());
     QCOMPARE(settings.canvasBackground(), QStringLiteral("neutral"));
     QVERIFY(settings.smoothDisplay());
@@ -416,6 +420,7 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     settings.setAutomaticUpdateChecks(false);
     settings.setApplyEmbeddedColorProfiles(false);
     settings.setPreserveHighBitDepth(false);
+    settings.setDisplayColorSpace(QStringLiteral("display-p3"));
     settings.setHonorExifOrientation(false);
     settings.setCanvasBackground(QStringLiteral("black"));
     settings.setSmoothDisplay(false);
@@ -429,7 +434,7 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QCOMPARE(languageSpy.count(), 1);
     QCOMPARE(themeSpy.count(), 1);
     QCOMPARE(shortcutsSpy.count(), 1);
-    QCOMPARE(colorDisplaySpy.count(), 4);
+    QCOMPARE(colorDisplaySpy.count(), 5);
     QCOMPARE(smoothDisplaySpy.count(), 1);
     QCOMPARE(QSettings().value(QStringLiteral("general/language")).toString(),
              QStringLiteral("en"));
@@ -441,18 +446,40 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QVERIFY(!settings.automaticUpdateChecks());
     QVERIFY(!settings.applyEmbeddedColorProfiles());
     QVERIFY(!settings.preserveHighBitDepth());
+    QCOMPARE(settings.displayColorSpace(), QStringLiteral("display-p3"));
     QVERIFY(!settings.honorExifOrientation());
     QCOMPARE(settings.canvasBackground(), QStringLiteral("black"));
     QVERIFY(!settings.smoothDisplay());
     QVERIFY(!QSettings().value(QStringLiteral("display/smoothDisplay")).toBool());
     AppSettings reloadedSettings(application);
     QVERIFY(!reloadedSettings.smoothDisplay());
+    QCOMPARE(reloadedSettings.displayColorSpace(), QStringLiteral("display-p3"));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::DisplayP3);
     QVERIFY(!EncodedColorManagement::isEnabled());
     QVERIFY(!QtImageDecoder::preserveHighBitDepth());
     QVERIFY(!QtImageDecoder::autoOrientationEnabled());
     QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("Ctrl+Shift+C"));
     QCOMPARE(QSettings().value(QStringLiteral("shortcuts/compare")).toString(),
              QStringLiteral("Ctrl+Shift+C"));
+
+    // "auto" follows the space the platform reports for the window surface.
+    settings.setDisplayColorSpace(QStringLiteral("auto"));
+    settings.setSurfaceColorSpace(QColorSpace(QColorSpace::DisplayP3));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::DisplayP3);
+    QCOMPARE(settings.resolvedDisplayColorSpace(), QStringLiteral("Display P3"));
+    // A pinned space ignores the surface report.
+    settings.setDisplayColorSpace(QStringLiteral("srgb"));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
+    settings.setSurfaceColorSpace(QColorSpace(QColorSpace::AdobeRgb));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
+    settings.setDisplayColorSpace(QStringLiteral("auto"));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::AdobeRgb);
+    // A surface space that is none of the SDR targets (linear sRGB here) falls back to sRGB.
+    settings.setSurfaceColorSpace(QColorSpace(QColorSpace::SRgbLinear));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
+    // An unknown preference is normalised to auto instead of pinning something arbitrary.
+    settings.setDisplayColorSpace(QStringLiteral("nonsense"));
+    QCOMPARE(settings.displayColorSpace(), QStringLiteral("auto"));
 
     settings.restoreDefaults();
     QCOMPARE(settings.language(), QStringLiteral("system"));
@@ -465,6 +492,8 @@ void QmlWorkspaceControllerTests::applicationSettingsPersistAndRestoreDefaults()
     QVERIFY(settings.honorExifOrientation());
     QCOMPARE(settings.canvasBackground(), QStringLiteral("neutral"));
     QVERIFY(settings.smoothDisplay());
+    QCOMPARE(settings.displayColorSpace(), QStringLiteral("auto"));
+    QCOMPARE(currentDisplayColorSpace(), DisplayColorSpace::Srgb);
     QCOMPARE(settings.shortcutFor(QStringLiteral("compare")), QStringLiteral("C"));
 }
 
@@ -995,6 +1024,16 @@ void QmlWorkspaceControllerTests::imagePropertiesAreExposedWithoutWidgetUi() {
     QVERIFY(!properties.directory());
     QVERIFY(properties.errorText().isEmpty());
     QVERIFY(properties.basicFields().size() >= 7);
+    const auto hasBasicField = [&properties](const QString& label) {
+        return std::any_of(properties.basicFields().cbegin(), properties.basicFields().cend(),
+                           [&label](const QVariant& entry) {
+                               return entry.toMap().value(QStringLiteral("label")).toString() ==
+                                      label;
+                           });
+    };
+    QVERIFY(hasBasicField(QStringLiteral("Source Color Space")));
+    QVERIFY(hasBasicField(QStringLiteral("Display Color Space")));
+    QVERIFY(hasBasicField(QStringLiteral("Display Transfer")));
     QVERIFY(properties.exifFields().size() >= 16);
 
     QSignalSpy histogramSpy(&properties, &ImagePropertiesController::histogramChanged);

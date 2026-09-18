@@ -1,5 +1,8 @@
 #pragma once
 
+#include "core/display_color_space.h"
+
+#include <QColorSpace>
 #include <QHash>
 #include <QObject>
 #include <QPointer>
@@ -35,6 +38,10 @@ class AppSettings final : public QObject {
                    setApplyEmbeddedColorProfiles NOTIFY colorDisplayChanged)
     Q_PROPERTY(bool preserveHighBitDepth READ preserveHighBitDepth WRITE setPreserveHighBitDepth
                    NOTIFY colorDisplayChanged)
+    Q_PROPERTY(QString displayColorSpace READ displayColorSpace WRITE setDisplayColorSpace NOTIFY
+                   colorDisplayChanged)
+    Q_PROPERTY(QString resolvedDisplayColorSpace READ resolvedDisplayColorSpace NOTIFY
+                   colorDisplayChanged)
     Q_PROPERTY(bool honorExifOrientation READ honorExifOrientation WRITE setHonorExifOrientation
                    NOTIFY colorDisplayChanged)
     Q_PROPERTY(QString canvasBackground READ canvasBackground WRITE setCanvasBackground NOTIFY
@@ -65,6 +72,10 @@ class AppSettings final : public QObject {
     [[nodiscard]] bool automaticUpdateChecks() const;
     [[nodiscard]] bool applyEmbeddedColorProfiles() const;
     [[nodiscard]] bool preserveHighBitDepth() const;
+    [[nodiscard]] QString displayColorSpace() const;
+    // Human readable name of the space the pipeline actually encodes into, which is what "auto"
+    // resolves to on this display.
+    [[nodiscard]] QString resolvedDisplayColorSpace() const;
     [[nodiscard]] bool honorExifOrientation() const;
     [[nodiscard]] QString canvasBackground() const;
     [[nodiscard]] bool smoothDisplay() const;
@@ -92,6 +103,9 @@ class AppSettings final : public QObject {
     void setAutomaticUpdateChecks(bool enabled);
     void setApplyEmbeddedColorProfiles(bool enabled);
     void setPreserveHighBitDepth(bool enabled);
+    void setDisplayColorSpace(const QString& space);
+    // The colour space the platform reports for the window surface. "auto" follows it.
+    void setSurfaceColorSpace(const QColorSpace& surface);
     void setHonorExifOrientation(bool enabled);
     void setCanvasBackground(const QString& background);
     void setSmoothDisplay(bool enabled);
@@ -132,6 +146,8 @@ class AppSettings final : public QObject {
     [[nodiscard]] static QString normalizedLanguage(const QString& language);
     [[nodiscard]] static QString normalizedTheme(const QString& theme);
     [[nodiscard]] static QString normalizedCanvasBackground(const QString& background);
+    [[nodiscard]] static QString normalizedDisplayColorSpace(const QString& space);
+    void applyDisplayColorSpace();
 
     bool loggingEnabled_ = true;
     bool crashReportingEnabled_ = true;
@@ -145,6 +161,12 @@ class AppSettings final : public QObject {
     bool automaticUpdateChecks_ = true;
     bool applyEmbeddedColorProfiles_ = true;
     bool preserveHighBitDepth_ = true;
+    QString displayColorSpace_ = QStringLiteral("auto");
+    // Resolved space the pipeline last applied, so "auto" only refreshes when the surface changes
+    // what it maps to.
+    DisplayColorSpace appliedDisplayColorSpace_ = DisplayColorSpace::Srgb;
+    bool appliedOnce_ = false;
+    QColorSpace surfaceColorSpace_;
     bool honorExifOrientation_ = true;
     QString canvasBackground_ = QStringLiteral("neutral");
     bool smoothDisplay_ = true;

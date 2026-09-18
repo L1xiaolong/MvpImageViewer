@@ -674,12 +674,42 @@ Popup {
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 3
-                        SettingLabel { text: qsTr("Display color space: sRGB") }
+                        SettingLabel { text: qsTr("Display color space") }
                         SettingDescription {
                             width: 380
-                            text: qsTr("Embedded RGB profiles are converted to the app’s fixed sRGB display space.")
+                            text: qsTr("Every presented frame is encoded in this space for the canvas, ICC conversion, and colour readouts. Currently: %1")
+                                      .arg(root.settingsController
+                                           ? root.settingsController.resolvedDisplayColorSpace
+                                           : qsTr("sRGB"))
                         }
                     }
+                }
+            }
+
+            SettingDescription {
+                width: parent.width
+                topPadding: 4
+                bottomPadding: 9
+                text: qsTr("Embedded RGB profiles are converted into the selected display space. Auto follows the space the window surface is tagged with, which is what the compositor assumes for the canvas buffer.")
+            }
+            SettingsComboBox {
+                id: displayColorSpaceCombo
+                width: 250
+                height: 36
+                model: [qsTr("Auto (follow display)"), qsTr("sRGB"), "Display P3",
+                        qsTr("Adobe RGB (1998)"), "BT.2020"]
+                currentIndex: !root.settingsController ? 0
+                              : root.settingsController.displayColorSpace === "srgb" ? 1
+                              : root.settingsController.displayColorSpace === "display-p3" ? 2
+                              : root.settingsController.displayColorSpace === "adobe-rgb" ? 3
+                              : root.settingsController.displayColorSpace === "bt2020" ? 4 : 0
+                onActivated: {
+                    if (root.settingsController)
+                        root.settingsController.displayColorSpace =
+                                currentIndex === 1 ? "srgb"
+                                : currentIndex === 2 ? "display-p3"
+                                : currentIndex === 3 ? "adobe-rgb"
+                                : currentIndex === 4 ? "bt2020" : "auto"
                 }
             }
 
@@ -717,7 +747,7 @@ Popup {
                 width: parent.width
                 leftPadding: 34
                 bottomPadding: 8
-                text: qsTr("Keeps 16-bit and floating-point samples for GPU display. Disable to convert them to 8-bit sRGB.")
+                text: qsTr("Keeps 16-bit and floating-point samples through ICC conversion and GPU display. Disable to use an 8-bit display buffer.")
             }
 
             Rectangle { width: parent.width; height: 1; color: Theme.opticalGray }

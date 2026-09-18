@@ -1,5 +1,6 @@
 #include "core/display_histogram.h"
 
+#include "core/color_conversion.h"
 #include "core/raw_plane_access.h"
 #include <QColorSpace>
 
@@ -70,35 +71,19 @@ void finishChannel(ChannelAccumulator& accumulator, qint64 sampleCount) {
     accumulator.channel.standardDeviation = std::sqrt(variance);
 }
 
-struct YuvCoefficients {
-    double redV;
-    double greenU;
-    double greenV;
-    double blueU;
-};
-
-YuvCoefficients yuvCoefficients(YuvMatrix matrix) {
-    switch (matrix) {
-    case YuvMatrix::BT601:
-        return {1.402, 0.344136, 0.714136, 1.772};
-    case YuvMatrix::BT2020:
-        return {1.4746, 0.164553, 0.571353, 1.8814};
-    case YuvMatrix::BT709:
-    default:
-        return {1.5748, 0.187324, 0.468124, 1.8556};
-    }
-}
-
 int toByte(double value) {
     return std::clamp(static_cast<int>(std::lround(value * 255.0)), 0, 255);
 }
 
-std::array<double, 2> interpolatedChromaAt(const RawPlaneAccessor& accessor,
+std::array<double, 2> interpolatedChromaAt(const RawImageParameters& parameters,
+                                           const RawPlaneAccessor& accessor,
                                            const QPoint& sourcePixel) {
     const QSize sourceSize = accessor.sourceSize();
     const QSize chromaSize((sourceSize.width() + 1) / 2, (sourceSize.height() + 1) / 2);
     const double chromaX = std::clamp(
-        (sourcePixel.x() + 0.5) * chromaSize.width() / sourceSize.width() - 0.5,
+        parameters.chromaLocation == ChromaLocation::Left
+            ? static_cast<double>(sourcePixel.x()) * chromaSize.width() / sourceSize.width()
+            : (sourcePixel.x() + 0.5) * chromaSize.width() / sourceSize.width() - 0.5,
         0.0, static_cast<double>(chromaSize.width() - 1));
     const double chromaY = std::clamp(
         (sourcePixel.y() + 0.5) * chromaSize.height() / sourceSize.height() - 0.5,
@@ -145,13 +130,16 @@ std::array<int, 3> displayRgbAt(const RawPlaneAccessor& accessor,
         const double chromaScale =
             parameters.range == QuantizationRange::Limited ? 224.0 * scale : maximum;
         const auto coefficients = yuvCoefficients(parameters.yuvMatrix);
-        const auto chroma = interpolatedChromaAt(accessor, sample->sourcePixel);
+        const auto chroma = interpolatedChromaAt(parameters, accessor, sample->sourcePixel);
         const double y = (sample->y - yOffset) / yScale;
         const double u = (chroma[0] - chromaCenter) / chromaScale;
         const double v = (chroma[1] - chromaCenter) / chromaScale;
-        return {toByte(y + coefficients.redV * v),
-                toByte(y - coefficients.greenU * u - coefficients.greenV * v),
-                toByte(y + coefficients.blueU * u)};
+        const auto rgb = yuvRgbToDisplay(
+            {y + coefficients.redV * v,
+             y - coefficients.greenU * u - coefficients.greenV * v,
+             y + coefficients.blueU * u},
+            parameters);
+        return {toByte(rgb[0]), toByte(rgb[1]), toByte(rgb[2])};
     }
 
     const auto center = accessor.bayerAtDisplayPixel(displayPixel);
@@ -278,9 +266,11 @@ DisplayHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normal
     }
 
     QImage colorConverted;
-    if (!nativeRgb && source->colorSpace().isValid() &&
-        source->colorSpace() != QColorSpace(QColorSpace::SRgb)) {
-        colorConverted = source->convertedToColorSpace(QColorSpace::SRgb);
+    const QColorSpace displaySpace = displayQColorSpace(currentDisplayColorSpace());
+    if (!nativeRgb && source->colorSpace().isValid() && source->colorSpace() != displaySpace) {
+        // Readouts follow the presentation space so the numbers describe the pixels the canvas
+        // samples, not the file's own space.
+        colorConverted = source->convertedToColorSpace(displaySpace);
         if (colorConverted.isNull()) return {};
         source = &colorConverted;
     }

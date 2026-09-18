@@ -135,6 +135,7 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
     QObject::connect(&appSettings, &ispview::AppSettings::colorDisplayChanged, &app, [&] {
         ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::settings(), QStringLiteral("settings.color_display"),
             {{"colorProfiles", appSettings.applyEmbeddedColorProfiles()}, {"highBitDepth", appSettings.preserveHighBitDepth()},
+             {"displayColorSpace", appSettings.displayColorSpace()},
              {"exifOrientation", appSettings.honorExifOrientation()}}, true);
         browseController.loader()->clearCache();
         browseController.refreshAll();
@@ -186,8 +187,20 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
         ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::render(), QStringLiteral("scenegraph.initialized"),
             {{"graphicsApi", static_cast<int>(mainWindow->rendererInterface()->graphicsApi())}}, true);
     }, Qt::DirectConnection);
-    QObject::connect(mainWindow, &QWindow::screenChanged, mainWindow, [] {
+    // The canvas buffer is interpreted in the colour space the platform reports for the window
+    // surface, so "auto" has to follow it. The report is only populated once the platform window
+    // exists, and these callbacks may arrive from the render thread, so they are queued to the
+    // main thread through the settings object.
+    const auto applySurfaceColorSpace = [mainWindow, &appSettings] {
+        appSettings.setSurfaceColorSpace(mainWindow->format().colorSpace());
+    };
+    QObject::connect(mainWindow, &QQuickWindow::sceneGraphInitialized, &appSettings,
+                     [applySurfaceColorSpace] { applySurfaceColorSpace(); });
+    mainWindow->create();
+    applySurfaceColorSpace();
+    QObject::connect(mainWindow, &QWindow::screenChanged, mainWindow, [applySurfaceColorSpace] {
         ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::render(), QStringLiteral("window.screen_changed"), {}, true);
+        applySurfaceColorSpace();
     });
     QObject::connect(mainWindow, &QWindow::visibilityChanged, mainWindow, [](QWindow::Visibility visibility) {
         ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::render(), QStringLiteral("window.visibility"), {{"visibility", static_cast<int>(visibility)}}, true);

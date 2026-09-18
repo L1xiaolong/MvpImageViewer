@@ -12,11 +12,15 @@ layout(std140, binding = 7) uniform PrimaryYuvParameters {
     vec4 primaryCoefficients;
     vec4 primaryRanges;
     vec4 primaryFlags;
+    mat3 primaryToDisplay;
+    vec4 primaryColorGeometry; // chroma location, width, height, display transfer
 };
 layout(std140, binding = 8) uniform CandidateYuvParameters {
     vec4 candidateCoefficients;
     vec4 candidateRanges;
     vec4 candidateFlags;
+    mat3 candidateToDisplay;
+    vec4 candidateColorGeometry; // chroma location, width, height, display transfer
 };
 layout(std140, binding = 9) uniform CompareParameters {
     vec4 compareParams;       // mode, split position, unused, unused
@@ -36,24 +40,55 @@ vec2 sourceUvForOrientation(vec2 displayUv, float orientation) {
     return displayUv;
 }
 
-vec3 yuvToRgb(vec3 codeValues, vec4 coefficients, vec4 ranges) {
+float decodeTransfer(float value, float transferValue) {
+    value = clamp(value, 0.0, 1.0);
+    int transfer = int(round(transferValue));
+    if (transfer == 2) return value;
+    if (transfer == 1)
+        return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4);
+    return value < 0.081 ? value / 4.5 : pow((value + 0.099) / 1.099, 1.0 / 0.45);
+}
+
+// Mirrors encodeForDisplay() in core/color_conversion.cpp so the GPU buffer and the CPU
+// reference paths describe the same display space.
+float encodeDisplay(float value, float transferValue) {
+    value = clamp(value, 0.0, 1.0);
+    int transfer = int(round(transferValue));
+    if (transfer == 1) return pow(value, 1.0 / 2.19921875);
+    if (transfer == 2)
+        return value <= 0.0181 ? 4.5 * value : 1.0993 * pow(value, 1.0 / 2.2) - 0.0993;
+    return value <= 0.0031308 ? 12.92 * value
+                              : 1.055 * pow(value, 1.0 / 2.4) - 0.055;
+}
+
+vec3 yuvToRgb(vec3 codeValues, vec4 coefficients, vec4 ranges, vec4 flags,
+              mat3 gamutMatrix, float displayTransfer) {
     float luma = (codeValues.x - ranges.x) / ranges.y;
     vec2 centered = (codeValues.yz - vec2(ranges.z)) / ranges.w;
-    return clamp(vec3(luma + coefficients.x * centered.y,
-                      luma - coefficients.y * centered.x - coefficients.z * centered.y,
-                      luma + coefficients.w * centered.x),
-                 0.0, 1.0);
+    vec3 encoded = vec3(luma + coefficients.x * centered.y,
+                        luma - coefficients.y * centered.x - coefficients.z * centered.y,
+                        luma + coefficients.w * centered.x);
+    vec3 linear = vec3(decodeTransfer(encoded.r, flags.w),
+                       decodeTransfer(encoded.g, flags.w),
+                       decodeTransfer(encoded.b, flags.w));
+    vec3 displayLinear = gamutMatrix * linear;
+    return vec3(encodeDisplay(displayLinear.r, displayTransfer),
+                encodeDisplay(displayLinear.g, displayTransfer),
+                encodeDisplay(displayLinear.b, displayTransfer));
 }
 
 vec3 samplePrimaryCode(vec2 displayUv) {
     vec2 sourceUv = sourceUvForOrientation(displayUv, primaryFlags.z);
     float y = texture(primaryYTexture, sourceUv).r;
+    vec2 chromaUv = sourceUv;
+    if (primaryColorGeometry.x > 0.5)
+        chromaUv.x += 0.5 / max(primaryColorGeometry.y, 1.0);
     vec2 chroma;
     if (primaryFlags.x > 0.5) {
-        chroma = vec2(texture(primaryUTexture, sourceUv).r,
-                      texture(primaryVTexture, sourceUv).r);
+        chroma = vec2(texture(primaryUTexture, chromaUv).r,
+                      texture(primaryVTexture, chromaUv).r);
     } else {
-        chroma = texture(primaryUTexture, sourceUv).rg;
+        chroma = texture(primaryUTexture, chromaUv).rg;
         if (primaryFlags.y > 0.5) {
             chroma = chroma.yx;
         }
@@ -64,12 +99,15 @@ vec3 samplePrimaryCode(vec2 displayUv) {
 vec3 sampleCandidateCode(vec2 displayUv) {
     vec2 sourceUv = sourceUvForOrientation(displayUv, candidateFlags.z);
     float y = texture(candidateYTexture, sourceUv).r;
+    vec2 chromaUv = sourceUv;
+    if (candidateColorGeometry.x > 0.5)
+        chromaUv.x += 0.5 / max(candidateColorGeometry.y, 1.0);
     vec2 chroma;
     if (candidateFlags.x > 0.5) {
-        chroma = vec2(texture(candidateUTexture, sourceUv).r,
-                      texture(candidateVTexture, sourceUv).r);
+        chroma = vec2(texture(candidateUTexture, chromaUv).r,
+                      texture(candidateVTexture, chromaUv).r);
     } else {
-        chroma = texture(candidateUTexture, sourceUv).rg;
+        chroma = texture(candidateUTexture, chromaUv).rg;
         if (candidateFlags.y > 0.5) {
             chroma = chroma.yx;
         }
@@ -83,9 +121,13 @@ void main() {
                            all(lessThanEqual(candidateUv, vec2(1.0)));
     vec3 primaryCode = samplePrimaryCode(uv);
     vec3 candidateCode = candidateInside ? sampleCandidateCode(candidateUv) : vec3(0.0);
-    vec4 source = vec4(yuvToRgb(primaryCode, primaryCoefficients, primaryRanges), 1.0);
+    vec4 source = vec4(yuvToRgb(primaryCode, primaryCoefficients, primaryRanges,
+                                primaryFlags, primaryToDisplay,
+                                primaryColorGeometry.w), 1.0);
     vec4 candidate = candidateInside
-                         ? vec4(yuvToRgb(candidateCode, candidateCoefficients, candidateRanges), 1.0)
+                         ? vec4(yuvToRgb(candidateCode, candidateCoefficients, candidateRanges,
+                                        candidateFlags, candidateToDisplay,
+                                        candidateColorGeometry.w), 1.0)
                          : vec4(0.0);
 
     int mode = int(compareParams.x + 0.5);

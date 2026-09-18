@@ -156,11 +156,26 @@ QImage bicubicImage(const QImage& input, const QSize& size) {
 }
 
 QString writeEncoded(const QString& path, const QImage& image) {
+    QImage outputImage = image;
+    const QColorSpace srgb(QColorSpace::SRgb);
+    if (!outputImage.colorSpace().isValid()) {
+        // Untagged encoded images follow the viewer's documented sRGB assumption. Persist the
+        // assumption when the writer supports profiles instead of producing another ambiguous
+        // file after an edit.
+        outputImage.setColorSpace(srgb);
+    }
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    if ((suffix == QStringLiteral("bmp") || suffix == QStringLiteral("dib")) &&
+        outputImage.colorSpace().isValid() && outputImage.colorSpace() != srgb) {
+        // BMP writers do not reliably retain arbitrary ICC profiles. Bake those pixels into
+        // the fixed sRGB interchange space before writing.
+        outputImage = outputImage.convertedToColorSpace(srgb);
+    }
     QSaveFile output(path);
     if (!output.open(QIODevice::WriteOnly)) return output.errorString();
     QImageWriter writer(&output, QFileInfo(path).suffix().toLatin1());
     writer.setQuality(95);
-    if (!writer.write(image)) {
+    if (!writer.write(outputImage)) {
         output.cancelWriting();
         return writer.errorString();
     }

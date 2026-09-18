@@ -29,6 +29,7 @@
 #include <QJsonObject>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QScopeGuard>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
@@ -213,6 +214,9 @@ class IoTests final : public QObject {
     void metadataFailureDoesNotReplaceSuccessfulPixelDecode();
     void colorManagementCapabilityMatchesBuildFeature();
     void decoderConvertsEmbeddedLinearIccToSrgb();
+    void colorManagementPreservesHighBitDepth();
+    void colorManagementConvertsWideGamutProfiles();
+    void colorManagementTargetsTheConfiguredDisplaySpace();
     void colorManagementRejectsNonRgbProfileWithoutChangingPixels();
     void colorManagementCachedTransformIsThreadSafe();
     void thumbnailDiskCacheRoundTripsImage();
@@ -562,7 +566,8 @@ void IoTests::colorManagementCapabilityMatchesBuildFeature() {
     QVERIFY(EncodedColorManagement::version().isEmpty());
 #endif
     const QString identity = QtImageDecoder().cacheIdentity();
-    QVERIFY(identity.contains(QStringLiteral("qt-image-v5")));
+    QVERIFY(identity.contains(QStringLiteral("qt-image-v7")));
+    QVERIFY(identity.contains(QStringLiteral("display-srgb")));
     QVERIFY(ImageLoader::cacheKey({QStringLiteral("/tmp/a.png"), DecodePurpose::Thumbnail, {}}) !=
             ImageLoader::cacheKey({QStringLiteral("/tmp/a.png"), DecodePurpose::Thumbnail, {}},
                                   identity));
@@ -602,8 +607,8 @@ void IoTests::decoderConvertsEmbeddedLinearIccToSrgb() {
                  QStringLiteral("sRGB"));
         QVERIFY(result.frame->metadata.colorProfile->transformEngine.startsWith(
             QStringLiteral("LittleCMS ")));
-        QCOMPARE(result.frame->descriptor.color.colorSpace, QStringLiteral("sRGB"));
-        QCOMPARE(result.frame->descriptor.color.transferFunction, QStringLiteral("sRGB"));
+        QCOMPARE(result.frame->descriptor.displayColor.colorSpace, QStringLiteral("sRGB"));
+        QCOMPARE(result.frame->descriptor.displayColor.transferFunction, QStringLiteral("sRGB"));
         QCOMPARE(result.frame->qImage()->colorSpace(), QColorSpace(QColorSpace::SRgb));
         const QImage expected =
             baseline.convertedToColorSpace(QColorSpace(QColorSpace::SRgb), QImage::Format_RGBA8888);
@@ -618,12 +623,144 @@ void IoTests::decoderConvertsEmbeddedLinearIccToSrgb() {
         QVERIFY(!result.frame->metadata.colorProfile->converted);
         QCOMPARE(result.frame->metadata.colorProfile->destinationColorSpace,
                  QStringLiteral("Unchanged"));
-        QCOMPARE(result.frame->descriptor.color.colorSpace,
+        QCOMPARE(result.frame->descriptor.displayColor.colorSpace,
                  result.frame->metadata.colorProfile->sourceDescription);
-        QCOMPARE(result.frame->descriptor.color.transferFunction, QStringLiteral("ICC"));
+        QCOMPARE(result.frame->descriptor.displayColor.transferFunction,
+                 QStringLiteral("Defined by ICC"));
         QCOMPARE(result.frame->qImage()->pixelColor(8, 8), baseline.pixelColor(8, 8));
 #endif
     }
+}
+
+void IoTests::colorManagementPreservesHighBitDepth() {
+    if (!EncodedColorManagement::isAvailable()) {
+        QSKIP("LittleCMS is not available in this build");
+    }
+    EncodedColorManagement::setEnabled(true);
+    const QColorSpace linearSrgb(QColorSpace::SRgbLinear);
+    const QColorSpace srgb(QColorSpace::SRgb);
+
+    QImage integerImage(4, 3, QImage::Format_RGBA64);
+    integerImage.fill(QColor::fromRgba64(32768, 16384, 8192, 49152));
+    integerImage.setColorSpace(linearSrgb);
+    const QImage expectedInteger =
+        integerImage.convertedToColorSpace(srgb, QImage::Format_RGBA64);
+    ImageMetadata integerMetadata;
+    EncodedColorManagement::normalizeToDisplay(integerImage, integerMetadata);
+    QCOMPARE(integerImage.format(), QImage::Format_RGBA64);
+    QCOMPARE(integerImage.colorSpace(), srgb);
+    QVERIFY(integerMetadata.colorProfile && integerMetadata.colorProfile->converted);
+    const QRgba64 actualInteger = integerImage.pixelColor(1, 1).rgba64();
+    const QRgba64 referenceInteger = expectedInteger.pixelColor(1, 1).rgba64();
+    QVERIFY(std::abs(int(actualInteger.red()) - int(referenceInteger.red())) <= 512);
+    QVERIFY(std::abs(int(actualInteger.green()) - int(referenceInteger.green())) <= 512);
+    QVERIFY(std::abs(int(actualInteger.blue()) - int(referenceInteger.blue())) <= 512);
+    QCOMPARE(actualInteger.alpha(), referenceInteger.alpha());
+
+    QImage floatImage(3, 2, QImage::Format_RGBA32FPx4);
+    floatImage.fill(QColor::fromRgbF(0.5F, 0.25F, 0.125F, 0.75F));
+    floatImage.setColorSpace(linearSrgb);
+    ImageMetadata floatMetadata;
+    EncodedColorManagement::normalizeToDisplay(floatImage, floatMetadata);
+    QCOMPARE(floatImage.format(), QImage::Format_RGBA32FPx4);
+    QCOMPARE(floatImage.colorSpace(), srgb);
+    QVERIFY(floatMetadata.colorProfile && floatMetadata.colorProfile->converted);
+    const QColor floatPixel = floatImage.pixelColor(1, 1);
+    QVERIFY(std::abs(floatPixel.alphaF() - 0.75F) < 0.0001F);
+    QVERIFY(floatPixel.redF() > 0.70F);
+    QVERIFY(floatPixel.greenF() > 0.50F);
+    QVERIFY(floatPixel.blueF() > 0.35F);
+}
+
+void IoTests::colorManagementConvertsWideGamutProfiles() {
+    if (!EncodedColorManagement::isAvailable()) {
+        QSKIP("LittleCMS is not available in this build");
+    }
+    EncodedColorManagement::setEnabled(true);
+    const QColorSpace srgb(QColorSpace::SRgb);
+    for (const QColorSpace::NamedColorSpace named : {QColorSpace::AdobeRgb,
+                                                      QColorSpace::DisplayP3,
+                                                      QColorSpace::Bt2020}) {
+        const QColorSpace sourceSpace(named);
+        QImage image(3, 2, QImage::Format_RGBA8888);
+        image.fill(QColor(220, 80, 40, 173));
+        image.setColorSpace(sourceSpace);
+        const QImage expected =
+            image.convertedToColorSpace(srgb, QImage::Format_RGBA8888);
+        ImageMetadata metadata;
+        EncodedColorManagement::normalizeToDisplay(image, metadata);
+        QVERIFY(metadata.colorProfile && metadata.colorProfile->converted);
+        QCOMPARE(image.colorSpace(), srgb);
+        const QColor actual = image.pixelColor(1, 1);
+        const QColor reference = expected.pixelColor(1, 1);
+        QVERIFY(std::abs(actual.red() - reference.red()) <= 3);
+        QVERIFY(std::abs(actual.green() - reference.green()) <= 3);
+        QVERIFY(std::abs(actual.blue() - reference.blue()) <= 3);
+        QCOMPARE(actual.alpha(), reference.alpha());
+    }
+
+    QImage untagged(2, 2, QImage::Format_RGBA8888);
+    untagged.fill(QColor(12, 34, 56, 78));
+    ImageMetadata metadata;
+    EncodedColorManagement::normalizeToDisplay(untagged, metadata);
+    QVERIFY(!metadata.colorProfile);
+    QCOMPARE(untagged.pixelColor(0, 0), QColor(12, 34, 56, 78));
+}
+
+void IoTests::colorManagementTargetsTheConfiguredDisplaySpace() {
+    if (!EncodedColorManagement::isAvailable()) {
+        QSKIP("LittleCMS is not available in this build");
+    }
+    EncodedColorManagement::setEnabled(true);
+    setCurrentDisplayColorSpace(DisplayColorSpace::DisplayP3);
+    const auto restore = qScopeGuard([] { setCurrentDisplayColorSpace(DisplayColorSpace::Srgb); });
+
+    // The decoder identities carry the space so cached frames can never cross spaces.
+    QVERIFY(QtImageDecoder().cacheIdentity().contains(QStringLiteral("display-display-p3")));
+    QVERIFY(RawImageDecoder().cacheIdentity().contains(QStringLiteral("display-display-p3")));
+
+    const QColorSpace target = displayQColorSpace(DisplayColorSpace::DisplayP3);
+    QImage image(3, 2, QImage::Format_RGBA8888);
+    image.fill(QColor(220, 80, 40, 173));
+    image.setColorSpace(QColorSpace(QColorSpace::AdobeRgb));
+    const QImage expected = image.convertedToColorSpace(target, QImage::Format_RGBA8888);
+    ImageMetadata metadata;
+    EncodedColorManagement::normalizeToDisplay(image, metadata);
+    QVERIFY(metadata.colorProfile && metadata.colorProfile->converted);
+    QCOMPARE(metadata.colorProfile->destinationColorSpace, QStringLiteral("Display P3"));
+    QCOMPARE(image.colorSpace(), target);
+    const QColor actual = image.pixelColor(1, 1);
+    const QColor reference = expected.pixelColor(1, 1);
+    QVERIFY(std::abs(actual.red() - reference.red()) <= 3);
+    QVERIFY(std::abs(actual.green() - reference.green()) <= 3);
+    QVERIFY(std::abs(actual.blue() - reference.blue()) <= 3);
+    QCOMPARE(actual.alpha(), reference.alpha());
+
+    // An untagged file keeps the documented sRGB assumption, which now has to be converted too.
+    QImage untagged(3, 2, QImage::Format_RGBA8888);
+    untagged.fill(QColor(12, 34, 56, 78));
+    QImage assumedSrgb = untagged.copy();
+    assumedSrgb.setColorSpace(QColorSpace(QColorSpace::SRgb));
+    const QImage untaggedReference =
+        assumedSrgb.convertedToColorSpace(target, QImage::Format_RGBA8888);
+    ImageMetadata untaggedMetadata;
+    EncodedColorManagement::normalizeToDisplay(untagged, untaggedMetadata);
+    QVERIFY(untaggedMetadata.colorProfile && untaggedMetadata.colorProfile->converted);
+    QCOMPARE(untaggedMetadata.colorProfile->sourceDescription,
+             QStringLiteral("Assumed sRGB (no embedded profile)"));
+    QCOMPARE(untagged.colorSpace(), target);
+    const QColor untaggedPixel = untagged.pixelColor(1, 1);
+    const QColor untaggedExpected = untaggedReference.pixelColor(1, 1);
+    QVERIFY(std::abs(untaggedPixel.red() - untaggedExpected.red()) <= 3);
+    QVERIFY(std::abs(untaggedPixel.green() - untaggedExpected.green()) <= 3);
+    QVERIFY(std::abs(untaggedPixel.blue() - untaggedExpected.blue()) <= 3);
+    QCOMPARE(untaggedPixel.alpha(), 78);
+
+    // A second pass over pixels that already sit in the display space is a no-op.
+    ImageMetadata repeatedMetadata;
+    EncodedColorManagement::normalizeToDisplay(untagged, repeatedMetadata);
+    QVERIFY(!repeatedMetadata.colorProfile);
+    QCOMPARE(untagged.pixelColor(1, 1), untaggedPixel);
 }
 
 void IoTests::colorManagementRejectsNonRgbProfileWithoutChangingPixels() {
@@ -638,7 +775,7 @@ void IoTests::colorManagementRejectsNonRgbProfileWithoutChangingPixels() {
     QVERIFY(image.colorSpace().isValid());
     ImageMetadata metadata;
 
-    EncodedColorManagement::normalizeToSrgb(image, metadata);
+    EncodedColorManagement::normalizeToDisplay(image, metadata);
     QVERIFY(metadata.colorProfile.has_value());
     QVERIFY(!metadata.colorProfile->converted);
     QCOMPARE(image.pixelColor(0, 0), original);
@@ -664,7 +801,7 @@ void IoTests::colorManagementCachedTransformIsThreadSafe() {
                 image.fill(QColor(128, 64, 32, 192));
                 image.setColorSpace(linearSrgb);
                 ImageMetadata metadata;
-                EncodedColorManagement::normalizeToSrgb(image, metadata);
+                EncodedColorManagement::normalizeToDisplay(image, metadata);
                 if (!metadata.colorProfile || !metadata.colorProfile->converted ||
                     !metadata.colorWarning.isEmpty() ||
                     image.pixelColor(0, 0).alpha() != 192) {
@@ -1136,7 +1273,7 @@ void IoTests::decoderRegistryRoutesByFormat() {
     QVERIFY(!registry.canDecode(QStringLiteral("notes.txt")));
     QVERIFY(registry.canDecode(QStringLiteral("frame.bmp")));
     QVERIFY(registry.canDecode(QStringLiteral("frame.DIB")));
-    QVERIFY(registry.cacheIdentity().contains(QStringLiteral("qt-image-v5")));
+    QVERIFY(registry.cacheIdentity().contains(QStringLiteral("qt-image-v7")));
 }
 
 void IoTests::defaultDecoderAndFormatCatalogStayConsistent() {
@@ -1604,8 +1741,8 @@ void IoTests::rawPreviewDirectlySamplesYuvAndBayerSources() {
         decoder.decode({yuvPath, DecodePurpose::Preview, QSize(2, 1), yuv});
     QVERIFY2(yuvPreview.succeeded(), qPrintable(yuvPreview.error));
     QCOMPARE(yuvPreview.frame->descriptor.size, QSize(2, 1));
-    QCOMPARE(yuvPreview.frame->qImage()->pixelColor(0, 0), QColor(32, 32, 32, 255));
-    QCOMPARE(yuvPreview.frame->qImage()->pixelColor(1, 0), QColor(192, 192, 192, 255));
+    QCOMPARE(yuvPreview.frame->qImage()->pixelColor(0, 0), QColor(40, 40, 40, 255));
+    QCOMPARE(yuvPreview.frame->qImage()->pixelColor(1, 0), QColor(197, 197, 197, 255));
     const DecodeResult yuvFull = decoder.decode({yuvPath, DecodePurpose::Full, {}, yuv});
     QVERIFY2(yuvFull.succeeded(), qPrintable(yuvFull.error));
     ImageFrame decodedYuvRgb;
@@ -1782,6 +1919,9 @@ void IoTests::namedRawPresetsRoundTripOverwriteAndDelete() {
     parameters.chromaStride = 8192;
     parameters.frameIndex = 7;
     parameters.msbAligned = true;
+    parameters.yuvPrimaries = YuvPrimaries::BT2020;
+    parameters.yuvTransfer = YuvTransfer::Linear;
+    parameters.chromaLocation = ChromaLocation::Left;
     parameters.whiteBalanceGains = {1.75, 1.0, 1.25};
     parameters.colorCorrectionMatrix[1] = -0.125;
     parameters.displayGamma = 2.4;
@@ -1794,6 +1934,9 @@ void IoTests::namedRawPresetsRoundTripOverwriteAndDelete() {
     QCOMPARE(restored->format, RawPixelFormat::P010);
     QCOMPARE(restored->frameIndex, 0);
     QVERIFY(restored->msbAligned);
+    QCOMPARE(restored->yuvPrimaries, YuvPrimaries::BT2020);
+    QCOMPARE(restored->yuvTransfer, YuvTransfer::Linear);
+    QCOMPARE(restored->chromaLocation, ChromaLocation::Left);
     QCOMPARE(restored->whiteBalanceGains, parameters.whiteBalanceGains);
     QCOMPARE(restored->colorCorrectionMatrix, parameters.colorCorrectionMatrix);
     QCOMPARE(restored->displayGamma, 2.4);
@@ -2108,6 +2251,8 @@ void IoTests::imageTransformerRotatesResizesAndRestoresEncodedImage() {
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("editable.png"));
     QImage original(3, 2, QImage::Format_RGBA8888);
+    const QColorSpace sourceColorSpace(QColorSpace::SRgbLinear);
+    original.setColorSpace(sourceColorSpace);
     original.fill(Qt::transparent);
     original.setPixelColor(0, 0, Qt::red);
     original.setPixelColor(2, 1, Qt::blue);
@@ -2122,6 +2267,10 @@ void IoTests::imageTransformerRotatesResizesAndRestoresEncodedImage() {
     QCOMPARE(QImageReader(path).size(), QSize(2, 3));
     QCOMPARE(ImageTransformer::resize(path, QSize(8, 6)), QString{});
     QCOMPARE(QImageReader(path).size(), QSize(8, 6));
+    QImageReader editedReader(path);
+    const QImage edited = editedReader.read();
+    QVERIFY2(!edited.isNull(), qPrintable(editedReader.errorString()));
+    QCOMPARE(edited.colorSpace(), sourceColorSpace);
 
     QCOMPARE(ImageTransformer::restore(path), QString{});
     QVERIFY(!ImageTransformer::canRestore(path));

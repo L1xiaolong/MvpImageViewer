@@ -1,9 +1,11 @@
 #include "io/raw_image_decoder.h"
 
+#include "core/color_conversion.h"
 #include "core/raw_plane_access.h"
 
 #include <QFile>
 #include <QFileInfo>
+#include <QColorSpace>
 #include <QtEndian>
 
 #include <algorithm>
@@ -19,25 +21,6 @@ namespace {
 // emergency fallback, so bounding it avoids repeating a full-resolution demosaic before
 // the plane texture can be submitted.
 constexpr QSize kFullFallbackMaximumSize{960, 720};
-
-struct YuvCoefficients {
-    double redV;
-    double greenU;
-    double greenV;
-    double blueU;
-};
-
-YuvCoefficients coefficients(YuvMatrix matrix) {
-    switch (matrix) {
-    case YuvMatrix::BT601:
-        return {1.402, 0.344136, 0.714136, 1.772};
-    case YuvMatrix::BT2020:
-        return {1.4746, 0.164553, 0.571353, 1.8814};
-    case YuvMatrix::BT709:
-    default:
-        return {1.5748, 0.187324, 0.468124, 1.8556};
-    }
-}
 
 int toByte(double value) {
     return std::clamp(static_cast<int>(std::lround(value * 255.0)), 0, 255);
@@ -78,7 +61,7 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     const qsizetype uvStride = chromaStride(parameters);
     const qsizetype yBytes = yStride * height;
     const qsizetype chromaPlaneBytes = uvStride * ((height + 1) / 2);
-    const auto matrix = coefficients(parameters.yuvMatrix);
+    const auto matrix = yuvCoefficients(parameters.yuvMatrix);
     const int bits = parameters.format == RawPixelFormat::P010 ? 10 : 8;
     const double maximum = static_cast<double>((1 << bits) - 1);
     const double yOffset =
@@ -124,8 +107,10 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
         const qsizetype yOffsetBytes = y * yStride + x * sampleBytes;
         const int yValue = sample(yOffsetBytes);
         const double chromaX = std::clamp(
-            (x + 0.5) * chromaWidth / width - 0.5, 0.0,
-            static_cast<double>(chromaWidth - 1));
+            parameters.chromaLocation == ChromaLocation::Left
+                ? static_cast<double>(x) * chromaWidth / width
+                : (x + 0.5) * chromaWidth / width - 0.5,
+            0.0, static_cast<double>(chromaWidth - 1));
         const double chromaY = std::clamp(
             (y + 0.5) * chromaHeight / height - 0.5, 0.0,
             static_cast<double>(chromaHeight - 1));
@@ -148,9 +133,11 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
         const double luma = (yValue - yOffset) / yScale;
         const double u = (chroma[0] - cCenter) / cScale;
         const double v = (chroma[1] - cCenter) / cScale;
-        return std::array<double, 3>{luma + matrix.redV * v,
-                                     luma - matrix.greenU * u - matrix.greenV * v,
-                                     luma + matrix.blueU * u};
+        return yuvRgbToDisplay(
+            {luma + matrix.redV * v,
+             luma - matrix.greenU * u - matrix.greenV * v,
+             luma + matrix.blueU * u},
+            parameters);
     };
     auto writePixel = [](uchar* destination, const std::array<double, 3>& rgb) {
         destination[0] = static_cast<uchar>(toByte(rgb[0]));
@@ -191,6 +178,7 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
             writePixel(destination + x * 4, interpolated);
         }
     }
+    image.setColorSpace(displayQColorSpace(currentDisplayColorSpace()));
     return image;
 }
 
@@ -327,7 +315,21 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
 
 } // namespace
 
-QString RawImageDecoder::cacheIdentity() const { return QStringLiteral("headerless-raw-v3"); }
+QImage renderBayerImage(const QByteArray& bytes, const RawImageParameters& parameters,
+                        const QSize& outputSize) {
+    QImage image = convertBayer(bytes, parameters,
+                                outputSize.isEmpty() ? parameters.size : outputSize);
+    // The developed mosaic keeps its documented CCM contract: sRGB/BT.709 primaries with the
+    // user's display gamma. It is a user-defined transform, not the application display space,
+    // and the properties panel reports it as such.
+    image.setColorSpace(QColorSpace(QColorSpace::SRgb));
+    return image;
+}
+
+QString RawImageDecoder::cacheIdentity() const {
+    return QStringLiteral("headerless-raw-v5|display-%1")
+        .arg(displayColorSpaceKey(currentDisplayColorSpace()));
+}
 
 bool RawImageDecoder::canDecode(const QString& path) const {
     const QString suffix = QFileInfo(path).suffix().toLower();
@@ -350,7 +352,8 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
                                        parameters.whiteLevel > formatMaximum))) {
         return {{}, QStringLiteral("Black/white levels must fit the effective sample bit depth")};
     }
-    if (!parameters.hasValidDisplayTransform() || !parameters.hasValidBayerSampling()) {
+    if (!parameters.hasValidDisplayTransform() || !parameters.hasValidBayerSampling() ||
+        !parameters.hasValidYuvColorDescription()) {
         return {{}, QStringLiteral("White balance, CCM, or display gamma is invalid")};
     }
     if (!parameters.hasValidOrientation()) {
@@ -380,7 +383,7 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     }
     const QSize sourceOutputSize = orientedImageSize(outputSize, parameters.orientation);
     QImage display = parameters.isYuv() ? convertYuv(bytes, parameters, sourceOutputSize)
-                                        : convertBayer(bytes, parameters, sourceOutputSize);
+                                        : renderBayerImage(bytes, parameters, sourceOutputSize);
     display = orientedImage(std::move(display), parameters.orientation);
     if (display.isNull()) {
         return {{}, QStringLiteral("RAW/YUV conversion failed")};
@@ -399,6 +402,36 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
             ? 16
             : parameters.validBits();
     frame->descriptor.validBits = parameters.validBits();
+    if (parameters.isYuv()) {
+        frame->descriptor.sourceColor.colorSpace = QStringLiteral("YUV");
+        frame->descriptor.sourceColor.primaries = yuvPrimariesName(parameters.yuvPrimaries);
+        frame->descriptor.sourceColor.transferFunction = yuvTransferName(parameters.yuvTransfer);
+        frame->descriptor.sourceColor.matrixCoefficients = yuvMatrixName(parameters.yuvMatrix);
+        frame->descriptor.sourceColor.chromaLocation = chromaLocationName(parameters.chromaLocation);
+        frame->descriptor.sourceColor.fullRange = parameters.range == QuantizationRange::Full;
+        applyDisplayColor(frame->descriptor.displayColor);
+        frame->descriptor.displayColor.matrixCoefficients = QStringLiteral("RGB");
+    } else if (parameters.demosaic) {
+        frame->descriptor.sourceColor.colorSpace = QStringLiteral("CFA sensor samples");
+        frame->descriptor.sourceColor.primaries = QStringLiteral("Sensor CFA");
+        frame->descriptor.sourceColor.transferFunction = QStringLiteral("Linear sensor values");
+        frame->descriptor.sourceColor.matrixCoefficients = QStringLiteral("None");
+        // The developed mosaic is a user-defined transform (CCM contract plus the user's display
+        // gamma), so it deliberately does not claim to be the application display space.
+        frame->descriptor.displayColor.colorSpace = QStringLiteral("User-defined RGB");
+        frame->descriptor.displayColor.primaries = QStringLiteral("sRGB / BT.709 (CCM contract)");
+        frame->descriptor.displayColor.transferFunction =
+            QStringLiteral("Power %1").arg(parameters.displayGamma, 0, 'g', 6);
+        frame->descriptor.displayColor.matrixCoefficients = QStringLiteral("RGB");
+    } else {
+        frame->descriptor.sourceColor.colorSpace = QStringLiteral("CFA sensor samples");
+        frame->descriptor.sourceColor.primaries = QStringLiteral("Sensor CFA");
+        frame->descriptor.sourceColor.transferFunction = QStringLiteral("Linear sensor values");
+        frame->descriptor.sourceColor.matrixCoefficients = QStringLiteral("None");
+        applyDisplayColor(frame->descriptor.displayColor, true);
+        frame->descriptor.displayColor.matrixCoefficients =
+            QStringLiteral("CFA false-colour channel mapping");
+    }
     frame->metadata.path = info.absoluteFilePath();
     frame->metadata.fileName = info.fileName();
     frame->metadata.format = rawPixelFormatName(parameters.format);

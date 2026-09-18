@@ -1,5 +1,6 @@
 #include "diagnostics/diagnostics.h"
 #include "qml/app_settings.h"
+#include "core/display_color_space.h"
 #include "io/encoded_color_management.h"
 #include "io/qt_image_decoder.h"
 
@@ -41,6 +42,7 @@ constexpr auto kConfirmTrashKey = "general/confirmTrash";
 constexpr auto kAutomaticUpdateChecksKey = "updates/automaticChecks";
 constexpr auto kApplyEmbeddedColorProfilesKey = "color/applyEmbeddedProfiles";
 constexpr auto kPreserveHighBitDepthKey = "color/preserveHighBitDepth";
+constexpr auto kDisplayColorSpaceKey = "color/displayColorSpace";
 constexpr auto kHonorExifOrientationKey = "display/honorExifOrientation";
 constexpr auto kCanvasBackgroundKey = "display/canvasBackground";
 constexpr auto kSmoothDisplayKey = "display/smoothDisplay";
@@ -115,11 +117,14 @@ AppSettings::AppSettings(QGuiApplication* application, QObject* parent)
     applyEmbeddedColorProfiles_ =
         settings.value(QLatin1String(kApplyEmbeddedColorProfilesKey), true).toBool();
     preserveHighBitDepth_ = settings.value(QLatin1String(kPreserveHighBitDepthKey), true).toBool();
+    displayColorSpace_ = normalizedDisplayColorSpace(
+        settings.value(QLatin1String(kDisplayColorSpaceKey), QStringLiteral("auto")).toString());
     honorExifOrientation_ = settings.value(QLatin1String(kHonorExifOrientationKey), true).toBool();
     canvasBackground_ = normalizedCanvasBackground(
         settings.value(QLatin1String(kCanvasBackgroundKey), QStringLiteral("neutral")).toString());
     smoothDisplay_ = settings.value(QLatin1String(kSmoothDisplayKey), true).toBool();
     EncodedColorManagement::setEnabled(applyEmbeddedColorProfiles_);
+    applyDisplayColorSpace();
     QtImageDecoder::setPreserveHighBitDepth(preserveHighBitDepth_);
     QtImageDecoder::setAutoOrientationEnabled(honorExifOrientation_);
     for (const auto& definition : kShortcutDefinitions) {
@@ -170,6 +175,48 @@ bool AppSettings::confirmTrash() const { return confirmTrash_; }
 bool AppSettings::automaticUpdateChecks() const { return automaticUpdateChecks_; }
 bool AppSettings::applyEmbeddedColorProfiles() const { return applyEmbeddedColorProfiles_; }
 bool AppSettings::preserveHighBitDepth() const { return preserveHighBitDepth_; }
+QString AppSettings::displayColorSpace() const { return displayColorSpace_; }
+
+QString AppSettings::resolvedDisplayColorSpace() const {
+    return displayColorSpaceName(currentDisplayColorSpace());
+}
+
+// "auto" follows the window surface, which is what the compositor will assume for the canvas
+// buffer. Everything else pins one of the spaces the viewer can encode.
+void AppSettings::applyDisplayColorSpace() {
+    const DisplayColorSpace resolved =
+        displayColorSpace_ == QStringLiteral("auto")
+            ? displayColorSpaceForSurface(surfaceColorSpace_, DisplayColorSpace::Srgb)
+            : displayColorSpaceFromKey(displayColorSpace_);
+    if (resolved == appliedDisplayColorSpace_ && appliedOnce_) {
+        return;
+    }
+    appliedDisplayColorSpace_ = resolved;
+    appliedOnce_ = true;
+    setCurrentDisplayColorSpace(resolved);
+    // "auto" before the platform window reports a surface would only ever log the placeholder
+    // fallback, so the event waits for the real report.
+    if (displayColorSpace_ != QStringLiteral("auto") || surfaceColorSpace_.isValid()) {
+        diagnostics::event(diagnostics::Level::Info, diagnostics::settings(),
+                           QStringLiteral("settings.display_color_space"),
+                           {{"preference", displayColorSpace_},
+                            {"resolved", displayColorSpaceKey(resolved)},
+                            {"surface", surfaceColorSpace_.isValid()
+                                            ? surfaceColorSpace_.description()
+                                            : QStringLiteral("unknown")}},
+                           true);
+    }
+    emit colorDisplayChanged();
+}
+
+void AppSettings::setSurfaceColorSpace(const QColorSpace& surface) {
+    if (surface == surfaceColorSpace_)
+        return;
+    surfaceColorSpace_ = surface;
+    if (displayColorSpace_ == QStringLiteral("auto")) {
+        applyDisplayColorSpace();
+    }
+}
 bool AppSettings::honorExifOrientation() const { return honorExifOrientation_; }
 QString AppSettings::canvasBackground() const { return canvasBackground_; }
 bool AppSettings::smoothDisplay() const { return smoothDisplay_; }
@@ -267,6 +314,15 @@ void AppSettings::setPreserveHighBitDepth(bool enabled) {
     QtImageDecoder::setPreserveHighBitDepth(enabled);
     QSettings().setValue(QLatin1String(kPreserveHighBitDepthKey), enabled);
     emit colorDisplayChanged();
+}
+
+void AppSettings::setDisplayColorSpace(const QString& space) {
+    const QString normalized = normalizedDisplayColorSpace(space);
+    if (displayColorSpace_ == normalized)
+        return;
+    displayColorSpace_ = normalized;
+    QSettings().setValue(QLatin1String(kDisplayColorSpaceKey), normalized);
+    applyDisplayColorSpace();
 }
 
 void AppSettings::setHonorExifOrientation(bool enabled) {
@@ -650,6 +706,7 @@ void AppSettings::restoreDefaults() {
     setAutomaticUpdateChecks(true);
     setApplyEmbeddedColorProfiles(true);
     setPreserveHighBitDepth(true);
+    setDisplayColorSpace(QStringLiteral("auto"));
     setHonorExifOrientation(true);
     setCanvasBackground(QStringLiteral("neutral"));
     setSmoothDisplay(true);
@@ -703,6 +760,20 @@ QString AppSettings::normalizedCanvasBackground(const QString& background) {
                    background == QStringLiteral("white")
                ? background
                : QStringLiteral("neutral");
+}
+
+// "auto" plus the four encodings the pipeline can target; anything else falls back to "auto".
+QString AppSettings::normalizedDisplayColorSpace(const QString& space) {
+    const QString normalized = space.trimmed().toLower();
+    if (normalized == QStringLiteral("auto")) {
+        return normalized;
+    }
+    for (const DisplayColorSpace candidate : availableDisplayColorSpaces()) {
+        if (displayColorSpaceKey(candidate) == normalized) {
+            return normalized;
+        }
+    }
+    return QStringLiteral("auto");
 }
 
 } // namespace ispview

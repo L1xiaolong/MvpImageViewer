@@ -1,4 +1,8 @@
 qt_add_library(ispview_core STATIC
+    color_conversion.h
+    color_conversion.cpp
+    display_color_space.h
+    display_color_space.cpp
     display_histogram.h
     display_histogram.cpp
     comparison_pixel_probe.h

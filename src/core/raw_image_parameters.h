@@ -15,6 +15,9 @@ enum class BayerPattern { RGGB, GRBG, GBRG, BGGR };
 // binning expands every CFA site to a 2x2 block, producing a 4x4 repeating tile.
 enum class BayerSampling { Standard2x2, QuadBayer4x4 };
 enum class YuvMatrix { BT601, BT709, BT2020 };
+enum class YuvPrimaries { BT709, BT2020, BT601_625, BT601_525 };
+enum class YuvTransfer { BT709, SRgb, Linear };
+enum class ChromaLocation { Center, Left };
 enum class QuantizationRange { Full, Limited };
 enum class ImageOrientation { Normal, Rotate90Clockwise, Rotate180, Rotate270Clockwise };
 
@@ -33,6 +36,9 @@ struct RawImageParameters {
     BayerPattern bayerPattern = BayerPattern::RGGB;
     BayerSampling bayerSampling = BayerSampling::Standard2x2;
     YuvMatrix yuvMatrix = YuvMatrix::BT709;
+    YuvPrimaries yuvPrimaries = YuvPrimaries::BT709;
+    YuvTransfer yuvTransfer = YuvTransfer::BT709;
+    ChromaLocation chromaLocation = ChromaLocation::Center;
     QuantizationRange range = QuantizationRange::Limited;
     ImageOrientation orientation = ImageOrientation::Normal;
     int blackLevel = 0;
@@ -49,6 +55,7 @@ struct RawImageParameters {
     [[nodiscard]] bool hasValidDisplayTransform() const;
     [[nodiscard]] bool hasValidOrientation() const;
     [[nodiscard]] bool hasValidBayerSampling() const;
+    [[nodiscard]] bool hasValidYuvColorDescription() const;
     [[nodiscard]] QString cacheKey() const;
 };
 
@@ -57,6 +64,9 @@ struct RawImageParameters {
 [[nodiscard]] QString bayerSamplingName(BayerSampling sampling);
 [[nodiscard]] int bayerSampleBlockSize(BayerSampling sampling);
 [[nodiscard]] QString yuvMatrixName(YuvMatrix matrix);
+[[nodiscard]] QString yuvPrimariesName(YuvPrimaries primaries);
+[[nodiscard]] QString yuvTransferName(YuvTransfer transfer);
+[[nodiscard]] QString chromaLocationName(ChromaLocation location);
 // Shifts a Bayer pattern by (dx, dy) positions, which is what cropping a mosaic off its original
 // origin does to the colour phase.
 [[nodiscard]] BayerPattern shiftedBayerPattern(BayerPattern pattern, int dx, int dy);

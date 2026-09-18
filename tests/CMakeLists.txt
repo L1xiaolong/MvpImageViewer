@@ -76,13 +76,15 @@ qt_add_executable(ispview_diagnostics_crash_fixture diagnostics_crash_fixture.cp
 target_link_libraries(ispview_diagnostics_crash_fixture PRIVATE ispview_diagnostics)
 qt_add_executable(ispview_diagnostics_tests diagnostics_tests.cpp)
 target_link_libraries(ispview_diagnostics_tests PRIVATE ispview_diagnostics ispview_miniz Qt6::Test)
+target_compile_definitions(ispview_diagnostics_tests PRIVATE
+    ISPVIEW_HAS_CRASHPAD=$<BOOL:${ISPVIEW_HAS_CRASHPAD}>)
 if(WIN32)
     add_dependencies(ispview_diagnostics_crash_fixture ispview_crash_handler)
     add_custom_command(TARGET ispview_diagnostics_crash_fixture POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ispview_crash_handler>
             $<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>)
 endif()
-if(APPLE)
+if(APPLE AND ISPVIEW_HAS_CRASHPAD)
     add_custom_command(TARGET ispview_diagnostics_crash_fixture POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>/../Helpers"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ISPVIEW_CRASHPAD_HANDLER}"
