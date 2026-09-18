@@ -910,7 +910,7 @@ void BrowseController::refreshTransformedPath(const QString& path) {
 }
 
 void BrowseController::setGalleryPath(const QString& path) {
-    const QString normalized = QFileInfo(path).absoluteFilePath();
+    const QString normalized = path.isEmpty() ? QString() : QFileInfo(path).absoluteFilePath();
     if (galleryPath_ == normalized && (galleryFrame_ || normalized.isEmpty())) {
         return;
     }
@@ -1038,6 +1038,10 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
         setStatusText(QStringLiteral("Folder is hidden, unreadable, or unavailable: %1").arg(path));
         return;
     }
+    // The gallery owns an asynchronous decode independently of the thumbnail model. Clear it
+    // before publishing the directory change so neither the old frame nor a late completion from
+    // the previous folder can remain visible while the new folder is scanned.
+    setGalleryPath({});
     currentDirectory_ = info.absoluteFilePath();
     // Persist at navigation time so an ordinary force-quit or crash still restores the last
     // meaningful workspace on the next start.

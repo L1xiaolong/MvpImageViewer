@@ -279,6 +279,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void rawParametersRefreshEveryPaneAndQmlProvider();
     void thumbnailMetadataSurvivesDemosaicCacheRoundTrip();
     void galleryUsesPreviewUntilPixelProbeRequestsFullResolution();
+    void galleryStateClearsWhenChangingFolders();
     void browseFileDialogsAreRequestedByQmlAndActionsStayInBackend();
     void imagePropertiesAreExposedWithoutWidgetUi();
     void fullScreenPresentationLifecycleIsIdempotent();
@@ -961,6 +962,30 @@ void QmlWorkspaceControllerTests::galleryUsesPreviewUntilPixelProbeRequestsFullR
     QCOMPARE(fullTexture.pixelColor(0, 0), QColor(Qt::green));
     QCOMPARE(fullTexture.pixelColor(1, 0), QColor(Qt::red));
     QCOMPARE(decoder->count(DecodePurpose::Full), 1);
+}
+
+void QmlWorkspaceControllerTests::galleryStateClearsWhenChangingFolders() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString firstDirectory = directory.filePath(QStringLiteral("first"));
+    const QString secondDirectory = directory.filePath(QStringLiteral("second"));
+    QVERIFY(QDir().mkpath(firstDirectory));
+    QVERIFY(QDir().mkpath(secondDirectory));
+    const QString firstImage = createImage(directory, QStringLiteral("first/gallery.png"));
+    QVERIFY(!firstImage.isEmpty());
+
+    BrowseController controller(std::make_shared<QtImageDecoder>(), firstDirectory);
+    controller.setGalleryPath(firstImage);
+    QTRY_VERIFY_WITH_TIMEOUT(controller.galleryImageReady(), 2000);
+    QVERIFY(controller.galleryImageSize().isValid());
+
+    QSignalSpy galleryChanged(&controller, &BrowseController::galleryImageChanged);
+    controller.openDirectory(secondDirectory);
+
+    QVERIFY(!controller.galleryImageReady());
+    QVERIFY(!controller.galleryImageSize().isValid());
+    QVERIFY(controller.galleryInfoText().isEmpty());
+    QVERIFY(galleryChanged.count() >= 1);
 }
 
 void QmlWorkspaceControllerTests::browseFileDialogsAreRequestedByQmlAndActionsStayInBackend() {

@@ -246,6 +246,48 @@ TestCase {
         conditionalMenuItem.visible = false
     }
 
+    function test_galleryPreviewFollowsFolderChanges() {
+        const workspace = findChild(browsePage, "galleryWorkspace")
+        verify(workspace !== null)
+        tryVerify(function() { return workspace.currentPreviewPath.length > 0 })
+
+        const originalDirectory = mockController.currentDirectory
+        const originalRows = []
+        for (let index = 0; index < mockController.thumbnails.count; ++index) {
+            const row = mockController.thumbnails.get(index)
+            originalRows.push({
+                path: row.path,
+                fileName: row.fileName,
+                technicalLabel: row.technicalLabel,
+                thumbnailUrl: row.thumbnailUrl,
+                isDirectory: row.isDirectory,
+                isSelected: row.isSelected,
+                selectionOrdinal: row.selectionOrdinal
+            })
+        }
+
+        try {
+            mockController.currentDirectory = "/Images/New Folder"
+            compare(workspace.currentPreviewPath, "")
+            mockController.thumbnails.clear()
+            mockController.thumbnails.append({
+                path: "/Images/New Folder/new-preview.png",
+                fileName: "new-preview.png",
+                technicalLabel: "1280×720 · PNG",
+                thumbnailUrl: "",
+                isDirectory: false,
+                isSelected: false,
+                selectionOrdinal: 0
+            })
+            tryCompare(workspace, "currentPreviewPath", "/Images/New Folder/new-preview.png")
+        } finally {
+            mockController.currentDirectory = originalDirectory
+            mockController.thumbnails.clear()
+            for (const row of originalRows)
+                mockController.thumbnails.append(row)
+        }
+    }
+
     function test_gallerySplitterChangesThumbnailWidth() {
         const handle = findChild(browsePage, "galleryResizeHandle");
         const panel = findChild(browsePage, "galleryStripPanel");

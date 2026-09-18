@@ -177,6 +177,11 @@ Rectangle {
                 galleryWorkspace.pixelProbeText = ""
             }
         }
+        function onCurrentDirectoryChanged() {
+            // Delegates from the next thumbnail-model reset will select that folder's first image.
+            // Clear the retained URL now so the previous folder cannot keep owning the preview.
+            galleryWorkspace.resetPreview()
+        }
     }
     Connections {
         target: root.workspaceController
@@ -642,6 +647,18 @@ Rectangle {
             actualPixels = false;
             manualZoom = 1.0;
             root.controller.setGalleryPath(path);
+        }
+        function resetPreview() {
+            currentPreviewPath = "";
+            currentPreviewUrl = "";
+            currentPreviewName = "";
+            currentPreviewTechnicalLabel = "";
+            contextPath = "";
+            contextIsDirectory = false;
+            pixelProbeText = "";
+            actualPixels = false;
+            manualZoom = 1.0;
+            root.controller.setGalleryPath("");
         }
         function showImageMenu(x, y) {
             if (root.controller.selectionCount === 0)
