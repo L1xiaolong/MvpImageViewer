@@ -69,6 +69,8 @@ qt_add_translations(ISPImageViewerQml
 set(_ispview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/back.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/forward.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/up.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/chevron-down.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/folder.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/folder-open.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/folder-plus.svg

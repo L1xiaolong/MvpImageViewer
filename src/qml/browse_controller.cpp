@@ -84,6 +84,9 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
     // sleeping removable drive can block QFileInfo long enough to make the app look hung before
     // its first frame. Invalid entries are handled normally if the user chooses one.
     recentFolders_.removeIf([](const QString& path) { return path.trimmed().isEmpty(); });
+    recentLocations_ = settings.value(QStringLiteral("browser/recentLocations")).toStringList();
+    recentLocations_.removeIf([](const QString& path) { return path.trimmed().isEmpty(); });
+    while (recentLocations_.size() > 12) recentLocations_.removeLast();
     gridCellWidth_ = std::clamp(settings.value(QStringLiteral("browser/qmlGridCellWidth"), 196).toInt(),
                                 168, 260);
     settings.remove(QStringLiteral("browser/qmlInspectorVisible"));
@@ -430,6 +433,49 @@ void BrowseController::navigateUp() {
     if (directory.cdUp()) {
         openDirectoryInternal(directory.absolutePath(), true);
     }
+}
+
+QString BrowseController::navigateToTypedPath(const QString& path) {
+    QString candidate = path.trimmed();
+    if (candidate.size() >= 2 &&
+        ((candidate.startsWith(QLatin1Char('"')) && candidate.endsWith(QLatin1Char('"'))) ||
+         (candidate.startsWith(QLatin1Char('\'')) && candidate.endsWith(QLatin1Char('\''))))) {
+        candidate = candidate.mid(1, candidate.size() - 2).trimmed();
+    }
+    if (candidate.isEmpty()) return QStringLiteral("Enter a folder path.");
+
+    const QUrl asUrl(candidate);
+    if (asUrl.isLocalFile()) candidate = asUrl.toLocalFile();
+    if (candidate == QStringLiteral("~")) {
+        candidate = QDir::homePath();
+    } else if (candidate.startsWith(QStringLiteral("~/")) ||
+               candidate.startsWith(QStringLiteral("~\\"))) {
+        candidate = QDir(QDir::homePath()).filePath(candidate.sliced(2));
+    }
+    if (QDir::isRelativePath(candidate)) {
+        const QString base = currentDirectory_.isEmpty() ? QDir::homePath() : currentDirectory_;
+        candidate = QDir(base).absoluteFilePath(candidate);
+    }
+
+    const QFileInfo info(QDir::cleanPath(candidate));
+    if (!info.exists())
+        return QStringLiteral("Folder does not exist: %1").arg(QDir::toNativeSeparators(candidate));
+    if (!info.isDir())
+        return QStringLiteral("Path is not a folder: %1").arg(QDir::toNativeSeparators(candidate));
+    if (!DirectoryScanner::isBrowsableEntry(info))
+        return QStringLiteral("Folder is hidden or unreadable: %1")
+            .arg(QDir::toNativeSeparators(candidate));
+
+    const QString resolved = info.absoluteFilePath();
+    if (resolved != currentDirectory_) openDirectoryInternal(resolved, true, true);
+    return {};
+}
+
+void BrowseController::clearRecentLocations() {
+    if (recentLocations_.isEmpty()) return;
+    recentLocations_.clear();
+    QSettings().remove(QStringLiteral("browser/recentLocations"));
+    emit recentLocationsChanged();
 }
 
 void BrowseController::activatePath(const QString& path) {
@@ -998,6 +1044,11 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.open"),
         {{"directory", diagnostics::fileId(currentDirectory_)}}, true);
     QSettings().setValue(QStringLiteral("browser/lastDirectory"), currentDirectory_);
+    recentLocations_.removeAll(currentDirectory_);
+    recentLocations_.prepend(currentDirectory_);
+    while (recentLocations_.size() > 12) recentLocations_.removeLast();
+    QSettings().setValue(QStringLiteral("browser/recentLocations"), recentLocations_);
+    emit recentLocationsChanged();
     recentCandidateTimer_->stop();
     recentCandidateDirectory_ = currentDirectory_;
     if (addToHistory &&
@@ -1067,6 +1118,13 @@ void BrowseController::setSharedRecentFolders(const QStringList& paths) {
     if (recentFolders_ == paths) return;
     recentFolders_ = paths;
     emit recentFoldersChanged();
+}
+
+void BrowseController::setSharedRecentLocations(const QStringList& paths) {
+    if (recentLocations_ == paths) return;
+    recentLocations_ = paths;
+    QSettings().setValue(QStringLiteral("browser/recentLocations"), recentLocations_);
+    emit recentLocationsChanged();
 }
 
 void BrowseController::requestTransferPaths(const QStringList& paths, bool move,

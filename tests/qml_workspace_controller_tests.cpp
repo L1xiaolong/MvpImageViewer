@@ -272,6 +272,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void loadsFolderTreeChildrenWithoutNavigating();
     void usesPlatformFolderIconForThumbnailDirectories();
     void keepsPaneStateIndependent();
+    void typedLocationNavigationMaintainsHistory();
     void aggregatesUniqueSelectionsInStableOrder();
     void copiesDropsIntoSubfoldersAndAcrossPanes();
     void emptyPaneOpensDroppedFoldersAndImageLocations();
@@ -587,6 +588,8 @@ void QmlWorkspaceControllerTests::keepsPaneStateIndependent() {
     QCOMPARE(first->loader(), second->loader());
     QCOMPARE(first->folderTree(), second->folderTree());
     second->openDirectory(secondDirectory.path());
+    QCOMPARE(first->recentLocations().constFirst(), secondDirectory.path());
+    QCOMPARE(second->recentLocations().constFirst(), secondDirectory.path());
     first->setFilterText(QStringLiteral("first"));
     first->setSortMode(2);
     second->setFilterText(QStringLiteral("second"));
@@ -604,6 +607,42 @@ void QmlWorkspaceControllerTests::keepsPaneStateIndependent() {
 
     first->setSharedRecentFolders({firstDirectory.path()});
     QCOMPARE(second->recentFolders(), QStringList({firstDirectory.path()}));
+}
+
+void QmlWorkspaceControllerTests::typedLocationNavigationMaintainsHistory() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString child = directory.filePath(QStringLiteral("child folder"));
+    QVERIFY(QDir().mkpath(child));
+    const QString filePath = createImage(directory, QStringLiteral("not-a-folder.png"));
+    QVERIFY(!filePath.isEmpty());
+
+    BrowseController controller(std::make_shared<QtImageDecoder>(), directory.path(), this);
+    QCOMPARE(controller.recentLocations().constFirst(), directory.path());
+    QVERIFY(!controller.canGoBack());
+
+    QCOMPARE(controller.navigateToTypedPath(QStringLiteral("child folder")), QString{});
+    QCOMPARE(controller.currentDirectory(), child);
+    QVERIFY(controller.canGoBack());
+    QCOMPARE(controller.recentLocations().constFirst(), child);
+
+    controller.navigateBack();
+    QCOMPARE(controller.currentDirectory(), directory.path());
+    QVERIFY(controller.canGoForward());
+    controller.navigateForward();
+    QCOMPARE(controller.currentDirectory(), child);
+    controller.navigateUp();
+    QCOMPARE(controller.currentDirectory(), directory.path());
+
+    const QString beforeError = controller.currentDirectory();
+    QVERIFY(controller.navigateToTypedPath(filePath).contains(QStringLiteral("not a folder")));
+    QCOMPARE(controller.currentDirectory(), beforeError);
+    QVERIFY(controller.navigateToTypedPath(QStringLiteral("missing")).contains(
+        QStringLiteral("does not exist")));
+    QCOMPARE(controller.currentDirectory(), beforeError);
+
+    controller.clearRecentLocations();
+    QVERIFY(controller.recentLocations().isEmpty());
 }
 
 void QmlWorkspaceControllerTests::aggregatesUniqueSelectionsInStableOrder() {

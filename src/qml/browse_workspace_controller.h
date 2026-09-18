@@ -77,6 +77,7 @@ class BrowseWorkspaceController final : public QObject {
     void recomputeSelection();
     void connectPane(BrowseController* pane);
     void synchronizeRecentFolders(BrowseController* source);
+    void synchronizeRecentLocations(BrowseController* source);
     void normalizeDisplayModes();
 
     ImageLoader* loader_ = nullptr;
@@ -88,6 +89,7 @@ class BrowseWorkspaceController final : public QObject {
     bool deferredInitialDirectoryPending_ = false;
     int activePaneIndex_ = -1;
     bool synchronizingRecentFolders_ = false;
+    bool synchronizingRecentLocations_ = false;
     BrowseController* pendingTransferPane_ = nullptr;
 };
 

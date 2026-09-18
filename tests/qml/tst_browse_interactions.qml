@@ -393,14 +393,47 @@ TestCase {
             compare(navigator.recentEntries()[index].kind, "recent")
     }
 
-    function test_folderEntitiesUseTheCurrentPlatformIcon() {
-        const paneFolderIcon = findChild(browsePage, "paneFolderIcon-0")
-        verify(paneFolderIcon !== null)
-        const expectedName = Qt.platform.os === "osx"
-                ? "macos-folder.svg"
-                : Qt.platform.os === "windows"
-                  ? "windows-folder.svg" : "folder.svg"
-        verify(paneFolderIcon.source.toString().endsWith(expectedName))
+    function test_paneHeaderProvidesEditableLocationNavigation() {
+        browsePage.displayMode = 0
+        mockController.setDisplayMode(0)
+        wait(80)
+        const backButton = findChild(browsePage, "paneBackButton-0")
+        const forwardButton = findChild(browsePage, "paneForwardButton-0")
+        const upButton = findChild(browsePage, "paneUpButton-0")
+        const locationField = findChild(browsePage, "paneLocationField-0")
+        const dropButton = findChild(browsePage, "paneLocationDropButton-0")
+        const popup = findChild(browsePage, "paneLocationPopup-0")
+        verify(backButton !== null)
+        verify(forwardButton !== null)
+        verify(upButton !== null)
+        verify(locationField !== null)
+        verify(dropButton !== null)
+        verify(popup !== null)
+        compare(locationField.text, mockController.currentDirectory)
+        compare(locationField.verticalAlignment, TextInput.AlignVCenter)
+        compare(locationField.topPadding, 0)
+        compare(locationField.bottomPadding, 0)
+        compare(locationField.font.weight, Font.DemiBold)
+
+        mouseClick(backButton, backButton.width / 2, backButton.height / 2, Qt.LeftButton)
+        compare(mockController.statusText, "Back")
+        mockController.canGoForward = true
+        mouseClick(forwardButton, forwardButton.width / 2, forwardButton.height / 2, Qt.LeftButton)
+        compare(mockController.statusText, "Forward")
+        mouseClick(upButton, upButton.width / 2, upButton.height / 2, Qt.LeftButton)
+        compare(mockController.statusText, "Parent folder")
+
+        mouseClick(locationField, 8, locationField.height / 2, Qt.LeftButton)
+        locationField.text = "/Images/Typed path"
+        keyClick(Qt.Key_Return)
+        compare(mockController.currentDirectory, "/Images/Typed path")
+        compare(mockController.recentLocations[0], "/Images/Typed path")
+
+        mouseClick(dropButton, dropButton.width / 2, dropButton.height / 2, Qt.LeftButton)
+        tryCompare(popup, "opened", true)
+        popup.close()
+        tryCompare(popup, "opened", false)
+        mockController.canGoForward = false
     }
 
     function test_directoryThumbnailKeepsSquareHighResolutionTexture() {

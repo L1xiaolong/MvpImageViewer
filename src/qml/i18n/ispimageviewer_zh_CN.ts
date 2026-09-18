@@ -299,6 +299,42 @@
 <context>
     <name>BrowserPane</name>
     <message>
+        <location filename="../Isp/BrowserPane.qml" line="84"/>
+        <source>Back</source>
+        <translation>后退</translation>
+    </message>
+    <message>
+        <location filename="../Isp/BrowserPane.qml" line="98"/>
+        <source>Forward</source>
+        <translation>前进</translation>
+    </message>
+    <message>
+        <location filename="../Isp/BrowserPane.qml" line="112"/>
+        <source>Parent folder</source>
+        <translation>上级文件夹</translation>
+    </message>
+    <message>
+        <location filename="../Isp/BrowserPane.qml" line="146"/>
+        <source>Enter a folder path</source>
+        <translation>输入文件夹路径</translation>
+    </message>
+    <message>
+        <location filename="../Isp/BrowserPane.qml" line="182"/>
+        <location filename="../Isp/BrowserPane.qml" line="232"/>
+        <source>Recent folders</source>
+        <translation>最近使用的文件夹</translation>
+    </message>
+    <message>
+        <location filename="../Isp/BrowserPane.qml" line="299"/>
+        <source>Clear recent folders</source>
+        <translation>清除最近使用的文件夹</translation>
+    </message>
+    <message>
+        <location filename="../Isp/BrowserPane.qml" line="329"/>
+        <source>%1 selected</source>
+        <translation>已选择 %1 个</translation>
+    </message>
+    <message>
         <location filename="../Isp/BrowserPane.qml" line="96"/>
         <source>Close file manager</source>
         <translation>关闭文件管理器</translation>

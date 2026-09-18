@@ -25,6 +25,7 @@ QtObject {
     property string currentFolderName: "Demo"
     property var currentFolderTreeIndex: undefined
     property var recentFolders: ["/Images/Demo", "/Images/Outdoor samples"]
+    property var recentLocations: ["/Images/Demo", "/Images/Outdoor samples", "/Images/Reference charts"]
     property var selectedPaths: ["/Images/Demo/sample_0001.jpg", "/Images/Demo/sample_0002.jpg"]
     property var selectedFileUrls: selectedPaths.map(path => "file://" + path)
     property string selectedUriList: selectedFileUrls.join("\r\n")
@@ -214,6 +215,12 @@ QtObject {
     function openDirectory(path) {
         currentDirectory = path;
         currentFolderName = path.split("/").pop();
+        const locations = recentLocations.slice()
+        const existing = locations.indexOf(path)
+        if (existing >= 0)
+            locations.splice(existing, 1)
+        locations.unshift(path)
+        recentLocations = locations.slice(0, 12)
     }
 
     function loadFolderTreeChildren(path) {}
@@ -231,6 +238,15 @@ QtObject {
     }
     function navigateUp() {
         statusText = "Parent folder";
+    }
+    function navigateToTypedPath(path) {
+        if (String(path).trim().length === 0)
+            return "Enter a folder path."
+        openDirectory(String(path).trim())
+        return ""
+    }
+    function clearRecentLocations() {
+        recentLocations = []
     }
     function createFolder(name) {
         if (name.trim().length === 0)

@@ -36,6 +36,7 @@ class BrowseController final : public QObject {
     Q_PROPERTY(QString currentDirectory READ currentDirectory NOTIFY currentDirectoryChanged)
     Q_PROPERTY(QString currentFolderName READ currentFolderName NOTIFY currentDirectoryChanged)
     Q_PROPERTY(QStringList recentFolders READ recentFolders NOTIFY recentFoldersChanged)
+    Q_PROPERTY(QStringList recentLocations READ recentLocations NOTIFY recentLocationsChanged)
     Q_PROPERTY(QVariantList nativeSidebarPlaces READ nativeSidebarPlaces CONSTANT)
     Q_PROPERTY(QStringList selectedPaths READ selectedPaths NOTIFY selectionChanged)
     Q_PROPERTY(QList<QUrl> selectedFileUrls READ selectedFileUrls NOTIFY selectionChanged)
@@ -74,6 +75,7 @@ class BrowseController final : public QObject {
     [[nodiscard]] QString currentDirectory() const { return currentDirectory_; }
     [[nodiscard]] QString currentFolderName() const;
     [[nodiscard]] QStringList recentFolders() const { return recentFolders_; }
+    [[nodiscard]] QStringList recentLocations() const { return recentLocations_; }
     [[nodiscard]] QVariantList nativeSidebarPlaces() const;
     [[nodiscard]] QStringList selectedPaths() const { return selectedPaths_; }
     [[nodiscard]] QList<QUrl> selectedFileUrls() const;
@@ -101,6 +103,7 @@ class BrowseController final : public QObject {
     [[nodiscard]] QStringList selectedImagePaths() const;
     void setWorkspaceSelectionOrder(const QStringList& paths);
     void setSharedRecentFolders(const QStringList& paths);
+    void setSharedRecentLocations(const QStringList& paths);
 
     Q_INVOKABLE void openDirectory(const QString& path);
     Q_INVOKABLE void openDirectoryUrl(const QUrl& url);
@@ -110,6 +113,8 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void navigateBack();
     Q_INVOKABLE void navigateForward();
     Q_INVOKABLE void navigateUp();
+    Q_INVOKABLE QString navigateToTypedPath(const QString& path);
+    Q_INVOKABLE void clearRecentLocations();
     Q_INVOKABLE void activatePath(const QString& path);
     Q_INVOKABLE void activateTreeItem(const QString& path);
     Q_INVOKABLE void selectPath(const QString& path, bool extend = false, bool toggle = false);
@@ -151,6 +156,7 @@ class BrowseController final : public QObject {
   signals:
     void currentDirectoryChanged();
     void recentFoldersChanged();
+    void recentLocationsChanged();
     void selectionChanged();
     void statusTextChanged();
     void navigationStateChanged();
@@ -199,6 +205,7 @@ class BrowseController final : public QObject {
     QString currentDirectory_;
     QString recentCandidateDirectory_;
     QStringList recentFolders_;
+    QStringList recentLocations_;
     QStringList selectedPaths_;
     QStringList navigationHistory_;
     QString statusText_;

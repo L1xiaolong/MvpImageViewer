@@ -40,6 +40,13 @@ TestCase {
         const third = findChild(page, "browserPane-2");
         const fourth = findChild(page, "browserPane-3");
         verify(first && second && third && fourth);
+        for (let paneIndex = 0; paneIndex < 4; ++paneIndex) {
+            verify(findChild(page, "paneBackButton-" + paneIndex) !== null)
+            verify(findChild(page, "paneForwardButton-" + paneIndex) !== null)
+            verify(findChild(page, "paneUpButton-" + paneIndex) !== null)
+            verify(findChild(page, "paneLocationField-" + paneIndex) !== null)
+            verify(findChild(page, "paneLocationDropButton-" + paneIndex) !== null)
+        }
         compare(Math.round(first.width), Math.round(second.width));
         verify(Math.abs(third.width - fourth.width) < 2);
         verify(Math.abs(first.height - third.height) < 2);
@@ -86,6 +93,9 @@ TestCase {
         compare(workspace.activePane.currentDirectory, "")
         verify(findChild(page, "browserPane-0") !== null)
         verify(findChild(page, "emptyWorkspace") === null)
+        const locationField = findChild(page, "paneLocationField-0")
+        verify(locationField !== null)
+        tryCompare(locationField, "text", "")
     }
 
     function test_addFocusesNewManagerAndTwoPanesDisableGallery() {

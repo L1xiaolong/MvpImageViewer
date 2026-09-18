@@ -85,6 +85,8 @@ void BrowseWorkspaceController::connectPane(BrowseController* pane) {
     });
     connect(pane, &BrowseController::recentFoldersChanged, this,
             [this, pane] { synchronizeRecentFolders(pane); });
+    connect(pane, &BrowseController::recentLocationsChanged, this,
+            [this, pane] { synchronizeRecentLocations(pane); });
     connect(pane, &BrowseController::transferConfirmationRequested, this,
             [this, pane](bool move, int itemCount, const QString& targetDirectory) {
                 if (pendingTransferPane_ && pendingTransferPane_ != pane) {
@@ -93,6 +95,16 @@ void BrowseWorkspaceController::connectPane(BrowseController* pane) {
                 pendingTransferPane_ = pane;
                 emit transferConfirmationRequested(move, itemCount, targetDirectory);
             });
+}
+
+void BrowseWorkspaceController::synchronizeRecentLocations(BrowseController* source) {
+    if (synchronizingRecentLocations_) return;
+    synchronizingRecentLocations_ = true;
+    const QStringList recent = source->recentLocations();
+    emptyPane_->setSharedRecentLocations(recent);
+    for (BrowseController* pane : panes_)
+        if (pane != source) pane->setSharedRecentLocations(recent);
+    synchronizingRecentLocations_ = false;
 }
 
 void BrowseWorkspaceController::confirmPendingTransfer() {

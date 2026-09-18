@@ -1,6 +1,8 @@
 <RCC>
     <qresource>
         <file>../assets/icons/ui/back.svg</file>
+        <file>../assets/icons/ui/up.svg</file>
+        <file>../assets/icons/ui/chevron-down.svg</file>
         <file>../assets/icons/ui/compare.svg</file>
         <file>../assets/icons/ui/cover.svg</file>
         <file>../assets/icons/ui/folder-open.svg</file>
