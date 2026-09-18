@@ -49,6 +49,9 @@ struct PlaneBufferSet {
     // smaller than ImageDescriptor::size; supported RAW/YUV formats render full source
     // planes on the GPU.
     QImage displayImage;
+    // Camera RAW keeps LibRaw's processed bitmap as the rendered image while the sensor
+    // mosaic is exposed to exact pixel probes only.
+    bool renderFromDisplayImage = false;
 };
 
 struct ImageMetadata {
@@ -124,6 +127,9 @@ struct ImageFrame {
     ImageMetadata metadata;
     ImageStorage storage;
     std::optional<RawImageParameters> rawParameters;
+    // Set by decoders when the frame is a bounded proxy whose exact source samples (RAW/YUV
+    // planes, camera RAW mosaic) only arrive with a full decode.
+    bool sourceSamplesPending = false;
 
     [[nodiscard]] const QImage* qImage() const {
         if (const auto* image = std::get_if<QImage>(&storage)) {

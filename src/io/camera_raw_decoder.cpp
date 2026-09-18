@@ -76,7 +76,8 @@ QImage processedImageToQImage(const libraw_processed_image_t& processed, QString
         }
         return image;
     }
-    if (processed.type != LIBRAW_IMAGE_BITMAP || processed.bits != 8 ||
+    if (processed.type != LIBRAW_IMAGE_BITMAP ||
+        (processed.bits != 8 && processed.bits != 16) ||
         (processed.colors != 3 && processed.colors != 4)) {
         if (error) {
             *error = QStringLiteral("Unsupported LibRaw output: type %1, %2-bit, %3 channels")
@@ -87,7 +88,8 @@ QImage processedImageToQImage(const libraw_processed_image_t& processed, QString
         return {};
     }
 
-    const qsizetype bytesPerPixel = processed.colors;
+    const qsizetype bytesPerChannel = processed.bits / 8;
+    const qsizetype bytesPerPixel = processed.colors * bytesPerChannel;
     const qsizetype expected = static_cast<qsizetype>(processed.width) * processed.height *
                                bytesPerPixel;
     if (expected <= 0 || expected > processed.data_size) {
@@ -97,12 +99,18 @@ QImage processedImageToQImage(const libraw_processed_image_t& processed, QString
         return {};
     }
 
-    const QImage::Format sourceFormat = processed.colors == 3 ? QImage::Format_RGB888
-                                                               : QImage::Format_RGBA8888;
+    // Sixteen-bit output keeps the decoder's real sample depth instead of quantizing a RAW to
+    // 8-bit display values.
+    const bool highBitDepth = processed.bits == 16;
+    const QImage::Format sourceFormat =
+        highBitDepth ? (processed.colors == 3 ? QImage::Format_RGBX64 : QImage::Format_RGBA64)
+                     : (processed.colors == 3 ? QImage::Format_RGB888
+                                              : QImage::Format_RGBA8888);
     const qsizetype sourceStride = static_cast<qsizetype>(processed.width) * bytesPerPixel;
     const QImage source(processed.data, processed.width, processed.height,
                         static_cast<qsizetype>(sourceStride), sourceFormat);
-    return source.convertToFormat(QImage::Format_RGBA8888);
+    return source.convertToFormat(highBitDepth ? QImage::Format_RGBA64
+                                               : QImage::Format_RGBA8888);
 }
 
 ImageMetadata metadataFor(const QString& path, const LibRaw& processor) {
@@ -170,9 +178,9 @@ std::optional<RawImageParameters> rawParametersFor(LibRaw& processor) {
     RawImageParameters parameters;
     parameters.size = {width, height};
     parameters.format = RawPixelFormat::Raw16;
-    parameters.rowStride = sizes.raw_pitch > 0
-                               ? sizes.raw_pitch
-                               : static_cast<qsizetype>(width) * sizeof(quint16);
+    parameters.rowStride =
+        sizes.raw_pitch > 0 ? static_cast<qsizetype>(sizes.raw_pitch)
+                            : static_cast<qsizetype>(width) * static_cast<qsizetype>(sizeof(quint16));
     parameters.bayerPattern = pattern;
     parameters.demosaic = true;
     parameters.orientation = ImageOrientation::Normal;
@@ -232,7 +240,9 @@ std::optional<RawImageParameters> rawParametersFor(LibRaw& processor) {
 
 DecodeResult frameFromImage(QImage image, ImageMetadata metadata,
                             std::optional<RawImageParameters> rawParameters,
-                            const QSize& maximumSize) {
+                            const QSize& maximumSize,
+                            const std::shared_ptr<const PlaneBufferSet>& mosaic = {},
+                            bool sourceSamplesPending = false) {
     if (image.isNull()) {
         return {{}, QStringLiteral("LibRaw produced an empty image")};
     }
@@ -240,21 +250,67 @@ DecodeResult frameFromImage(QImage image, ImageMetadata metadata,
         (image.width() > maximumSize.width() || image.height() > maximumSize.height())) {
         image = image.scaled(maximumSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     }
-    if (image.format() != QImage::Format_RGBA8888) {
-        image = image.convertToFormat(QImage::Format_RGBA8888);
+    const bool highBitDepth = image.depth() > 32;
+    if (image.format() != (highBitDepth ? QImage::Format_RGBA64 : QImage::Format_RGBA8888)) {
+        image = image.convertToFormat(highBitDepth ? QImage::Format_RGBA64
+                                                   : QImage::Format_RGBA8888);
+    }
+    // LibRaw hands back the processed image in sensor orientation; rotate it once here so the
+    // rendered pixels, the reported sizes, and the mosaic plane reads all agree.
+    if (rawParameters) {
+        image = orientedImage(std::move(image), rawParameters->orientation);
     }
 
     auto frame = std::make_shared<ImageFrame>();
     frame->descriptor.size = image.size();
-    frame->descriptor.layout = PixelLayout::Interleaved;
     frame->descriptor.sampleType = SampleType::UInt;
-    frame->descriptor.channelOrder = ChannelOrder::RGBA;
-    frame->descriptor.storageBits = 8;
-    frame->descriptor.validBits = 8;
+    // A retained mosaic is the frame's sample storage, so it reports the sensor's own depth.
+    frame->descriptor.storageBits = mosaic ? 16 : (highBitDepth ? 16 : 8);
+    frame->descriptor.validBits =
+        mosaic && rawParameters ? rawParameters->validBits() : (highBitDepth ? 16 : 8);
+    frame->descriptor.layout = mosaic ? PixelLayout::Bayer : PixelLayout::Interleaved;
+    frame->descriptor.channelOrder = mosaic ? ChannelOrder::Bayer : ChannelOrder::RGBA;
     frame->metadata = std::move(metadata);
     frame->rawParameters = std::move(rawParameters);
-    frame->storage = std::move(image);
+    frame->sourceSamplesPending = sourceSamplesPending;
+    if (mosaic) {
+        auto planes = std::make_shared<PlaneBufferSet>(*mosaic);
+        planes->displayImage = image;
+        frame->storage = std::shared_ptr<const PlaneBufferSet>(std::move(planes));
+    } else {
+        frame->storage = std::move(image);
+    }
     return {std::move(frame), {}};
+}
+
+// Copies the sensor mosaic LibRaw unpacked so exact probes can read true sensor samples.
+// LibRaw crops the processed image from (left_margin, top_margin) with (width, height), so the
+// same rectangle - moved to the new colour phase - is what the probe must address.
+std::shared_ptr<PlaneBufferSet> mosaicPlanes(LibRaw& processor,
+                                            const RawImageParameters& parameters) {
+    const auto& sizes = processor.imgdata.sizes;
+    const auto& rawdata = processor.imgdata.rawdata;
+    const unsigned filters = processor.imgdata.idata.filters;
+    // Monochrome, X-Trans, and multi-channel RAW variants have no plain 2x2 Bayer mosaic.
+    if (!rawdata.raw_image || filters == 0 || filters == 9 || sizes.width == 0 ||
+        sizes.height == 0 || sizes.raw_pitch < sizeof(quint16) ||
+        (sizes.raw_pitch % sizeof(quint16)) != 0) {
+        return {};
+    }
+    const QRect crop(sizes.left_margin, sizes.top_margin, sizes.width, sizes.height);
+    const QByteArray packed = packedMosaicPlane(
+        reinterpret_cast<const quint16*>(rawdata.raw_image),
+        static_cast<qsizetype>(sizes.raw_pitch / sizeof(quint16)),
+        QSize(sizes.raw_width, sizes.raw_height), crop, parameters.littleEndian, 16);
+    if (packed.isEmpty()) {
+        return {};
+    }
+    auto planes = std::make_shared<PlaneBufferSet>();
+    planes->planes = {{0, static_cast<qsizetype>(crop.width()) * 2, packed.size()}};
+    planes->storage = packed;
+    // LibRaw's processed bitmap stays the rendered image; the mosaic only feeds exact probes.
+    planes->renderFromDisplayImage = true;
+    return planes;
 }
 
 DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
@@ -268,8 +324,29 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     }
     ImageMetadata metadata = metadataFor(request.path, *processor);
     std::optional<RawImageParameters> rawParameters = rawParametersFor(*processor);
+    // The RAW parameters editor owns the processing values; the file owns the geometry.
+    if (rawParameters && request.rawParameters) {
+        const RawImageParameters& requested = *request.rawParameters;
+        rawParameters->demosaic = requested.demosaic;
+        rawParameters->blackLevel = requested.blackLevel;
+        rawParameters->whiteLevel = requested.whiteLevel;
+        rawParameters->validBitsOverride = requested.validBitsOverride;
+        rawParameters->whiteBalanceGains = requested.whiteBalanceGains;
+        rawParameters->colorCorrectionMatrix = requested.colorCorrectionMatrix;
+        rawParameters->displayGamma = requested.displayGamma;
+    }
+    const ImageOrientation orientation =
+        rawParameters ? rawParameters->orientation : ImageOrientation::Normal;
+    metadata.sourceSize = orientedImageSize(metadata.sourceSize, orientation);
 
-    if (request.purpose != DecodePurpose::Full) {
+    // Un-demosaiced camera RAW renders the sensor mosaic itself, exactly like the headerless RAW
+    // path, instead of LibRaw's already-demosaiced bitmap. Preview frames drop the mosaic so the
+    // probe can promote them to a full decode that addresses the plane directly; grid thumbnails
+    // keep the fast embedded preview.
+    const bool mosaicDisplay = rawParameters && !rawParameters->demosaic;
+    const bool mosaicPreview = mosaicDisplay && request.purpose == DecodePurpose::Preview;
+
+    if (request.purpose != DecodePurpose::Full && !mosaicPreview) {
         code = processor->unpack_thumb();
         if (code == LIBRAW_SUCCESS) {
             int imageError = LIBRAW_SUCCESS;
@@ -279,8 +356,8 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                 QImage image = processedImageToQImage(*processed, &conversionError);
                 if (!image.isNull()) {
                     return frameFromImage(std::move(image), std::move(metadata),
-                                          std::move(rawParameters),
-                                          request.maximumSize);
+                                          std::move(rawParameters), request.maximumSize, {},
+                                          request.purpose == DecodePurpose::Preview);
                 }
             }
         }
@@ -295,13 +372,63 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
         }
         metadata = metadataFor(request.path, *processor);
         rawParameters = rawParametersFor(*processor);
+        if (rawParameters && request.rawParameters) {
+            const RawImageParameters& requested = *request.rawParameters;
+            rawParameters->demosaic = requested.demosaic;
+            rawParameters->blackLevel = requested.blackLevel;
+            rawParameters->whiteLevel = requested.whiteLevel;
+            rawParameters->validBitsOverride = requested.validBitsOverride;
+            rawParameters->whiteBalanceGains = requested.whiteBalanceGains;
+            rawParameters->colorCorrectionMatrix = requested.colorCorrectionMatrix;
+            rawParameters->displayGamma = requested.displayGamma;
+        }
+        metadata.sourceSize = orientedImageSize(
+            metadata.sourceSize,
+            rawParameters ? rawParameters->orientation : ImageOrientation::Normal);
         processor->imgdata.params.half_size = 1;
     }
 
-    processor->imgdata.params.output_bps = 8;
+    // Sixteen-bit output keeps the decoder's real sample depth for RAW inspection instead of
+    // quantizing every value to 8-bit display units.
+    processor->imgdata.params.output_bps = 16;
     processor->imgdata.params.output_color = 1;
     processor->imgdata.params.use_camera_wb = 1;
     code = processor->unpack();
+    std::shared_ptr<PlaneBufferSet> mosaic;
+    if (code == LIBRAW_SUCCESS && rawParameters &&
+        (request.purpose == DecodePurpose::Full || mosaicPreview)) {
+        mosaic = mosaicPlanes(*processor, *rawParameters);
+        if (mosaic) {
+            // The mosaic plane is the processed crop, so the parameters must address exactly
+            // that rectangle - which also shifts the CFA phase by its origin.
+            const auto& sizes = processor->imgdata.sizes;
+            const QRect crop(sizes.left_margin, sizes.top_margin, sizes.width, sizes.height);
+            rawParameters->bayerPattern = shiftedBayerPattern(
+                rawParameters->bayerPattern, crop.x(), crop.y());
+            rawParameters->size = crop.size();
+            rawParameters->rowStride = static_cast<qsizetype>(crop.width()) * 2;
+            rawParameters->chromaStride = 0;
+            rawParameters->msbAligned = false;
+        }
+    }
+
+    if (code == LIBRAW_SUCCESS && mosaic && rawParameters && !rawParameters->demosaic) {
+        const QSize bounded = request.maximumSize.isEmpty()
+                                  ? QSize{}
+                                  : rawParameters->size.scaled(request.maximumSize,
+                                                               Qt::KeepAspectRatio);
+        QImage gray = grayMosaicImage(mosaic->storage, *rawParameters, bounded);
+        if (!gray.isNull()) {
+            // LibRaw's demosaic and colour conversion are skipped entirely: the mosaic is the
+            // image, and the same parameter set drives the pixel probe.
+            const bool attachMosaic = request.purpose == DecodePurpose::Full;
+            return frameFromImage(std::move(gray), std::move(metadata),
+                                  std::move(rawParameters), {},
+                                  attachMosaic ? mosaic : nullptr,
+                                  request.purpose != DecodePurpose::Full);
+        }
+    }
+
     if (code == LIBRAW_SUCCESS) {
         code = processor->dcraw_process();
     }
@@ -321,8 +448,12 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     if (image.isNull()) {
         return {{}, conversionError};
     }
-    return frameFromImage(std::move(image), std::move(metadata), std::move(rawParameters),
-                          request.maximumSize);
+    // A full decode is the final answer: the frame either carries source planes, the sensor
+    // mosaic, or the decoder's own processed samples. Only bounded proxies stay pending.
+    DecodeResult result = frameFromImage(std::move(image), std::move(metadata),
+                                         std::move(rawParameters), request.maximumSize, mosaic,
+                                         request.purpose != DecodePurpose::Full);
+    return result;
 }
 
 #endif
@@ -343,7 +474,8 @@ QStringList CameraRawDecoder::supportedSuffixes() {
 
 QString CameraRawDecoder::cacheIdentity() const {
 #if ISPVIEW_HAS_LIBRAW
-    return QStringLiteral("camera-raw-v2|libraw-%1")
+    // v3: 16-bit output, orientation applied during decode, and the retained sensor mosaic.
+    return QStringLiteral("camera-raw-v3|libraw-%1")
         .arg(QString::fromLatin1(libraw_version()));
 #else
     return QStringLiteral("camera-raw-disabled");

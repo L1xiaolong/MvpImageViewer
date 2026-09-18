@@ -171,8 +171,7 @@ Rectangle {
         function onGalleryImageChanged() {
             if (root.controller.galleryImageReady && galleryProbeArea.containsMouse) {
                 Qt.callLater(function() {
-                    galleryWorkspace.updatePixelProbe(galleryProbeArea.mouseX,
-                                                      galleryProbeArea.mouseY)
+                    galleryWorkspace.refreshPixelProbe()
                 })
             } else if (galleryWorkspace.pixelProbeText === "Loading pixel data…") {
                 galleryWorkspace.pixelProbeText = ""
@@ -606,14 +605,14 @@ Rectangle {
         readonly property bool useFullResolutionTexture:
             fullResolutionAvailable && actualPixels && manualZoom >= 1.0 &&
             !root.smoothDisplay
-        function updatePixelProbe(mouseX, mouseY) {
+        function updatePixelProbe(viewportX, viewportY) {
             if (!root.controller.galleryImageReady || galleryImage.paintedWidth <= 0 ||
                     galleryImage.paintedHeight <= 0 ||
                     (useFullResolutionTexture && galleryImage.status !== Image.Ready)) {
                 pixelProbeText = "Loading pixel data…"
                 return
             }
-            const point = galleryProbeArea.mapToItem(galleryImage, mouseX, mouseY)
+            const point = galleryFlick.mapToItem(galleryImage, viewportX, viewportY)
             const left = (galleryImage.width - galleryImage.paintedWidth) / 2
             const top = (galleryImage.height - galleryImage.paintedHeight) / 2
             const sourceSize = root.controller.galleryImageSize
@@ -623,6 +622,14 @@ Rectangle {
                                   galleryImage.paintedHeight)
             const value = root.controller.probeGalleryPixel(px, py)
             pixelProbeText = value.length > 0 ? value : "Outside image"
+        }
+        function refreshPixelProbe() {
+            if (!galleryProbeArea.containsMouse)
+                return
+            const point = galleryProbeArea.mapToItem(galleryFlick,
+                                                     galleryProbeArea.mouseX,
+                                                     galleryProbeArea.mouseY)
+            updatePixelProbe(point.x, point.y)
         }
         function showPreview(path, previewUrl, fileName, technicalLabel, directory) {
             if (directory)
@@ -825,6 +832,8 @@ Rectangle {
                         if (!interactive)
                             cancelFlick()
                     }
+                    onContentXChanged: galleryWorkspace.refreshPixelProbe()
+                    onContentYChanged: galleryWorkspace.refreshPixelProbe()
                     contentWidth: galleryWorkspace.actualPixels
                                   ? Math.max(width, galleryImage.width + 36) : width
                     contentHeight: galleryWorkspace.actualPixels
@@ -861,8 +870,7 @@ Rectangle {
                         fillMode: galleryWorkspace.actualPixels ? Image.Stretch : Image.PreserveAspectFit
                         onStatusChanged: {
                             if (status === Image.Ready && galleryProbeArea.containsMouse)
-                                galleryWorkspace.updatePixelProbe(galleryProbeArea.mouseX,
-                                                                  galleryProbeArea.mouseY)
+                                galleryWorkspace.refreshPixelProbe()
                         }
                     }
 
@@ -873,7 +881,8 @@ Rectangle {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.BackButton | Qt.ForwardButton
                         preventStealing: false
                         onPositionChanged: function (mouse) {
-                            galleryWorkspace.updatePixelProbe(mouse.x, mouse.y)
+                            const point = mapToItem(galleryFlick, mouse.x, mouse.y)
+                            galleryWorkspace.updatePixelProbe(point.x, point.y)
                         }
                         onExited: galleryWorkspace.pixelProbeText = ""
                         onWheel: function (wheel) {
@@ -903,6 +912,7 @@ Rectangle {
                                     galleryImage.x + sourceX * newScale - viewportPoint.x));
                                 galleryFlick.contentY = Math.max(0, Math.min(galleryFlick.contentHeight - galleryFlick.height,
                                     galleryImage.y + sourceY * newScale - viewportPoint.y));
+                                galleryWorkspace.updatePixelProbe(viewportPoint.x, viewportPoint.y)
                             });
                             wheel.accepted = true;
                         }

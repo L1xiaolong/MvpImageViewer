@@ -103,16 +103,12 @@ Item {
     Connections {
         target: root.imageCanvas
         ignoreUnknownSignals: true
-        function onPixelHovered(sourceSlot, pixel, colorValue, valid) {
+        function onPixelHovered(sourceSlot, pixel, valueText, valid) {
             if (!valid) {
                 root.pixelText = "Move over the image"
                 return
             }
-            root.pixelText = "(" + pixel.x + "," + pixel.y + ") RGBA("
-                    + Math.round(colorValue.r * 255) + ","
-                    + Math.round(colorValue.g * 255) + ","
-                    + Math.round(colorValue.b * 255) + ","
-                    + Math.round(colorValue.a * 255) + ")"
+            root.pixelText = "(" + pixel.x + "," + pixel.y + ") " + valueText
         }
         function onContextMenuRequested(position) {
             fullScreenContextMenu.popup(position.x, position.y)

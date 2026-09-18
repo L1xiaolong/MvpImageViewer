@@ -8,6 +8,7 @@
 #include "core/weighted_lru_cache.h"
 
 #include <QTest>
+#include <QtCore/qfloat16.h>
 #include <QtEndian>
 
 #include <cmath>
@@ -34,6 +35,7 @@ class CoreTests final : public QObject {
     void displayHistogramRestrictsNormalizedRegion();
     void unifiedHistogramUsesExactPixelsAndBayerColors();
     void rawPlaneAccessorAndHistogramPreserveEngineeringSamples();
+    void rawMosaicHelpersPreserveGeometryAndPhase();
     void comparisonPixelProbeMapsDifferentSizesAndRawOrientation();
 };
 
@@ -62,6 +64,112 @@ void CoreTests::visibleNormalizedRectTracksZoomAndEdges() {
     QVERIFY(ViewTransform::visibleNormalizedRect({}, {400, 300}, state).isEmpty());
 }
 
+void CoreTests::rawMosaicHelpersPreserveGeometryAndPhase() {
+    // Cropping a mosaic off its origin moves the CFA phase one step in x and the opposite step
+    // in y; even offsets leave the phase untouched.
+    QCOMPARE(shiftedBayerPattern(BayerPattern::RGGB, 0, 0), BayerPattern::RGGB);
+    QCOMPARE(shiftedBayerPattern(BayerPattern::RGGB, 1, 0), BayerPattern::GRBG);
+    QCOMPARE(shiftedBayerPattern(BayerPattern::RGGB, 0, 1), BayerPattern::GBRG);
+    QCOMPARE(shiftedBayerPattern(BayerPattern::RGGB, 1, 1), BayerPattern::BGGR);
+    QCOMPARE(shiftedBayerPattern(BayerPattern::RGGB, 2, 4), BayerPattern::RGGB);
+    QCOMPARE(shiftedBayerPattern(BayerPattern::BGGR, -1, 0), BayerPattern::GBRG);
+
+    // A 4x3 mosaic holding 100..111, cropped at (1,1).
+    std::array<quint16, 12> mosaic{};
+    for (std::size_t index = 0; index < mosaic.size(); ++index) {
+        mosaic[index] = static_cast<quint16>(100 + index);
+    }
+    const QByteArray plane =
+        packedMosaicPlane(mosaic.data(), 4, QSize(4, 3), QRect(1, 1, 2, 2), true, 12);
+    QCOMPARE(plane.size(), qsizetype(8));
+    const auto sampleAt = [&plane](qsizetype index) {
+        return qFromLittleEndian<quint16>(
+            reinterpret_cast<const uchar*>(plane.constData() + index * 2));
+    };
+    QCOMPARE(sampleAt(0), quint16{105});
+    QCOMPARE(sampleAt(1), quint16{106});
+    QCOMPARE(sampleAt(2), quint16{109});
+    QCOMPARE(sampleAt(3), quint16{110});
+    // Crops outside the array or wider than the stride are rejected instead of reading past it.
+    QVERIFY(packedMosaicPlane(mosaic.data(), 4, QSize(4, 3), QRect(3, 2, 2, 2), true, 12).isEmpty());
+    QVERIFY(packedMosaicPlane(mosaic.data(), 2, QSize(4, 3), QRect(2, 0, 2, 1), true, 12).isEmpty());
+    QVERIFY(packedMosaicPlane(nullptr, 4, QSize(4, 3), QRect(0, 0, 1, 1), true, 12).isEmpty());
+    // Every sample is masked to the container's valid-bit range.
+    const std::array<quint16, 1> deep{0xFFFF};
+    const QByteArray masked =
+        packedMosaicPlane(deep.data(), 1, QSize(1, 1), QRect(0, 0, 1, 1), true, 12);
+    QCOMPARE(qFromLittleEndian<quint16>(reinterpret_cast<const uchar*>(masked.constData())),
+             quint16{0x0FFF});
+
+    // An un-demosaiced frame renders the mosaic itself: grey, black-level removed, normalized to
+    // the white level, and gamma encoded - the same transform the headerless RAW path uses.
+    RawImageParameters mosaicParameters;
+    mosaicParameters.size = {2, 2};
+    mosaicParameters.format = RawPixelFormat::Raw16;
+    mosaicParameters.validBitsOverride = 12;
+    mosaicParameters.blackLevel = 100;
+    mosaicParameters.whiteLevel = 4095;
+    mosaicParameters.displayGamma = 2.2;
+    const QByteArray mosaicPlane =
+        packedMosaicPlane(mosaic.data(), 4, QSize(4, 3), QRect(1, 1, 2, 2), true, 16);
+    const QImage gray = grayMosaicImage(mosaicPlane, mosaicParameters);
+    QCOMPARE(gray.size(), QSize(2, 2));
+    const auto expectedGray = [&mosaicParameters](int value) {
+        const double normalized = std::clamp(
+            (value - mosaicParameters.blackLevel) /
+                static_cast<double>(mosaicParameters.whiteLevel - mosaicParameters.blackLevel),
+            0.0, 1.0);
+        return static_cast<int>(
+            std::lround(std::pow(normalized, 1.0 / mosaicParameters.displayGamma) * 255.0));
+    };
+    QCOMPARE(gray.pixelColor(0, 0), QColor(expectedGray(105), expectedGray(105), expectedGray(105)));
+    QCOMPARE(gray.pixelColor(1, 1), QColor(expectedGray(110), expectedGray(110), expectedGray(110)));
+    QVERIFY(expectedGray(105) < expectedGray(110));
+    // The transform keeps the headerless RAW anchors: the black level maps to 0 and the white
+    // level maps to 255.
+    RawImageParameters onePixel = mosaicParameters;
+    onePixel.size = {1, 1};
+    const auto grayOf = [&onePixel](quint16 value) {
+        return grayMosaicImage(
+                   packedMosaicPlane(&value, 1, QSize(1, 1), QRect(0, 0, 1, 1), true, 16),
+                   onePixel)
+            .pixelColor(0, 0);
+    };
+    QCOMPARE(grayOf(100), QColor(0, 0, 0));
+    QCOMPARE(grayOf(4095), QColor(255, 255, 255));
+    QVERIFY(grayOf(2048).red() > grayOf(1024).red());
+    // A bounded output samples the mosaic with nearest neighbours, centring on the source grid.
+    const QImage thumb = grayMosaicImage(mosaicPlane, mosaicParameters, QSize(1, 1));
+    QCOMPARE(thumb.size(), QSize(1, 1));
+    QCOMPARE(thumb.pixelColor(0, 0), gray.pixelColor(1, 1));
+    // Sizes that do not match the plane are rejected instead of reading past it.
+    RawImageParameters mismatched = mosaicParameters;
+    mismatched.size = {4, 4};
+    QVERIFY(grayMosaicImage(mosaicPlane, mismatched).isNull());
+
+    // Orientation uses the same mapping the plane reads rely on.
+    QImage source(3, 2, QImage::Format_RGBA8888);
+    for (int y = 0; y < source.height(); ++y) {
+        for (int x = 0; x < source.width(); ++x) {
+            source.setPixelColor(x, y, QColor(y * 3 + x, 0, 0));
+        }
+    }
+    const QImage rotatedClockwise =
+        orientedImage(source, ImageOrientation::Rotate90Clockwise);
+    QCOMPARE(rotatedClockwise.size(), QSize(2, 3));
+    QCOMPARE(rotatedClockwise.pixelColor(0, 0), QColor(3, 0, 0));
+    QCOMPARE(rotatedClockwise.pixelColor(1, 0), QColor(0, 0, 0));
+    QCOMPARE(rotatedClockwise.pixelColor(0, 2), QColor(5, 0, 0));
+    const QImage rotatedHalf = orientedImage(source, ImageOrientation::Rotate180);
+    QCOMPARE(rotatedHalf.size(), source.size());
+    QCOMPARE(rotatedHalf.pixelColor(0, 0), QColor(5, 0, 0));
+    const QImage rotatedCounter =
+        orientedImage(source, ImageOrientation::Rotate270Clockwise);
+    QCOMPARE(rotatedCounter.size(), QSize(2, 3));
+    QCOMPARE(rotatedCounter.pixelColor(0, 0), QColor(2, 0, 0));
+    QCOMPARE(orientedImage(source, ImageOrientation::Normal).pixelColor(2, 1), QColor(5, 0, 0));
+}
+
 void CoreTests::comparisonPixelProbeMapsDifferentSizesAndRawOrientation() {
     QImage encodedImage(8, 4, QImage::Format_RGBA8888);
     encodedImage.fill(Qt::black);
@@ -75,7 +183,7 @@ void CoreTests::comparisonPixelProbeMapsDifferentSizesAndRawOrientation() {
     QVERIFY(encoded.valid);
     QCOMPARE(encoded.displayPixel, QPoint(3, 3));
     QCOMPARE(encoded.displayColor, QColor(12, 34, 56, 78));
-    QCOMPARE(encoded.sourceValueText(), QStringLiteral("RGBA(12,34,56,78)"));
+    QCOMPARE(encoded.sourceValueText(), QStringLiteral("RGB(12,34,56)"));
     QVERIFY(!ComparisonPixelProbe::sample(encodedFrame, QPointF(-0.01, 0.5)).valid);
 
     RawImageParameters parameters;
@@ -104,8 +212,42 @@ void CoreTests::comparisonPixelProbeMapsDifferentSizesAndRawOrientation() {
     QCOMPARE(raw.sourcePixel, QPoint(0, 1));
     QVERIFY(raw.bayer.has_value());
     QCOMPARE(raw.bayer->value, quint16{5});
-    QCOMPARE(raw.sourceValueText(), QStringLiteral("RAW(5, Gb)"));
-    QCOMPARE(raw.displayValueText(), QStringLiteral("RGBA(12,12,12,255)"));
+
+    // A demosaiced RAW frame reports the pipeline RGB in the RAW container's value range
+    // instead of an 8-bit display triple. RGGB positions carry 12-bit red, green, and blue
+    // samples of 4095, 2048, and 0.
+    RawImageParameters demosaicParameters;
+    demosaicParameters.size = {4, 4};
+    demosaicParameters.format = RawPixelFormat::Raw16;
+    demosaicParameters.validBitsOverride = 12;
+    demosaicParameters.bayerPattern = BayerPattern::RGGB;
+    demosaicParameters.demosaic = true;
+    auto demosaicStorage = std::make_shared<PlaneBufferSet>();
+    demosaicStorage->storage.resize(4 * 4 * 2);
+    for (int y = 0; y < 4; ++y) {
+        for (int x = 0; x < 4; ++x) {
+            const bool red = (y % 2 == 0) && (x % 2 == 0);
+            const bool blue = (y % 2 == 1) && (x % 2 == 1);
+            const quint16 value = red ? 4095 : blue ? 0 : 2048;
+            qToLittleEndian<quint16>(
+                value, reinterpret_cast<uchar*>(demosaicStorage->storage.data() +
+                                               (y * 4 + x) * 2));
+        }
+    }
+    demosaicStorage->planes = {{0, 8, 32}};
+    ImageFrame demosaicFrame;
+    demosaicFrame.descriptor.size = demosaicParameters.size;
+    demosaicFrame.rawParameters = demosaicParameters;
+    demosaicFrame.storage = std::shared_ptr<const PlaneBufferSet>(demosaicStorage);
+    const auto demosaicSample =
+        ComparisonPixelProbe::sampleAtDisplayPixel(demosaicFrame, {1, 1});
+    QVERIFY(demosaicSample.valid);
+    QVERIFY(demosaicSample.bayer.has_value());
+    QCOMPARE(demosaicSample.bayer->value, quint16{0});
+    QCOMPARE(demosaicSample.sourceValueText(), QStringLiteral("RGB(4095,2048,0)"));
+    QCOMPARE(demosaicSample.displayValueText(), QStringLiteral("RGB(255,186,0)"));
+    QCOMPARE(raw.sourceValueText(), QStringLiteral("RAW(5)"));
+    QCOMPARE(raw.displayValueText(), QStringLiteral("RGB(12,12,12)"));
 
     RawImageParameters yuvParameters;
     yuvParameters.size = {2, 2};
@@ -133,8 +275,143 @@ void CoreTests::comparisonPixelProbeMapsDifferentSizesAndRawOrientation() {
         yuvFrame, ComparisonPixelProbe::normalizedPixelCenter({1, 0}, yuvParameters.size));
     QCOMPARE(darkYuv.displayPixel, QPoint(0, 0));
     QCOMPARE(darkYuv.displayColor, QColor(0, 0, 0));
+    QCOMPARE(darkYuv.sourceValueText(), QStringLiteral("YUV(0,128,128) · RGB(0,0,0)"));
     QCOMPARE(brightYuv.displayPixel, QPoint(1, 0));
     QCOMPARE(brightYuv.displayColor, QColor(255, 255, 255));
+    QCOMPARE(brightYuv.sourceValueText(), QStringLiteral("YUV(255,128,128) · RGB(255,255,255)"));
+
+    RawImageParameters p010Parameters;
+    p010Parameters.size = {2, 2};
+    p010Parameters.format = RawPixelFormat::P010;
+    p010Parameters.msbAligned = true;
+    auto p010Storage = std::make_shared<PlaneBufferSet>();
+    p010Storage->storage.resize(12);
+    const quint16 p010Values[]{64, 940, 64, 940, 512, 512};
+    for (int index = 0; index < 6; ++index) {
+        qToLittleEndian<quint16>(
+            static_cast<quint16>(p010Values[index] << 6),
+            reinterpret_cast<uchar*>(p010Storage->storage.data() + index * 2));
+    }
+    p010Storage->planes = {{0, 4, 8}, {8, 4, 4}};
+    ImageFrame p010Frame;
+    p010Frame.descriptor.size = p010Parameters.size;
+    p010Frame.rawParameters = p010Parameters;
+    p010Frame.storage = std::shared_ptr<const PlaneBufferSet>(p010Storage);
+    const auto p010Sample = ComparisonPixelProbe::sampleAtDisplayPixel(p010Frame, {1, 0});
+    QVERIFY(p010Sample.valid);
+    QCOMPARE(p010Sample.sourceValueText(),
+             QStringLiteral("YUV(940,512,512) · RGB(1023,1023,1023)"));
+
+    QImage highDepth(1, 1, QImage::Format_RGBA64);
+    highDepth.setPixelColor(0, 0, QColor::fromRgba64(1024, 32768, 65535, 4567));
+    ImageFrame highDepthFrame;
+    highDepthFrame.descriptor.size = highDepth.size();
+    highDepthFrame.descriptor.validBits = 16;
+    highDepthFrame.storage = std::move(highDepth);
+    const auto highDepthSample =
+        ComparisonPixelProbe::sampleAtDisplayPixel(highDepthFrame, {0, 0});
+    QCOMPARE(highDepthSample.sourceValueText(), QStringLiteral("RGB(1024,32768,65535)"));
+
+    QImage premultipliedDepth(1, 1, QImage::Format_RGBA64_Premultiplied);
+    premultipliedDepth.setPixelColor(0, 0, QColor::fromRgba64(512, 1024, 2048, 32768));
+    ImageFrame premultipliedDepthFrame;
+    premultipliedDepthFrame.descriptor.size = premultipliedDepth.size();
+    premultipliedDepthFrame.storage = std::move(premultipliedDepth);
+    const auto premultipliedDepthSample =
+        ComparisonPixelProbe::sampleAtDisplayPixel(premultipliedDepthFrame, {0, 0});
+    QCOMPARE(premultipliedDepthSample.sourceValueText(), QStringLiteral("RGB(512,1024,2048)"));
+
+    // A twelve-bit sensor sample above the 8-bit range must survive verbatim.
+    RawImageParameters deepParameters = parameters;
+    deepParameters.size = {1, 1};
+    deepParameters.orientation = ImageOrientation::Normal;
+    auto deepStorage = std::make_shared<PlaneBufferSet>();
+    deepStorage->storage.resize(sizeof(quint16));
+    qToLittleEndian<quint16>(4095,
+                             reinterpret_cast<uchar*>(deepStorage->storage.data()));
+    deepStorage->planes = {{0, 2, 2}};
+    ImageFrame deepFrame;
+    deepFrame.descriptor.size = deepParameters.size;
+    deepFrame.rawParameters = deepParameters;
+    deepFrame.storage = std::shared_ptr<const PlaneBufferSet>(deepStorage);
+    const auto deepRaw = ComparisonPixelProbe::sampleAtDisplayPixel(deepFrame, {0, 0});
+    QVERIFY(deepRaw.valid);
+    QCOMPARE(deepRaw.sourceValueText(), QStringLiteral("RAW(4095)"));
+
+    // Floating point frames keep the stored sample instead of a quantized QColor round trip.
+    QImage halfFloat(1, 1, QImage::Format_RGBA16FPx4);
+    auto* halfLine = reinterpret_cast<qfloat16*>(halfFloat.scanLine(0));
+    halfLine[0] = qfloat16(0.5F);
+    halfLine[1] = qfloat16(0.25F);
+    halfLine[2] = qfloat16(0.125F);
+    halfLine[3] = qfloat16(1.0F);
+    ImageFrame halfFloatFrame;
+    halfFloatFrame.descriptor.size = halfFloat.size();
+    halfFloatFrame.storage = std::move(halfFloat);
+    const auto halfFloatSample =
+        ComparisonPixelProbe::sampleAtDisplayPixel(halfFloatFrame, {0, 0});
+    QCOMPARE(halfFloatSample.sourceValueText(), QStringLiteral("RGB(0.5,0.25,0.125)"));
+
+    QImage fullFloat(1, 1, QImage::Format_RGBA32FPx4);
+    auto* floatLine = reinterpret_cast<float*>(fullFloat.scanLine(0));
+    floatLine[0] = 2.5F;
+    floatLine[1] = 0.001F;
+    floatLine[2] = -0.25F;
+    floatLine[3] = 1.0F;
+    ImageFrame fullFloatFrame;
+    fullFloatFrame.descriptor.size = fullFloat.size();
+    fullFloatFrame.storage = std::move(fullFloat);
+    const auto fullFloatSample =
+        ComparisonPixelProbe::sampleAtDisplayPixel(fullFloatFrame, {0, 0});
+    QCOMPARE(fullFloatSample.sourceValueText(), QStringLiteral("RGB(2.5,0.001,-0.25)"));
+
+    // A bounded RAW/YUV preview renders through the full source size, so hover coordinates in
+    // that space must still resolve against the decoded proxy.
+    RawImageParameters previewParameters;
+    previewParameters.size = {8, 8};
+    previewParameters.format = RawPixelFormat::Raw16;
+    QImage previewImage(4, 4, QImage::Format_RGBA8888);
+    previewImage.fill(QColor(40, 50, 60));
+    previewImage.setPixelColor(3, 3, QColor(70, 80, 90));
+    ImageFrame previewFrame;
+    previewFrame.descriptor.size = previewImage.size();
+    previewFrame.rawParameters = previewParameters;
+    previewFrame.storage = std::move(previewImage);
+    QCOMPARE(ComparisonPixelProbe::logicalFrameSize(previewFrame), QSize(8, 8));
+    const auto previewSample = ComparisonPixelProbe::sampleAtLogicalPixel(previewFrame, {7, 7},
+                                                                         QSize(8, 8));
+    QVERIFY(previewSample.valid);
+    QCOMPARE(previewSample.displayPixel, QPoint(7, 7));
+    QCOMPARE(previewSample.displayColor, QColor(70, 80, 90));
+    QCOMPARE(previewSample.sourceValueText(), QStringLiteral("RGB(70,80,90)"));
+    const auto edgeSample = ComparisonPixelProbe::sampleAtLogicalPixel(previewFrame, {0, 0},
+                                                                      QSize(8, 8));
+    QCOMPARE(edgeSample.displayColor, QColor(40, 50, 60));
+
+    // A RAW/YUV proxy whose source planes still need a full decode reports that state instead
+    // of passing off proxy pixels as source samples.
+    RawImageParameters pendingParameters;
+    pendingParameters.size = {8, 8};
+    pendingParameters.format = RawPixelFormat::Raw16;
+    pendingParameters.demosaic = false;
+    QImage pendingImage(4, 4, QImage::Format_RGBA8888);
+    pendingImage.fill(QColor(40, 50, 60));
+    ImageFrame pendingFrame;
+    pendingFrame.descriptor.size = pendingImage.size();
+    pendingFrame.rawParameters = pendingParameters;
+    pendingFrame.sourceSamplesPending = true;
+    pendingFrame.storage = std::move(pendingImage);
+    const auto pendingSample =
+        ComparisonPixelProbe::sampleAtLogicalPixel(pendingFrame, {7, 7}, QSize(8, 8));
+    QVERIFY(pendingSample.valid);
+    QVERIFY(pendingSample.sourceSamplesPending);
+    QCOMPARE(pendingSample.sourceValueText(), QStringLiteral("Loading pixel data…"));
+
+    // Once the full decode arrives, the same position reports real samples.
+    pendingFrame.sourceSamplesPending = false;
+    QCOMPARE(ComparisonPixelProbe::sampleAtLogicalPixel(pendingFrame, {7, 7}, QSize(8, 8))
+                 .sourceValueText(),
+             QStringLiteral("RGB(40,50,60)"));
 }
 
 void CoreTests::cursorAnchoredZoomPreservesImagePoint() {
@@ -148,6 +425,19 @@ void CoreTests::cursorAnchoredZoomPreservesImagePoint() {
     const ViewState zoomed = ViewTransform::zoomAt(state, 1.0, anchor, viewport, imageSize);
     const QPointF after = ViewTransform::widgetToImage(anchor, viewport, imageSize, zoomed);
     QVERIFY(QLineF(before, after).length() < 0.0001);
+
+    ViewState magnified;
+    magnified.fitMode = FitMode::Manual;
+    magnified.pixelsPerImagePixel = 64.0;
+    magnified.normalizedCenter = {0.43125, 0.6175};
+    const QSizeF fractionalViewport(499.5, 333.25);
+    const QPoint expectedPixel(432, 123);
+    const QPointF pixelCenter = ViewTransform::imageToWidget(
+        QPointF(expectedPixel.x() + 0.5, expectedPixel.y() + 0.5), fractionalViewport,
+        imageSize, magnified);
+    QCOMPARE(ViewTransform::imagePixelAtWidgetPoint(pixelCenter, fractionalViewport, imageSize,
+                                                     magnified),
+             std::optional<QPoint>(expectedPixel));
 }
 
 void CoreTests::panUsesImageScale() {

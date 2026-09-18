@@ -14,7 +14,7 @@ Item {
     property int navigationRevision: 0
     property real compareAmount: controller ? controller.splitAmount : 0.5
 
-    signal pixelHovered(int sourceSlot, point pixel, color colorValue, bool valid)
+    signal pixelHovered(int sourceSlot, point pixel, string valueText, bool valid)
 
     function navigationState(slot) {
         return { "visible": false }

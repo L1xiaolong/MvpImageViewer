@@ -38,8 +38,8 @@ QtObject {
                           : "Demo Camera B  •  1/640 s  •  f/2.8  •  ISO 100"
     }
     function pixelTexts(sourceSlot, x, y) {
-        return ["(" + x + "," + y + ") RGBA(92,118,73,255)",
-                "(" + x + "," + y + ") RGBA(88,113,70,255)"]
+        return ["(" + x + "," + y + ") RGB(92,118,73)",
+                "(" + x + "," + y + ") RGB(88,113,70)"]
     }
     function histogram(slot) {
         const bins = []

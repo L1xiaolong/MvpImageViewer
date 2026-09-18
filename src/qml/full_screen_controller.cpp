@@ -106,6 +106,13 @@ void FullScreenController::attachCanvas(QObject* object) {
     canvas_ = canvas;
     canvas_->setPresentationMode(0);
     canvas_->setSynchronized(false);
+    // Hovering a RAW/YUV preview promotes it to the full decode so the readout can show exact
+    // source samples, exactly like the gallery probe does.
+    connect(canvas_, &QmlImageCanvas::pixelProbeFullResolutionRequested, this, [this](int) {
+        if (frame_ && !fullRequested_) {
+            requestFullFrame(currentPath(), generation_);
+        }
+    });
     refreshCanvas(true);
 }
 

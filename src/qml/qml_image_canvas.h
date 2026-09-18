@@ -34,6 +34,7 @@ class QmlImageCanvas : public QQuickRhiItem {
 
   public:
     explicit QmlImageCanvas(QQuickItem* parent = nullptr);
+    ~QmlImageCanvas() override;
 
     int presentationMode() const { return presentationMode_; }
     qreal compareAmount() const { return compareAmount_; }
@@ -76,12 +77,15 @@ class QmlImageCanvas : public QQuickRhiItem {
     void backgroundColorChanged();
     void smoothDisplayChanged();
     void viewStateChanged(int slot, const ispview::ViewState& state);
-    void pixelHovered(int sourceSlot, const QPoint& pixel, const QColor& color, bool valid);
+    void pixelHovered(int sourceSlot, const QPoint& pixel, const QString& valueText, bool valid);
+    // Emitted when a probe needs source samples that only a full decode provides.
+    void pixelProbeFullResolutionRequested(int sourceSlot);
     void slotActivated(int slot);
     void contextMenuRequested(const QPointF& position);
 
   protected:
     QQuickRhiItemRenderer* createRenderer() override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
@@ -92,6 +96,9 @@ class QmlImageCanvas : public QQuickRhiItem {
   private:
     QVector<ImageFramePtr> frames_;
     QVector<ViewState> viewStates_;
+    // Frame that already reported a missing full decode per slot, so hovering keeps working
+    // without repeating the request.
+    QVector<const ImageFrame*> probeFullResolutionRequested_;
     SyncGroup syncGroup_;
     int presentationMode_ = 0;
     qreal compareAmount_ = 0.5;
@@ -104,9 +111,13 @@ class QmlImageCanvas : public QQuickRhiItem {
     QColor backgroundColor_{160, 160, 160};
     bool smoothDisplay_ = true;
     QTimer hoverProbeTimer_;
-    QPointF lastHoverPosition_;
+    QPointer<QWindow> hoverWindow_;
+    // Scene coordinates of the last probed cursor position. Events are published by the window,
+    // the item, and the cursor poll, so an exact match suppresses the duplicate reports while a
+    // real move always refreshes the probe.
+    QPointF lastHoverScenePosition_;
     int lastHoverNavigationRevision_ = -1;
-    bool hasLastHoverPosition_ = false;
+    bool hasLastHoverScenePosition_ = false;
     bool cursorInside_ = false;
 
     QRectF cellRect(int slot) const;
@@ -115,6 +126,9 @@ class QmlImageCanvas : public QQuickRhiItem {
     void setViewState(int slot, const ViewState& state, bool notify = true,
                       bool synchronizeViews = true);
     void notifyNavigationChanged();
+    void handleItemGeometryChanged();
+    void attachHoverWindow(QWindow* window);
+    void probeHoverScenePosition(const QPointF& scenePosition, bool force = false);
     void emitPixelAt(const QPointF& position);
     void clearPixelProbe();
     void pollCursorForPixelProbe();

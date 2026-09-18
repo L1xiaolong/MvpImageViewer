@@ -67,12 +67,6 @@ QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
             {QStringLiteral("channels"), channels}};
 }
 
-QSize logicalFrameSize(const ImageFramePtr& frame) {
-    if (!frame) return {};
-    const RawPlaneAccessor accessor(*frame);
-    return accessor.isValid() ? accessor.displaySize() : frame->descriptor.size;
-}
-
 } // namespace
 
 CompareController::CompareController(ImageLoader* loader, QObject* parent)
@@ -385,6 +379,11 @@ void CompareController::attachCanvas(QObject* object) {
     auto* canvas = qobject_cast<QmlImageCanvas*>(object);
     if (!canvas) return;
     canvas_ = canvas;
+    // Hovering a RAW/YUV preview promotes it to the full decode so the readout can show exact
+    // source samples, exactly like the gallery probe does.
+    connect(canvas_, &QmlImageCanvas::pixelProbeFullResolutionRequested, this, [this](int slot) {
+        requestFullFrame(slot, LoadCategory::Interactive);
+    });
     refreshCanvas(-1, true);
 }
 
@@ -401,22 +400,29 @@ void CompareController::refreshCanvas(int changedSlot, bool resetChangedView) {
 
 QVariantList CompareController::pixelTexts(int sourceSlot, int x, int y) const {
     const auto source = frame(sourceSlot);
-    const QSize sourceSize = logicalFrameSize(source);
+    // The canvas reports hover coordinates in a frame's zoom/pan space, so the source slot is
+    // sampled directly and the remaining slots map through the normalized pixel center.
+    const QSize sourceSize =
+        source ? ComparisonPixelProbe::logicalFrameSize(*source) : QSize{};
     if (!source || sourceSize.isEmpty()) return {};
     const QPointF normalized = ComparisonPixelProbe::normalizedPixelCenter({x, y}, sourceSize);
     QVariantList values;
     values.reserve(frames_.size());
-    for (const auto& candidate : frames_) {
+    for (int candidateSlot = 0; candidateSlot < frames_.size(); ++candidateSlot) {
+        const auto& candidate = frames_.at(candidateSlot);
         if (!candidate) {
             values.append(QString{});
             continue;
         }
-        const auto sample = ComparisonPixelProbe::sample(*candidate, normalized);
+        const auto sample = candidateSlot == sourceSlot
+                                ? ComparisonPixelProbe::sampleAtLogicalPixel(*candidate, {x, y},
+                                                                             sourceSize)
+                                : ComparisonPixelProbe::sample(*candidate, normalized);
         values.append(sample.valid
                           ? QStringLiteral("(%1,%2) %3")
                                 .arg(sample.displayPixel.x())
                                 .arg(sample.displayPixel.y())
-                                .arg(sample.displayValueText())
+                                .arg(sample.sourceValueText())
                           : QStringLiteral("Outside image"));
     }
     return values;

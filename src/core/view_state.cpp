@@ -14,7 +14,7 @@ double ViewTransform::fitScale(const QSize& imageSize, const QSize& viewportSize
     return std::max(0.0001, std::min(horizontal, vertical));
 }
 
-QPointF ViewTransform::widgetToImage(const QPointF& widgetPoint, const QSize& viewportSize,
+QPointF ViewTransform::widgetToImage(const QPointF& widgetPoint, const QSizeF& viewportSize,
                                      const QSize& imageSize, const ViewState& state) {
     if (imageSize.isEmpty() || state.pixelsPerImagePixel <= 0.0) {
         return {};
@@ -25,7 +25,7 @@ QPointF ViewTransform::widgetToImage(const QPointF& widgetPoint, const QSize& vi
     return imageCenter + (widgetPoint - viewportCenter) / state.pixelsPerImagePixel;
 }
 
-QPointF ViewTransform::imageToWidget(const QPointF& imagePoint, const QSize& viewportSize,
+QPointF ViewTransform::imageToWidget(const QPointF& imagePoint, const QSizeF& viewportSize,
                                      const QSize& imageSize, const ViewState& state) {
     const QPointF viewportCenter(viewportSize.width() * 0.5, viewportSize.height() * 0.5);
     const QPointF imageCenter(state.normalizedCenter.x() * imageSize.width(),
@@ -33,8 +33,21 @@ QPointF ViewTransform::imageToWidget(const QPointF& imagePoint, const QSize& vie
     return viewportCenter + (imagePoint - imageCenter) * state.pixelsPerImagePixel;
 }
 
+std::optional<QPoint>
+ViewTransform::imagePixelAtWidgetPoint(const QPointF& widgetPoint, const QSizeF& viewportSize,
+                                       const QSize& imageSize, const ViewState& state) {
+    const QPointF imagePoint = widgetToImage(widgetPoint, viewportSize, imageSize, state);
+    if (!std::isfinite(imagePoint.x()) || !std::isfinite(imagePoint.y()) ||
+        imagePoint.x() < 0.0 || imagePoint.y() < 0.0 || imagePoint.x() >= imageSize.width() ||
+        imagePoint.y() >= imageSize.height()) {
+        return std::nullopt;
+    }
+    return QPoint(static_cast<int>(std::floor(imagePoint.x())),
+                  static_cast<int>(std::floor(imagePoint.y())));
+}
+
 ViewState ViewTransform::zoomAt(const ViewState& state, double newScale,
-                                const QPointF& anchorInWidget, const QSize& viewportSize,
+                                const QPointF& anchorInWidget, const QSizeF& viewportSize,
                                 const QSize& imageSize) {
     if (imageSize.isEmpty()) {
         return state;
@@ -67,7 +80,7 @@ ViewState ViewTransform::panBy(const ViewState& state, const QPointF& widgetDelt
     return result;
 }
 
-QRectF ViewTransform::visibleNormalizedRect(const QSize& viewportSize, const QSize& imageSize,
+QRectF ViewTransform::visibleNormalizedRect(const QSizeF& viewportSize, const QSize& imageSize,
                                             const ViewState& state) {
     if (viewportSize.isEmpty() || imageSize.isEmpty() || state.pixelsPerImagePixel <= 0.0) {
         return {};

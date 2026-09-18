@@ -10,7 +10,7 @@ Rectangle {
                                  settingsController.smoothDisplay === undefined
                                  ? true : settingsController.smoothDisplay
     property int navigationRevision: 1
-    signal pixelHovered(int sourceSlot, point pixel, color colorValue, bool valid)
+    signal pixelHovered(int sourceSlot, point pixel, string valueText, bool valid)
     signal contextMenuRequested(point position)
 
     color: "#A0A0A0"
@@ -38,7 +38,7 @@ Rectangle {
         acceptedButtons: Qt.RightButton
         hoverEnabled: true
         onPositionChanged: root.pixelHovered(0, Qt.point(Math.round(mouseX), Math.round(mouseY)),
-                                             "#5078A0", true)
+                                             "RGB(80,120,160)", true)
         onClicked: function(mouse) {
             if (mouse.button === Qt.RightButton)
                 root.contextMenuRequested(Qt.point(mouse.x, mouse.y))

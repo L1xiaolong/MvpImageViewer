@@ -318,20 +318,6 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
     return image;
 }
 
-QImage applyOrientation(QImage source, ImageOrientation orientation) {
-    if (orientation == ImageOrientation::Normal || source.isNull()) {
-        return source;
-    }
-    QImage oriented(orientedImageSize(source.size(), orientation), source.format());
-    for (int y = 0; y < oriented.height(); ++y) {
-        for (int x = 0; x < oriented.width(); ++x) {
-            const QPoint sourcePixel = displayToSourcePixel({x, y}, source.size(), orientation);
-            oriented.setPixel(x, y, source.pixel(sourcePixel));
-        }
-    }
-    return oriented;
-}
-
 } // namespace
 
 QString RawImageDecoder::cacheIdentity() const { return QStringLiteral("headerless-raw-v1"); }
@@ -388,7 +374,7 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     const QSize sourceOutputSize = orientedImageSize(outputSize, parameters.orientation);
     QImage display = parameters.isYuv() ? convertYuv(bytes, parameters, sourceOutputSize)
                                         : convertBayer(bytes, parameters, sourceOutputSize);
-    display = applyOrientation(std::move(display), parameters.orientation);
+    display = orientedImage(std::move(display), parameters.orientation);
     if (display.isNull()) {
         return {{}, QStringLiteral("RAW/YUV conversion failed")};
     }
@@ -414,6 +400,8 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     frame->metadata.decoderName = QStringLiteral("ISPView RAW/YUV");
     frame->metadata.sourceSize = logicalDisplaySize;
     frame->rawParameters = parameters;
+    // Only a full decode keeps the source planes the exact probes read.
+    frame->sourceSamplesPending = request.purpose != DecodePurpose::Full;
     if (request.purpose != DecodePurpose::Full) {
         frame->storage = std::move(display);
     } else {

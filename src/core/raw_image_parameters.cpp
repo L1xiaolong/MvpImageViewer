@@ -1,6 +1,9 @@
 #include "core/raw_image_parameters.h"
 
+#include <QtEndian>
+
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 
@@ -23,6 +26,129 @@ qsizetype effectiveStride(qsizetype configured, qsizetype minimum) {
 }
 
 } // namespace
+
+BayerPattern shiftedBayerPattern(BayerPattern pattern, int dx, int dy) {
+    // The four phases are RGGB with optional x/y inversions, and a shift toggles the inversion
+    // of the axis it moves along.
+    bool invertX = (((dx % 2) + 2) % 2) == 1;
+    bool invertY = (((dy % 2) + 2) % 2) == 1;
+    switch (pattern) {
+    case BayerPattern::RGGB:
+        break;
+    case BayerPattern::GRBG:
+        invertX = !invertX;
+        break;
+    case BayerPattern::GBRG:
+        invertY = !invertY;
+        break;
+    case BayerPattern::BGGR:
+        invertX = !invertX;
+        invertY = !invertY;
+        break;
+    }
+    if (invertX && invertY) {
+        return BayerPattern::BGGR;
+    }
+    if (invertX) {
+        return BayerPattern::GRBG;
+    }
+    if (invertY) {
+        return BayerPattern::GBRG;
+    }
+    return BayerPattern::RGGB;
+}
+
+QByteArray packedMosaicPlane(const quint16* samples, qsizetype strideInSamples,
+                             const QSize& sampleSize, const QRect& crop, bool littleEndian,
+                             int validBits) {
+    if (!samples || strideInSamples <= 0 || validBits <= 0 || validBits > 16 ||
+        crop.x() < 0 || crop.y() < 0 || crop.isEmpty() ||
+        crop.x() + crop.width() > sampleSize.width() ||
+        crop.y() + crop.height() > sampleSize.height() ||
+        strideInSamples < crop.x() + crop.width()) {
+        return {};
+    }
+    const quint16 mask =
+        static_cast<quint16>(validBits >= 16 ? 0xFFFFU : ((1U << validBits) - 1U));
+    const qsizetype rowBytes = static_cast<qsizetype>(crop.width()) * 2;
+    QByteArray plane(rowBytes * crop.height(), Qt::Uninitialized);
+    auto* destination = reinterpret_cast<uchar*>(plane.data());
+    for (int row = 0; row < crop.height(); ++row) {
+        const quint16* sourceRow =
+            samples + static_cast<qsizetype>(crop.y() + row) * strideInSamples + crop.x();
+        auto* destinationRow = destination + static_cast<qsizetype>(row) * rowBytes;
+        for (int column = 0; column < crop.width(); ++column) {
+            const quint16 value = static_cast<quint16>(sourceRow[column] & mask);
+            uchar* bytes = destinationRow + static_cast<qsizetype>(column) * 2;
+            if (littleEndian) {
+                qToLittleEndian<quint16>(value, bytes);
+            } else {
+                qToBigEndian<quint16>(value, bytes);
+            }
+        }
+    }
+    return plane;
+}
+
+QImage grayMosaicImage(const QByteArray& plane, const RawImageParameters& parameters,
+                       const QSize& outputSize) {
+    const QSize sourceSize = parameters.size;
+    const qsizetype rowBytes = static_cast<qsizetype>(sourceSize.width()) * 2;
+    if (sourceSize.isEmpty() || plane.size() < rowBytes * sourceSize.height() ||
+        parameters.maximumSampleValue() <= parameters.blackLevel) {
+        return {};
+    }
+    const QSize target = outputSize.isEmpty() ? sourceSize : outputSize;
+    if (target.isEmpty()) {
+        return {};
+    }
+    const int maximum = parameters.whiteLevel > parameters.blackLevel
+                            ? parameters.whiteLevel
+                            : parameters.maximumSampleValue();
+    const quint16 mask = static_cast<quint16>(parameters.validBits() >= 16
+                                                  ? 0xFFFFU
+                                                  : ((1U << parameters.validBits()) - 1U));
+    const auto sampleAt = [&](int x, int y) {
+        const auto* bytes = reinterpret_cast<const uchar*>(plane.constData()) +
+                            static_cast<qsizetype>(y) * rowBytes + static_cast<qsizetype>(x) * 2;
+        const quint16 stored = parameters.littleEndian ? qFromLittleEndian<quint16>(bytes)
+                                                       : qFromBigEndian<quint16>(bytes);
+        return static_cast<int>(stored & mask);
+    };
+    QImage image(target, QImage::Format_RGBA8888);
+    if (image.isNull()) {
+        return {};
+    }
+    const bool fullSize = target == sourceSize;
+    for (int y = 0; y < target.height(); ++y) {
+        auto* destination = image.scanLine(y);
+        for (int x = 0; x < target.width(); ++x) {
+            const int sourceX =
+                fullSize ? x
+                         : std::clamp(static_cast<int>((x + 0.5) * sourceSize.width() /
+                                                       target.width()),
+                                      0, sourceSize.width() - 1);
+            const int sourceY =
+                fullSize ? y
+                         : std::clamp(static_cast<int>((y + 0.5) * sourceSize.height() /
+                                                       target.height()),
+                                      0, sourceSize.height() - 1);
+            const double normalized =
+                std::clamp((sampleAt(sourceX, sourceY) - parameters.blackLevel) /
+                               static_cast<double>(maximum - parameters.blackLevel),
+                           0.0, 1.0);
+            const auto gray = static_cast<uchar>(std::clamp(
+                static_cast<int>(std::lround(std::pow(normalized, 1.0 / parameters.displayGamma) *
+                                             255.0)),
+                0, 255));
+            destination[x * 4 + 0] = gray;
+            destination[x * 4 + 1] = gray;
+            destination[x * 4 + 2] = gray;
+            destination[x * 4 + 3] = 255;
+        }
+    }
+    return image;
+}
 
 bool RawImageParameters::isYuv() const {
     return format == RawPixelFormat::NV12 || format == RawPixelFormat::NV21 ||
@@ -255,6 +381,23 @@ QPoint displayToSourcePixel(const QPoint& displayPixel, const QSize& sourceSize,
         return {sourceSize.width() - 1 - displayPixel.y(), displayPixel.x()};
     }
     return displayPixel;
+}
+
+QImage orientedImage(QImage source, ImageOrientation orientation) {
+    if (orientation == ImageOrientation::Normal || source.isNull()) {
+        return source;
+    }
+    QImage oriented(orientedImageSize(source.size(), orientation), source.format());
+    if (oriented.isNull()) {
+        return source;
+    }
+    for (int y = 0; y < oriented.height(); ++y) {
+        for (int x = 0; x < oriented.width(); ++x) {
+            const QPoint sourcePixel = displayToSourcePixel({x, y}, source.size(), orientation);
+            oriented.setPixel(x, y, source.pixel(sourcePixel));
+        }
+    }
+    return oriented;
 }
 
 } // namespace ispview

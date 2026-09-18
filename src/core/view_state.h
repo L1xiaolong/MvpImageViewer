@@ -3,6 +3,7 @@
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
+#include <QSizeF>
 
 #include <optional>
 
@@ -23,16 +24,21 @@ class ViewTransform final {
   public:
     [[nodiscard]] static double fitScale(const QSize& imageSize, const QSize& viewportSize);
     [[nodiscard]] static QPointF widgetToImage(const QPointF& widgetPoint,
-                                               const QSize& viewportSize, const QSize& imageSize,
+                                               const QSizeF& viewportSize, const QSize& imageSize,
                                                const ViewState& state);
-    [[nodiscard]] static QPointF imageToWidget(const QPointF& imagePoint, const QSize& viewportSize,
+    [[nodiscard]] static QPointF imageToWidget(const QPointF& imagePoint,
+                                               const QSizeF& viewportSize,
                                                const QSize& imageSize, const ViewState& state);
+    [[nodiscard]] static std::optional<QPoint>
+    imagePixelAtWidgetPoint(const QPointF& widgetPoint, const QSizeF& viewportSize,
+                            const QSize& imageSize, const ViewState& state);
     [[nodiscard]] static ViewState zoomAt(const ViewState& state, double newScale,
-                                          const QPointF& anchorInWidget, const QSize& viewportSize,
+                                          const QPointF& anchorInWidget,
+                                          const QSizeF& viewportSize,
                                           const QSize& imageSize);
     [[nodiscard]] static ViewState panBy(const ViewState& state, const QPointF& widgetDelta,
                                          const QSize& imageSize);
-    [[nodiscard]] static QRectF visibleNormalizedRect(const QSize& viewportSize,
+    [[nodiscard]] static QRectF visibleNormalizedRect(const QSizeF& viewportSize,
                                                       const QSize& imageSize,
                                                       const ViewState& state);
     [[nodiscard]] static QPointF clampedCenter(QPointF center);

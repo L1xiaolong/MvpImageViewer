@@ -25,7 +25,7 @@ Item {
         Component.onCompleted: {
             open(mockFullScreen.paths, 0)
             showPropertiesDialog()
-            pixelText = "(1842,1064) RGBA(80,120,160,255)"
+            pixelText = "(1842,1064) RGB(80,120,160)"
         }
     }
 }

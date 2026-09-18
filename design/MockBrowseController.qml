@@ -324,6 +324,6 @@ QtObject {
         galleryImageChanged();
     }
     function probeGalleryPixel(x, y) {
-        return "x " + x + " · y " + y + " · RGBA(32, 64, 96, 255)";
+        return "x " + x + " · y " + y + " · RGB(32,64,96)";
     }
 }

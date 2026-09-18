@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QImage>
 #include <QPoint>
 #include <QSize>
 #include <QString>
@@ -49,12 +50,31 @@ struct RawImageParameters {
 [[nodiscard]] QString rawPixelFormatName(RawPixelFormat format);
 [[nodiscard]] QString bayerPatternName(BayerPattern pattern);
 [[nodiscard]] QString yuvMatrixName(YuvMatrix matrix);
+// Shifts a Bayer pattern by (dx, dy) positions, which is what cropping a mosaic off its original
+// origin does to the colour phase.
+[[nodiscard]] BayerPattern shiftedBayerPattern(BayerPattern pattern, int dx, int dy);
+// Copies a 16-bit mosaic out of a strided sensor array into a tightly packed RAW16 plane,
+// clamping to the source bounds and masking every sample to the valid-bit range. Returns an
+// empty array when the geometry does not describe a readable region.
+[[nodiscard]] QByteArray packedMosaicPlane(const quint16* samples, qsizetype strideInSamples,
+                                           const QSize& sampleSize, const QRect& crop,
+                                           bool littleEndian, int validBits);
+// Renders a packed RAW16 Bayer plane as the un-demosaiced grey mosaic the viewer shows when
+// demosaicing is off: black level removal, white-level normalization, and display gamma, using
+// the same transform as the headerless RAW path. Samples are masked to the valid-bit range, and
+// an output size other than parameters.size samples the mosaic with nearest neighbours.
+[[nodiscard]] QImage grayMosaicImage(const QByteArray& plane,
+                                     const RawImageParameters& parameters,
+                                     const QSize& outputSize = {});
 [[nodiscard]] qsizetype minimumRowStride(const RawImageParameters& parameters);
 [[nodiscard]] qsizetype minimumChromaRowStride(const RawImageParameters& parameters);
 [[nodiscard]] qsizetype frameByteSize(const RawImageParameters& parameters);
 [[nodiscard]] qsizetype estimatedFullFrameBytes(const RawImageParameters& parameters);
 [[nodiscard]] int availableFrameCount(qint64 fileSize, const RawImageParameters& parameters);
 [[nodiscard]] QSize orientedImageSize(const QSize& sourceSize, ImageOrientation orientation);
+// Rotates a decoded image into the orientation its parameters describe. The mapping matches
+// displayToSourcePixel so plane reads and rendered pixels stay aligned.
+[[nodiscard]] QImage orientedImage(QImage source, ImageOrientation orientation);
 [[nodiscard]] QPoint displayToSourcePixel(const QPoint& displayPixel, const QSize& sourceSize,
                                           ImageOrientation orientation);
 

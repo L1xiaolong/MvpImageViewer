@@ -81,7 +81,7 @@ bool supportsGpuYuv(const ImageFramePtr& frame) {
     if (!frame || !frame->rawParameters || !frame->rawParameters->isYuv())
         return false;
     const auto* storage = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&frame->storage);
-    if (!storage || !*storage)
+    if (!storage || !*storage || (*storage)->renderFromDisplayImage)
         return false;
     const bool planar = frame->rawParameters->format == RawPixelFormat::I420;
     const int required = planar ? 3 : 2;
@@ -101,7 +101,8 @@ bool supportsGpuBayer(const ImageFramePtr& frame) {
     if (!frame || !frame->rawParameters || frame->rawParameters->isYuv())
         return false;
     const auto* storage = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&frame->storage);
-    if (!storage || !*storage || (*storage)->planes.isEmpty())
+    if (!storage || !*storage || (*storage)->planes.isEmpty() ||
+        (*storage)->renderFromDisplayImage)
         return false;
     const PlaneBuffer& plane = (*storage)->planes.constFirst();
     return plane.stride > 0 && plane.stride <= std::numeric_limits<int>::max() &&
@@ -116,13 +117,8 @@ QImage displayImage(const ImageFramePtr& frame) {
 }
 
 QSize logicalSize(const ImageFramePtr& frame) {
-    if (!frame)
-        return {};
-    if (frame->rawParameters)
-        return orientedImageSize(frame->rawParameters->size, frame->rawParameters->orientation);
-    if (!frame->descriptor.size.isEmpty())
-        return frame->descriptor.size;
-    return displayImage(frame).size();
+    // Shared with the pixel probe so hover coordinates and sampled pixels can never diverge.
+    return frame ? ComparisonPixelProbe::logicalFrameSize(*frame) : QSize{};
 }
 
 struct EncodedTextureUpload {
@@ -738,14 +734,90 @@ QmlImageCanvas::QmlImageCanvas(QQuickItem* parent) : QQuickRhiItem(parent) {
     connect(&hoverProbeTimer_, &QTimer::timeout, this,
             &QmlImageCanvas::pollCursorForPixelProbe);
     hoverProbeTimer_.start();
-    connect(this, &QQuickItem::widthChanged, this, [this] {
-        emit dividerPositionChanged();
-        notifyNavigationChanged();
-    });
-    connect(this, &QQuickItem::heightChanged, this, [this] {
-        emit dividerPositionChanged();
-        notifyNavigationChanged();
-    });
+    // Window-level pointer events are also observed directly: full-display presentation
+    // rebuilds the native window, and that can leave item-level hover tracking stale until a
+    // button press hands the item the mouse grab. Watching the window keeps hovering live.
+    connect(this, &QQuickItem::windowChanged, this, &QmlImageCanvas::attachHoverWindow);
+    attachHoverWindow(window());
+    connect(this, &QQuickItem::widthChanged, this,
+            &QmlImageCanvas::handleItemGeometryChanged);
+    connect(this, &QQuickItem::heightChanged, this,
+            &QmlImageCanvas::handleItemGeometryChanged);
+}
+
+QmlImageCanvas::~QmlImageCanvas() {
+    // QQuickItem re-emits its geometry and window signals while its own destructor tears the
+    // scene down, which would call back into this already partially destroyed object. Release
+    // the hover plumbing here, while every member is still alive.
+    disconnect(this, &QQuickItem::windowChanged, this, &QmlImageCanvas::attachHoverWindow);
+    disconnect(this, &QQuickItem::widthChanged, this,
+               &QmlImageCanvas::handleItemGeometryChanged);
+    disconnect(this, &QQuickItem::heightChanged, this,
+               &QmlImageCanvas::handleItemGeometryChanged);
+    hoverProbeTimer_.stop();
+    if (hoverWindow_) {
+        hoverWindow_->removeEventFilter(this);
+    }
+}
+
+void QmlImageCanvas::handleItemGeometryChanged() {
+    emit dividerPositionChanged();
+    notifyNavigationChanged();
+}
+
+void QmlImageCanvas::attachHoverWindow(QWindow* window) {
+    if (hoverWindow_ == window) {
+        return;
+    }
+    if (hoverWindow_) {
+        hoverWindow_->removeEventFilter(this);
+    }
+    hoverWindow_ = window;
+    if (hoverWindow_) {
+        hoverWindow_->installEventFilter(this);
+    }
+    hasLastHoverScenePosition_ = false;
+}
+
+bool QmlImageCanvas::eventFilter(QObject* watched, QEvent* event) {
+    if (watched != hoverWindow_) {
+        return QQuickRhiItem::eventFilter(watched, event);
+    }
+    switch (event->type()) {
+    case QEvent::HoverEnter:
+    case QEvent::HoverMove:
+        probeHoverScenePosition(static_cast<QHoverEvent*>(event)->scenePosition());
+        break;
+    case QEvent::MouseMove:
+        probeHoverScenePosition(static_cast<QMouseEvent*>(event)->scenePosition());
+        break;
+    case QEvent::HoverLeave:
+    case QEvent::Leave:
+    case QEvent::WindowDeactivate:
+        clearPixelProbe();
+        break;
+    default:
+        break;
+    }
+    return QQuickRhiItem::eventFilter(watched, event);
+}
+
+void QmlImageCanvas::probeHoverScenePosition(const QPointF& scenePosition, bool force) {
+    const bool navigationChanged = lastHoverNavigationRevision_ != navigationRevision_;
+    if (!force && !navigationChanged && hasLastHoverScenePosition_ &&
+        scenePosition == lastHoverScenePosition_) {
+        return;
+    }
+    lastHoverScenePosition_ = scenePosition;
+    lastHoverNavigationRevision_ = navigationRevision_;
+    hasLastHoverScenePosition_ = true;
+    const QPointF localPosition = mapFromScene(scenePosition);
+    if (contains(localPosition)) {
+        cursorInside_ = true;
+        emitPixelAt(localPosition);
+    } else if (cursorInside_) {
+        clearPixelProbe();
+    }
 }
 
 void QmlImageCanvas::setPresentationMode(int mode) {
@@ -799,6 +871,7 @@ void QmlImageCanvas::setFrames(const QVector<ImageFramePtr>& frames, int changed
     const int oldCount = static_cast<int>(frames_.size());
     frames_ = frames.mid(0, kMaximumImages);
     viewStates_.resize(frames_.size());
+    probeFullResolutionRequested_.resize(frames_.size());
     if (resetChangedView && changedSlot >= 0 && changedSlot < viewStates_.size()) {
         viewStates_[changedSlot] = {};
         viewStates_[changedSlot].fitMode = FitMode::Fit;
@@ -859,7 +932,7 @@ qreal QmlImageCanvas::dividerPosition() const {
             ? QPointF(compareAmount_ * imageSize.width(), imageSize.height() * 0.5)
             : QPointF(imageSize.width() * 0.5, compareAmount_ * imageSize.height());
     const QPointF local =
-        ViewTransform::imageToWidget(imagePoint, QSize(qRound(cell.width()), qRound(cell.height())),
+        ViewTransform::imageToWidget(imagePoint, cell.size(),
                                      imageSize, effectiveViewState(0));
     return presentationMode_ == 1 ? cell.x() + local.x() : cell.y() + local.y();
 }
@@ -884,8 +957,7 @@ QVariantMap QmlImageCanvas::navigationState(int slot) const {
         {QStringLiteral("width"), contentSize.width() + 6},
         {QStringLiteral("height"), contentSize.height() + 6},
         {QStringLiteral("viewport"),
-         ViewTransform::visibleNormalizedRect(QSize(qRound(cell.width()), qRound(cell.height())),
-                                              imageSize, state)},
+         ViewTransform::visibleNormalizedRect(cell.size(), imageSize, state)},
         {QStringLiteral("zoom"), zoom},
     };
 }
@@ -955,7 +1027,7 @@ QPointF QmlImageCanvas::normalizedPoint(int slot, const QPointF& position) const
         return {};
     const QPointF local = position - cell.topLeft();
     const QPointF image =
-        ViewTransform::widgetToImage(local, QSize(qRound(cell.width()), qRound(cell.height())),
+        ViewTransform::widgetToImage(local, cell.size(),
                                      imageSize, effectiveViewState(slot));
     return {std::clamp(image.x() / imageSize.width(), 0.0, 1.0),
             std::clamp(image.y() / imageSize.height(), 0.0, 1.0)};
@@ -970,23 +1042,31 @@ void QmlImageCanvas::emitPixelAt(const QPointF& position) {
         return;
     }
     const QRectF cell = cellRect(slot);
-    const QPointF imagePosition = ViewTransform::widgetToImage(
-        position - cell.topLeft(), QSize(qRound(cell.width()), qRound(cell.height())), imageSize,
-        effectiveViewState(slot));
-    const QPoint pixel(qFloor(imagePosition.x()), qFloor(imagePosition.y()));
-    if (!QRect(QPoint{}, imageSize).contains(pixel)) {
-        emit pixelHovered(slot, pixel, {}, false);
+    const auto pixel = ViewTransform::imagePixelAtWidgetPoint(
+        position - cell.topLeft(), cell.size(), imageSize, effectiveViewState(slot));
+    if (!pixel) {
+        emit pixelHovered(slot, {}, {}, false);
         return;
     }
-    const ComparisonPixelSample sample = ComparisonPixelProbe::sample(
-        *frame, ComparisonPixelProbe::normalizedPixelCenter(pixel, imageSize));
-    emit pixelHovered(slot, pixel, sample.displayColor, sample.valid);
+    const ComparisonPixelSample sample =
+        ComparisonPixelProbe::sampleAtLogicalPixel(*frame, *pixel, imageSize);
+    if (sample.sourceSamplesPending && slot >= 0 &&
+        slot < probeFullResolutionRequested_.size() &&
+        probeFullResolutionRequested_.at(slot) != frame.get()) {
+        probeFullResolutionRequested_[slot] = frame.get();
+        emit pixelProbeFullResolutionRequested(slot);
+    }
+    emit pixelHovered(slot, *pixel, sample.sourceValueText(), sample.valid);
 }
 
 void QmlImageCanvas::clearPixelProbe() {
+    const bool wasInside = cursorInside_;
     cursorInside_ = false;
-    hasLastHoverPosition_ = false;
-    emit pixelHovered(-1, {}, {}, false);
+    hasLastHoverScenePosition_ = false;
+    if (wasInside) {
+        // Qt publishes a leave to both the window and the item, so clearing stays idempotent.
+        emit pixelHovered(-1, {}, {}, false);
+    }
 }
 
 void QmlImageCanvas::pollCursorForPixelProbe() {
@@ -995,25 +1075,13 @@ void QmlImageCanvas::pollCursorForPixelProbe() {
         if (cursorInside_) {
             clearPixelProbe();
         }
-        hasLastHoverPosition_ = false;
+        hasLastHoverScenePosition_ = false;
         return;
     }
 
-    const QPoint windowPosition = quickWindow->mapFromGlobal(QCursor::pos());
-    const QPointF localPosition = mapFromScene(QPointF(windowPosition));
-    const bool navigationChanged = lastHoverNavigationRevision_ != navigationRevision_;
-    if (hasLastHoverPosition_ && localPosition == lastHoverPosition_ && !navigationChanged)
-        return;
-
-    lastHoverPosition_ = localPosition;
-    lastHoverNavigationRevision_ = navigationRevision_;
-    hasLastHoverPosition_ = true;
-    if (contains(localPosition)) {
-        cursorInside_ = true;
-        emitPixelAt(localPosition);
-    } else if (cursorInside_) {
-        clearPixelProbe();
-    }
+    // Polling covers platforms that never deliver hover events to this item. Scene coordinates
+    // come from the integer cursor position, so an unchanged cursor does not re-run the probe.
+    probeHoverScenePosition(quickWindow->mapFromGlobal(QCursor::pos()));
 }
 
 void QmlImageCanvas::wheelEvent(QWheelEvent* event) {
@@ -1030,9 +1098,13 @@ void QmlImageCanvas::wheelEvent(QWheelEvent* event) {
     const bool controlHeld = isIndependentViewAdjustment(event->modifiers());
     setViewState(slot,
                  ViewTransform::zoomAt(state, scale, local,
-                                       QSize(qRound(cell.width()), qRound(cell.height())),
+                                       cell.size(),
                                        imageSize),
                  true, !controlHeld);
+    // The zoom anchors on the cursor, so the pixel below it changes even when the pointer
+    // does not move. Probing with this exact event position keeps the reported pixel aligned
+    // with the magnified image instead of waiting for the rounded cursor poll.
+    probeHoverScenePosition(event->scenePosition(), true);
     event->accept();
 }
 
@@ -1064,7 +1136,7 @@ void QmlImageCanvas::mousePressEvent(QMouseEvent* event) {
 }
 
 void QmlImageCanvas::mouseMoveEvent(QMouseEvent* event) {
-    emitPixelAt(event->position());
+    probeHoverScenePosition(event->scenePosition());
     if (dividerDragging_) {
         const QPointF normalized = normalizedPoint(0, event->position());
         setCompareAmount(presentationMode_ == 1 ? normalized.x() : normalized.y());
@@ -1102,7 +1174,7 @@ void QmlImageCanvas::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void QmlImageCanvas::hoverMoveEvent(QHoverEvent* event) {
-    emitPixelAt(event->position());
+    probeHoverScenePosition(event->scenePosition());
     if (presentationMode_ != 0 && !dragging_ && !dividerDragging_) {
         const qreal pointer =
             presentationMode_ == 1 ? event->position().x() : event->position().y();

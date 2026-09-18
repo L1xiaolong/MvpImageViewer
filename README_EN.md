@@ -64,7 +64,7 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 | Workflow | Capabilities |
 |---|---|
 | Browse | Finder/Explorer-style directory tree, history, search, sorting, thumbnails, and multi-folder workspaces |
-| Inspect | Fit, 100%, cursor-centered zoom, pan, coordinates, RGBA values, file details, EXIF, and luma histograms |
+| Inspect | Fit, 100%, cursor-centered zoom, pan, coordinates, RGB values, file details, EXIF, and luma histograms |
 | Compare | Synchronized two-to-four-image zoom/pan, horizontal or vertical split, hold-B-over-A, and per-pane details |
 | Manage files | Copy, cut, paste, rename, drag and drop, reveal in file manager, and system Trash integration |
 | Extended formats | Optional RAW/YUV interpretation, camera RAW, metadata extraction, and ICC-to-sRGB conversion |
@@ -74,7 +74,7 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 - Finder/Explorer-style directory tree, history navigation, search, sorting, and thumbnail browsing
 - Asynchronous directory scanning, image decoding, and persistent thumbnail caching
 - GPU-backed image canvas built on Qt RHI
-- Fit, 100%, cursor-centered zoom, pan, coordinate display, and RGBA pixel inspection
+- Fit, 100%, cursor-centered zoom, pan, coordinates, and pixel inspection: no alpha channel; YUV reports the source YUV triple together with the converted RGB, RAW shows the mosaic itself (grey) when demosaicing is off and a RAW-depth RGB when it is on, 16-bit data keeps its source depth; camera RAW (LibRaw) decodes at 16-bit, retains the sensor mosaic, and applies the demosaic switch to both the image and the pixel values; RAW/YUV previews are promoted to the full decode before source samples are reported; the hovered coordinate stays aligned with the image at high magnification
 - Full-screen browsing and synchronized zoom/pan comparison for two to four images
 - Horizontal or vertical split inspection for two images, plus hold-B-over-A comparison
 - Per-pane file information, EXIF data, luma histogram, and pixel overlays
@@ -111,7 +111,7 @@ The app checks GitHub Releases at most once every 24 hours when automatic checks
 | HEIC / HEIF | System-dependent | Enabled when the current Qt/OS HEIF plugin is available; reads the primary image without sequence playback |
 | NV12 / NV21 / I420 / P010 | Built-in advanced feature | Headerless data; width, height, stride, and related parameters are required |
 | Bayer RAW10 / RAW12 / RAW16 | Built-in advanced feature | CFA, valid bits, byte order, black/white levels, white balance, CCM, and gamma parameters |
-| DNG / camera RAW | Optional | Requires LibRaw 0.21+ |
+| DNG / camera RAW | Optional | Requires LibRaw 0.21+; decoded at 16-bit with the sensor mosaic retained for exact pixel inspection |
 | EXIF / IPTC / XMP | Optional | JPEG/PNG metadata requires Exiv2 0.28+ |
 | Embedded RGB ICC | Optional | Requires LittleCMS 2.x and converts into an sRGB display buffer |
 

@@ -208,6 +208,9 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
     QObject::connect(
         mainWindow, &QWindow::visibilityChanged, &app,
         [mainWindow, &lastMainWindowStateWasMaximized](QWindow::Visibility visibility) {
+#ifndef Q_OS_WIN
+            Q_UNUSED(mainWindow);
+#endif
 #ifdef Q_OS_WIN
             if (visibility == QWindow::Hidden
                 && mainWindow->property("applicationExitPending").toBool()) {

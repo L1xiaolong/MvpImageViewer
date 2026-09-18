@@ -21,11 +21,13 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QHash>
+#include <QHoverEvent>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMutex>
+#include <QQuickWindow>
 #include <QMutexLocker>
 #include <QSettings>
 #include <QSignalSpy>
@@ -36,6 +38,7 @@
 #include <QTest>
 #include <QUrl>
 #include <QWheelEvent>
+#include <QtEndian>
 
 #include <atomic>
 #include <cmath>
@@ -111,6 +114,59 @@ class PurposeTrackingDecoder final : public IImageDecoder {
 
   private:
     QSize sourceSize_;
+    mutable QMutex mutex_;
+    mutable QHash<int, int> purposeCounts_;
+};
+
+class RawPreviewTrackingDecoder final : public IImageDecoder {
+  public:
+    [[nodiscard]] bool canDecode(const QString&) const override { return true; }
+
+    [[nodiscard]] DecodeResult decode(const DecodeRequest& request) const override {
+        {
+            const QMutexLocker lock(&mutex_);
+            ++purposeCounts_[static_cast<int>(request.purpose)];
+        }
+        auto frame = std::make_shared<ImageFrame>();
+        RawImageParameters parameters;
+        parameters.size = {4, 4};
+        parameters.format = RawPixelFormat::Raw16;
+        parameters.validBitsOverride = 12;
+        parameters.bayerPattern = BayerPattern::RGGB;
+        parameters.demosaic = false;
+        frame->rawParameters = parameters;
+        frame->descriptor.size = {4, 4};
+        frame->metadata.path = request.path;
+        frame->metadata.fileName = QFileInfo(request.path).fileName();
+        frame->metadata.sourceSize = QSize(4, 4);
+        if (request.purpose == DecodePurpose::Full) {
+            auto storage = std::make_shared<PlaneBufferSet>();
+            storage->storage.resize(4 * 4 * 2);
+            for (int index = 0; index < 16; ++index) {
+                qToLittleEndian<quint16>(
+                    static_cast<quint16>(index + 1),
+                    reinterpret_cast<uchar*>(storage->storage.data() + index * 2));
+            }
+            storage->planes = {{0, 8, 32}};
+            storage->displayImage = QImage(4, 4, QImage::Format_RGBA8888);
+            storage->displayImage.fill(QColor(20, 30, 40));
+            frame->storage = std::shared_ptr<const PlaneBufferSet>(storage);
+        } else {
+            QImage proxy(2, 2, QImage::Format_RGBA8888);
+            proxy.fill(QColor(20, 30, 40));
+            frame->descriptor.size = proxy.size();
+            frame->sourceSamplesPending = true;
+            frame->storage = std::move(proxy);
+        }
+        return {std::move(frame), {}};
+    }
+
+    [[nodiscard]] int count(DecodePurpose purpose) const {
+        const QMutexLocker lock(&mutex_);
+        return purposeCounts_.value(static_cast<int>(purpose));
+    }
+
+  private:
     mutable QMutex mutex_;
     mutable QHash<int, int> purposeCounts_;
 };
@@ -226,12 +282,15 @@ class QmlWorkspaceControllerTests final : public QObject {
     void imagePropertiesAreExposedWithoutWidgetUi();
     void fullScreenPresentationLifecycleIsIdempotent();
     void imageCanvasSmoothDisplayCanBeToggled();
+    void fullScreenCanvasPromotesRawPreviewWhenProbingSourceSamples();
+    void canvasProbesPixelsFromWindowHoverEvents();
+    void canvasPixelProbeReportsExactPixelAtHighZoom();
     void fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml();
     void fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution();
     void fullScreenAutomaticallyPromotesBudgetedImageAfterNavigationSettles();
     void rawParameterEditorAppliesValuesAndManagesPresetsWithoutWidgets();
     void comparePreferencesPersistAndHorizontalModeIsUnavailable();
-    void compareUsesCompactRgbaPixelTextAndLumaOnlyHistogram();
+    void compareUsesSourcePixelTextAndLumaOnlyHistogram();
     void compareViewSyncTemporarilyBypassesWithControl();
     void compareDefersOversizedAutomaticFullLoadsButExactToolsStillPromote();
     void compareAutomaticallyPromotesBudgetedImages();
@@ -823,8 +882,8 @@ void QmlWorkspaceControllerTests::galleryUsesPreviewUntilPixelProbeRequestsFullR
     QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
     QTRY_VERIFY_WITH_TIMEOUT(controller.galleryFullResolution(), 2000);
     QTRY_VERIFY_WITH_TIMEOUT(
-        controller.probeGalleryPixel(0, 0).contains(QStringLiteral("RGBA(0, 255, 0, 255)")), 2000);
-    QVERIFY(controller.probeGalleryPixel(1, 0).contains(QStringLiteral("RGBA(255, 0, 0, 255)")));
+        controller.probeGalleryPixel(0, 0).contains(QStringLiteral("RGB(0,255,0)")), 2000);
+    QVERIFY(controller.probeGalleryPixel(1, 0).contains(QStringLiteral("RGB(255,0,0)")));
 
     ThumbnailImageProvider provider(decoder, controller.loader());
     const QString encodedPath = QString::fromLatin1(QUrl::toPercentEncoding(path));
@@ -951,6 +1010,160 @@ void QmlWorkspaceControllerTests::imageCanvasSmoothDisplayCanBeToggled() {
     canvas.setSmoothDisplay(true);
     QVERIFY(canvas.smoothDisplay());
     QCOMPARE(smoothDisplaySpy.size(), 2);
+}
+
+void QmlWorkspaceControllerTests::fullScreenCanvasPromotesRawPreviewWhenProbingSourceSamples() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("frame.raw"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("fixture"), 7);
+    file.close();
+
+    auto decoder = std::make_shared<RawPreviewTrackingDecoder>();
+    ImageLoader loader(decoder);
+    FullScreenController controller(&loader);
+    controller.open({path}, 0);
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Preview), 1, 2000);
+
+    QmlImageCanvas canvas;
+    canvas.setWidth(200);
+    canvas.setHeight(200);
+    controller.attachCanvas(&canvas);
+    QCOMPARE(canvas.imageCount(), 1);
+
+    QSignalSpy probeSpy(&canvas, &QmlImageCanvas::pixelHovered);
+    QSignalSpy fullSpy(&canvas, &QmlImageCanvas::pixelProbeFullResolutionRequested);
+    const QPointF center(100, 100);
+    QHoverEvent hover(QEvent::HoverMove, center, center, center);
+    QCoreApplication::sendEvent(&canvas, &hover);
+    QCOMPARE(probeSpy.count(), 1);
+    // Proxy pixels are never presented as source samples: either the pending state or, when the
+    // controller's own promotion already landed, the real RAW value.
+    const QString firstText = probeSpy.last().at(2).toString();
+    QVERIFY2(firstText == QStringLiteral("Loading pixel data…") ||
+                 firstText == QStringLiteral("RAW(11)"),
+             qPrintable(firstText));
+    QCOMPARE(fullSpy.count(), 1);
+
+    // The promotion delivers sensor samples for the same position.
+    QTRY_COMPARE_WITH_TIMEOUT(decoder->count(DecodePurpose::Full), 1, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        canvas.frames().value(0) && !canvas.frames().value(0)->sourceSamplesPending, 2000);
+    probeSpy.clear();
+    const QPointF offset = center + QPointF(2.0, 2.0);
+    QHoverEvent promoted(QEvent::HoverMove, offset, offset, center);
+    QCoreApplication::sendEvent(&canvas, &promoted);
+    QCOMPARE(probeSpy.count(), 1);
+    QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(2, 2));
+    QCOMPARE(probeSpy.last().at(2).toString(), QStringLiteral("RAW(11)"));
+    QVERIFY(probeSpy.last().at(3).toBool());
+    // Repeating the hover does not request the full decode again.
+    QCoreApplication::sendEvent(&canvas, &promoted);
+    QCOMPARE(fullSpy.count(), 1);
+}
+
+void QmlWorkspaceControllerTests::canvasProbesPixelsFromWindowHoverEvents() {
+    QQuickWindow window;
+    window.resize(400, 300);
+    QmlImageCanvas canvas(window.contentItem());
+    canvas.setWidth(400);
+    canvas.setHeight(300);
+
+    auto frame = std::make_shared<ImageFrame>();
+    QImage image(8, 8, QImage::Format_RGBA8888);
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            image.setPixelColor(x, y, QColor(x * 16, y * 16, 0, 255));
+        }
+    }
+    frame->descriptor.size = image.size();
+    frame->storage = std::move(image);
+    canvas.setFrames({frame});
+
+    QSignalSpy probeSpy(&canvas, &QmlImageCanvas::pixelHovered);
+    const QPointF center(200, 150);
+    QHoverEvent centerHover(QEvent::HoverMove, center, center, center);
+    // Only the window sees this event. Full-display presentation can leave item-level hover
+    // tracking stale, so the canvas observes the window directly.
+    QCoreApplication::sendEvent(&window, &centerHover);
+    QCOMPARE(probeSpy.count(), 1);
+    QCOMPARE(probeSpy.last().at(0).toInt(), 0);
+    QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(4, 4));
+    QCOMPARE(probeSpy.last().at(2).toString(), QStringLiteral("RGB(64,64,0)"));
+    QVERIFY(probeSpy.last().at(3).toBool());
+
+    // Delivery to the item as well must not report the same cursor position twice.
+    QCoreApplication::sendEvent(&canvas, &centerHover);
+    QCOMPARE(probeSpy.count(), 1);
+
+    const QPointF offset = center + QPointF(4.0, 4.0);
+    QHoverEvent offsetHover(QEvent::HoverMove, offset, offset, offset);
+    QCoreApplication::sendEvent(&window, &offsetHover);
+    QCOMPARE(probeSpy.count(), 2);
+    QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(4, 4));
+    QVERIFY(probeSpy.last().at(3).toBool());
+
+    QHoverEvent leave(QEvent::HoverLeave, QPointF(-40, -40), QPointF(-40, -40), center);
+    QCoreApplication::sendEvent(&window, &leave);
+    QCOMPARE(probeSpy.count(), 3);
+    QVERIFY(!probeSpy.last().at(3).toBool());
+}
+
+void QmlWorkspaceControllerTests::canvasPixelProbeReportsExactPixelAtHighZoom() {
+    const auto makeFrame = [](int baseRed) {
+        auto frame = std::make_shared<ImageFrame>();
+        QImage image(8, 8, QImage::Format_RGBA8888);
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                image.setPixelColor(x, y, QColor(baseRed + x * 16, y * 16, 0, 255));
+            }
+        }
+        frame->descriptor.size = image.size();
+        frame->storage = std::move(image);
+        return frame;
+    };
+
+    QmlImageCanvas canvas;
+    canvas.setWidth(101);
+    canvas.setHeight(101);
+    canvas.setFrames({makeFrame(0), makeFrame(128)});
+    canvas.actualPixelsAll();
+
+    // Two side-by-side cells are (101 - 2) / 2 = 49.5 px wide, so an exact probe has to use the
+    // fractional cell geometry instead of a rounded viewport of the same item.
+    const QPointF imageCenterInCell(24.75, 50.5);
+    for (int step = 0; step < 22; ++step) {
+        QWheelEvent wheel(imageCenterInCell, imageCenterInCell, {}, QPoint(0, 120), Qt::NoButton,
+                          Qt::NoModifier, Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(&canvas, &wheel);
+    }
+    QVERIFY(std::abs(canvas.effectiveViewState(0).pixelsPerImagePixel - std::pow(1.2, 22.0)) <
+            0.001);
+
+    QSignalSpy probeSpy(&canvas, &QmlImageCanvas::pixelHovered);
+    const auto hover = [&](const QPointF& position) {
+        probeSpy.clear();
+        QHoverEvent event(QEvent::HoverMove, position, position, position);
+        QCoreApplication::sendEvent(&canvas, &event);
+        return probeSpy.count() == 1 ? probeSpy.last() : QList<QVariant>{};
+    };
+
+    // Cursor anchored zoom keeps the image center exactly under the pointer, so the boundary
+    // between columns 3 and 4 stays on the cell center and a 0.2 px offset decides the pixel.
+    const QList<QVariant> insideRight = hover(imageCenterInCell + QPointF(0.2, -0.2));
+    QCOMPARE(insideRight.size(), 4);
+    QCOMPARE(insideRight.at(0).toInt(), 0);
+    QCOMPARE(insideRight.at(1).toPoint(), QPoint(4, 3));
+    QCOMPARE(insideRight.at(2).toString(), QStringLiteral("RGB(64,48,0)"));
+    QVERIFY(insideRight.at(3).toBool());
+
+    const QList<QVariant> insideLeft = hover(imageCenterInCell + QPointF(-0.2, 0.2));
+    QCOMPARE(insideLeft.size(), 4);
+    QCOMPARE(insideLeft.at(1).toPoint(), QPoint(3, 4));
+    QCOMPARE(insideLeft.at(2).toString(), QStringLiteral("RGB(48,64,0)"));
+    QVERIFY(insideLeft.at(3).toBool());
 }
 
 void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml() {
@@ -1158,7 +1371,7 @@ void QmlWorkspaceControllerTests::comparePreferencesPersistAndHorizontalModeIsUn
     QVERIFY(restored.pixelValueVisible());
 }
 
-void QmlWorkspaceControllerTests::compareUsesCompactRgbaPixelTextAndLumaOnlyHistogram() {
+void QmlWorkspaceControllerTests::compareUsesSourcePixelTextAndLumaOnlyHistogram() {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("rgba.png"));
@@ -1174,7 +1387,7 @@ void QmlWorkspaceControllerTests::compareUsesCompactRgbaPixelTextAndLumaOnlyHist
 
     const QVariantList values = compare.pixelTexts(0, 0, 0);
     QCOMPARE(values.size(), 2);
-    QCOMPARE(values.at(0).toString(), QStringLiteral("(0,0) RGBA(10,20,30,40)"));
+    QCOMPARE(values.at(0).toString(), QStringLiteral("(0,0) RGB(10,20,30)"));
     QVERIFY(!values.at(0).toString().contains(QStringLiteral("RAW")));
     QVERIFY(!values.at(0).toString().contains(QStringLiteral("YUV")));
     QVERIFY(!values.at(0).toString().contains(QChar(0x2022)));

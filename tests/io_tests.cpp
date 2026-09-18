@@ -1093,6 +1093,27 @@ void IoTests::cameraRawDecodesLocalDngWhenAvailable() {
     QVERIFY(full.frame->descriptor.size.width() > preview.frame->descriptor.size.width());
     QVERIFY(full.frame->descriptor.size.height() > preview.frame->descriptor.size.height());
     QCOMPARE(full.frame->metadata.camera->sensorSize, preview.frame->metadata.camera->sensorSize);
+
+    // The processed bitmap keeps the RAW bit depth instead of being quantized to 8-bit, and the
+    // camera RAW preview advertises that exact samples still need the full decode.
+    QCOMPARE(full.frame->descriptor.storageBits, 16);
+    QVERIFY(full.frame->descriptor.validBits > 8);
+    QVERIFY(preview.frame->sourceSamplesPending);
+    QCOMPARE(full.frame->descriptor.size, full.frame->metadata.sourceSize);
+
+    // The full decode also retains the sensor mosaic, which exact probes read; formats without a
+    // plain Bayer mosaic keep the processed bitmap only.
+    const auto* storage =
+        std::get_if<std::shared_ptr<const PlaneBufferSet>>(&full.frame->storage);
+    const bool hasMosaic = storage && *storage && !(*storage)->planes.isEmpty();
+    QVERIFY(!full.frame->sourceSamplesPending);
+    if (hasMosaic) {
+        QVERIFY((*storage)->renderFromDisplayImage);
+        const PlaneBuffer& plane = (*storage)->planes.constFirst();
+        QCOMPARE(plane.stride, static_cast<qsizetype>(full.frame->rawParameters->size.width()) * 2);
+        QCOMPARE(plane.byteSize,
+                 plane.stride * static_cast<qsizetype>(full.frame->rawParameters->size.height()));
+    }
 #else
     QSKIP("This build does not include LibRaw");
 #endif

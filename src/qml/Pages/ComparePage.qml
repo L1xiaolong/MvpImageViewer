@@ -403,7 +403,7 @@ Item {
         Connections {
             target: root.comparisonCanvas
             ignoreUnknownSignals: true
-            function onPixelHovered(sourceSlot, pixel, colorValue, valid) {
+            function onPixelHovered(sourceSlot, pixel, valueText, valid) {
                 if (valid)
                     root.pixelValues = root.controller.pixelTexts(sourceSlot, pixel.x, pixel.y)
             }

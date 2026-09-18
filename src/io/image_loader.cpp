@@ -208,6 +208,13 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     if (result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
                         self->cacheFor(purpose).put(key, result.frame, result.frame->byteSize());
                         self->enforceMemoryBudget(purpose);
+                        // A decoder that derives RAW parameters from the file itself (camera RAW)
+                        // publishes them so the parameters editor and later probes start from the
+                        // real geometry, bit depth, and demosaic setting.
+                        if (result.frame->rawParameters &&
+                            !self->rawParameters(sourcePath)) {
+                            self->setRawParameters(sourcePath, *result.frame->rawParameters);
+                        }
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                          ? result.frame->metadata.sourceSize

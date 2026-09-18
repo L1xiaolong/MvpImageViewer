@@ -965,25 +965,12 @@ QString BrowseController::probeGalleryPixel(int x, int y) {
         return QStringLiteral("Loading pixel data…");
     }
 
-    const ComparisonPixelSample sample = ComparisonPixelProbe::sample(
-        *galleryFrame_,
-        ComparisonPixelProbe::normalizedPixelCenter(QPoint(x, y), galleryImageSize_));
-    if (!sample.valid || !sample.displayColor.isValid()) {
+    const ComparisonPixelSample sample =
+        ComparisonPixelProbe::sampleAtDisplayPixel(*galleryFrame_, QPoint(x, y));
+    if (!sample.valid) {
         return {};
     }
-    QString value;
-    const QColor color = sample.displayColor;
-    value = QStringLiteral("RGBA(%1, %2, %3, %4)")
-                .arg(color.red())
-                .arg(color.green())
-                .arg(color.blue())
-                .arg(color.alpha());
-    const QString engineering = sample.sourceValueText();
-    const bool duplicatesDisplayColor = !sample.yuv && !sample.bayer;
-    if (!engineering.isEmpty() && !duplicatesDisplayColor) {
-        value += QStringLiteral(" · ") + engineering;
-    }
-    return QStringLiteral("x %1 · y %2 · %3").arg(x).arg(y).arg(value);
+    return QStringLiteral("x %1 · y %2 · %3").arg(x).arg(y).arg(sample.sourceValueText());
 }
 
 void BrowseController::setGridCellWidth(int width) {
