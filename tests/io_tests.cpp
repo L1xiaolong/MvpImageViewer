@@ -13,7 +13,10 @@
 #include "io/single_file_rename.h"
 #include "io/supported_image_formats.h"
 #include "io/thumbnail_disk_cache.h"
+#include "core/comparison_pixel_probe.h"
 #include "core/display_histogram.h"
+#include "core/raw_plane_access.h"
+#include "core/raw_plane_histogram.h"
 
 #include <QColorSpace>
 #include <QCollator>
@@ -39,6 +42,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <limits>
 #include <thread>
 #include <vector>
@@ -216,6 +220,8 @@ class IoTests final : public QObject {
     void nv12LimitedRangeProducesReferencePixels();
     void mipiRawPackingReturnsExactSensorValues();
     void bayerRawDefaultsToMosaicAndDemosaicIsOptIn();
+    void quadBayerRawUsesFourByFourCfaForPreviewAndPlane();
+    void realQuadBayerFixtureMatchesReferenceSamplesAndStatistics();
     void decoderRegistryRoutesByFormat();
     void defaultDecoderAndFormatCatalogStayConsistent();
     void cameraRawCapabilityMatchesBuildFeature();
@@ -954,7 +960,7 @@ void IoTests::mipiRawPackingReturnsExactSensorValues() {
     QCOMPARE(RawImageDecoder::bayerValueAt(*raw10Result.frame, 2, 0), std::optional<quint16>(1022));
     QCOMPARE(RawImageDecoder::bayerValueAt(*raw10Result.frame, 3, 0), std::optional<quint16>(1023));
     QCOMPARE(RawImageDecoder::pixelDescription(*raw10Result.frame, 3, 0),
-             QStringLiteral("RAW(1023, Gr)"));
+             QStringLiteral("RGB(0,1023,0)"));
 
     const QString raw12Path = directory.filePath(QStringLiteral("raw12.raw"));
     QFile raw12(raw12Path);
@@ -996,7 +1002,7 @@ void IoTests::bayerRawDefaultsToMosaicAndDemosaicIsOptIn() {
     const DecodeResult mosaic = decoder.decode({path, DecodePurpose::Preview, {}, parameters});
     QVERIFY2(mosaic.succeeded(), qPrintable(mosaic.error));
     QCOMPARE(mosaic.frame->rawParameters->demosaic, false);
-    QCOMPARE(mosaic.frame->qImage()->pixelColor(0, 0), QColor(255, 255, 255, 255));
+    QCOMPARE(mosaic.frame->qImage()->pixelColor(0, 0), QColor(255, 0, 0, 255));
     QCOMPARE(mosaic.frame->qImage()->pixelColor(1, 0), QColor(0, 0, 0, 255));
 
     parameters.demosaic = true;
@@ -1005,6 +1011,116 @@ void IoTests::bayerRawDefaultsToMosaicAndDemosaicIsOptIn() {
     const QColor color = demosaiced.frame->qImage()->pixelColor(0, 0);
     QVERIFY(color.red() > color.green());
     QVERIFY(color.red() > color.blue());
+}
+
+void IoTests::quadBayerRawUsesFourByFourCfaForPreviewAndPlane() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("quad_4x4_raw16.raw"));
+    QByteArray bytes(4 * 4 * 2, Qt::Uninitialized);
+    RawImageParameters parameters;
+    parameters.size = {4, 4};
+    parameters.format = RawPixelFormat::Raw16;
+    parameters.validBitsOverride = 12;
+    parameters.bayerPattern = BayerPattern::RGGB;
+    parameters.bayerSampling = BayerSampling::QuadBayer4x4;
+    parameters.displayGamma = 1.0;
+    for (int y = 0; y < 4; ++y) {
+        for (int x = 0; x < 4; ++x) {
+            const auto channel = RawPlaneAccessor::channelAtSourcePixel(
+                parameters.bayerPattern, {x, y}, parameters.bayerSampling);
+            const quint16 value = channel == BayerSampleChannel::Red
+                                      ? 4095
+                                  : channel == BayerSampleChannel::Blue ? 1024 : 2048;
+            qToLittleEndian<quint16>(
+                value, reinterpret_cast<uchar*>(bytes.data() + (y * 4 + x) * 2));
+        }
+    }
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write(bytes), bytes.size());
+    file.close();
+
+    RawImageDecoder decoder;
+    const DecodeResult mosaic =
+        decoder.decode({path, DecodePurpose::Preview, {}, parameters});
+    QVERIFY2(mosaic.succeeded(), qPrintable(mosaic.error));
+    QCOMPARE(mosaic.frame->qImage()->pixelColor(0, 0), QColor(255, 0, 0, 255));
+    QCOMPARE(mosaic.frame->qImage()->pixelColor(2, 0), QColor(0, 128, 0, 255));
+    QCOMPARE(mosaic.frame->qImage()->pixelColor(0, 2), QColor(0, 128, 0, 255));
+    QCOMPARE(mosaic.frame->qImage()->pixelColor(3, 3), QColor(0, 0, 64, 255));
+
+    parameters.demosaic = true;
+    const DecodeResult developed =
+        decoder.decode({path, DecodePurpose::Preview, {}, parameters});
+    QVERIFY2(developed.succeeded(), qPrintable(developed.error));
+    const QColor developedPixel = developed.frame->qImage()->pixelColor(0, 0);
+    QCOMPARE(developedPixel.red(), 255);
+    QVERIFY(developedPixel.green() >= 127 && developedPixel.green() <= 128);
+    QVERIFY(developedPixel.blue() >= 63 && developedPixel.blue() <= 64);
+
+    const DecodeResult full = decoder.decode({path, DecodePurpose::Full, {}, parameters});
+    QVERIFY2(full.succeeded(), qPrintable(full.error));
+    const auto bottomRight = RawPlaneAccessor(*full.frame).bayerAtSourcePixel({3, 3});
+    QVERIFY(bottomRight.has_value());
+    QCOMPARE(bottomRight->channel, BayerSampleChannel::Blue);
+    QCOMPARE(bottomRight->value, quint16{1024});
+}
+
+void IoTests::realQuadBayerFixtureMatchesReferenceSamplesAndStatistics() {
+    const QString path = QFINDTESTDATA("raw_8000_6000_quad_bayer_RGGB_10bits.raw");
+    if (path.isEmpty())
+        QSKIP("Optional 8000x6000 Quad Bayer fixture is not available");
+
+    const RawImageParameters inferred = RawPresetStore::inferFromFileName(path);
+    QCOMPARE(inferred.size, QSize(8000, 6000));
+    QCOMPARE(inferred.format, RawPixelFormat::Raw16);
+    QCOMPARE(inferred.validBitsOverride, 10);
+    QCOMPARE(inferred.bayerPattern, BayerPattern::RGGB);
+    QCOMPARE(inferred.bayerSampling, BayerSampling::QuadBayer4x4);
+    QVERIFY(inferred.littleEndian);
+    QVERIFY(!inferred.msbAligned);
+
+    RawImageDecoder decoder;
+    const DecodeResult decoded = decoder.decode({path, DecodePurpose::Full, {}, inferred});
+    QVERIFY2(decoded.succeeded(), qPrintable(decoded.error));
+    RawPlaneAccessor accessor(*decoded.frame);
+    QVERIFY(accessor.isValid());
+    const struct {
+        QPoint point;
+        quint16 value;
+    } expected[]{{{3996, 2984}, 576}, {{3997, 2984}, 704},
+                 {{3996, 2985}, 832}, {{3997, 2985}, 768}};
+    for (const auto& entry : expected) {
+        const auto sample = accessor.bayerAtSourcePixel(entry.point);
+        QVERIFY(sample.has_value());
+        QCOMPARE(sample->channel, BayerSampleChannel::Red);
+        QCOMPARE(sample->value, entry.value);
+        const ComparisonPixelSample probe =
+            ComparisonPixelProbe::sampleAtDisplayPixel(*decoded.frame, entry.point);
+        QVERIFY(probe.valid);
+        QCOMPARE(probe.sourceValueText(), QStringLiteral("RGB(%1,0,0)").arg(entry.value));
+        const int encoded = qRound(entry.value / 1023.0 * 255.0);
+        QCOMPARE(probe.displayColor, QColor(encoded, 0, 0));
+    }
+
+    const QRectF normalizedBin(3996.0 / 8000.0, 2984.0 / 6000.0,
+                               2.0 / 8000.0, 2.0 / 6000.0);
+    const RawPlaneHistogram histogram =
+        RawPlaneHistogramAnalyzer::analyzeRegion(*decoded.frame, normalizedBin);
+    QVERIFY(histogram.isValid());
+    QCOMPARE(histogram.sourceRegion, QRect(3996, 2984, 2, 2));
+    const RawHistogramChannel& red = histogram.channels.at(0);
+    QCOMPARE(red.id, RawHistogramChannelId::Red);
+    QCOMPARE(red.availableSampleCount, 4);
+    QCOMPARE(red.sampledSampleCount, 4);
+    QCOMPARE(red.minimum, 576);
+    QCOMPARE(red.maximum, 832);
+    QCOMPARE(red.mean, 720.0);
+    QCOMPARE(red.bins.at(576), quint64{1});
+    QCOMPARE(red.bins.at(704), quint64{1});
+    QCOMPARE(red.bins.at(768), quint64{1});
+    QCOMPARE(red.bins.at(832), quint64{1});
 }
 
 void IoTests::decoderRegistryRoutesByFormat() {
@@ -1137,6 +1253,18 @@ void IoTests::rawFileNameInferenceExtractsCommonParameters() {
     QCOMPARE(raw14.size, QSize(6236, 4178));
     QCOMPARE(raw14.format, RawPixelFormat::Raw16);
     QCOMPARE(raw14.validBitsOverride, 14);
+
+    const RawImageParameters quad = RawPresetStore::inferFromFileName(
+        QStringLiteral("capture_quadbayer_4000x3000_raw12_rggb.raw"));
+    QCOMPARE(quad.size, QSize(4000, 3000));
+    QCOMPARE(quad.bayerSampling, BayerSampling::QuadBayer4x4);
+
+    const RawImageParameters unpacked10 = RawPresetStore::inferFromFileName(
+        QStringLiteral("raw_8000_6000_quad_bayer_RGGB_10bits.raw"));
+    QCOMPARE(unpacked10.size, QSize(8000, 6000));
+    QCOMPARE(unpacked10.format, RawPixelFormat::Raw16);
+    QCOMPARE(unpacked10.validBitsOverride, 10);
+    QCOMPARE(unpacked10.bayerSampling, BayerSampling::QuadBayer4x4);
 }
 
 void IoTests::yuvLayoutsProduceEquivalentReferencePixels() {
@@ -1248,7 +1376,7 @@ void IoTests::p010AndRaw16PreserveHighBitDepthValues() {
     QCOMPARE(rotatedRaw16.frame->qImage()->pixelColor(0, 0),
              raw16Result.frame->qImage()->pixelColor(1, 1));
     QCOMPARE(RawImageDecoder::pixelDescription(*rotatedRaw16.frame, 0, 0),
-             QStringLiteral("RAW(65535, B)"));
+             QStringLiteral("RGB(0,0,65535)"));
     QCOMPARE(RawImageDecoder::bayerValueAt(*rotatedRaw16.frame, 0, 0), std::optional<quint16>(0));
 
     raw16Parameters.validBitsOverride = 14;
@@ -1387,6 +1515,7 @@ void IoTests::rawSidecarRoundTripsParameters() {
     parameters.validBitsOverride = 14;
     parameters.frameIndex = 1;
     parameters.bayerPattern = BayerPattern::BGGR;
+    parameters.bayerSampling = BayerSampling::QuadBayer4x4;
     parameters.blackLevel = 64;
     parameters.whiteLevel = 4095;
     parameters.whiteBalanceGains = {2.0, 1.0, 1.5};
@@ -1399,13 +1528,15 @@ void IoTests::rawSidecarRoundTripsParameters() {
     const auto restored = RawPresetStore::loadForFile(path);
     QVERIFY(restored.has_value());
     QCOMPARE(restored->cacheKey(), parameters.cacheKey());
+    QCOMPARE(restored->bayerSampling, BayerSampling::QuadBayer4x4);
 
     QFile sidecar(RawPresetStore::sidecarPath(path));
     QVERIFY(sidecar.open(QIODevice::ReadOnly));
     QJsonObject legacy = QJsonDocument::fromJson(sidecar.readAll()).object();
     sidecar.close();
     for (const QString& key :
-         {QStringLiteral("validBits"), QStringLiteral("orientation"), QStringLiteral("wbRed"),
+         {QStringLiteral("validBits"), QStringLiteral("orientation"),
+          QStringLiteral("bayerSampling"), QStringLiteral("wbRed"),
           QStringLiteral("wbGreen"), QStringLiteral("wbBlue"), QStringLiteral("displayGamma")}) {
         legacy.remove(key);
     }
@@ -1427,6 +1558,7 @@ void IoTests::rawSidecarRoundTripsParameters() {
     QCOMPARE(restoredLegacy->colorCorrectionMatrix, identityMatrix);
     QCOMPARE(restoredLegacy->displayGamma, 2.2);
     QCOMPARE(restoredLegacy->orientation, ImageOrientation::Normal);
+    QCOMPARE(restoredLegacy->bayerSampling, BayerSampling::Standard2x2);
 }
 
 void IoTests::rawPreviewIsBoundedAndDoesNotRetainFullPlanes() {

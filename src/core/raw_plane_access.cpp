@@ -113,7 +113,8 @@ RawPlaneAccessor::bayerAtSourcePixel(const QPoint& sourcePixel) const {
         return std::nullopt;
     }
     return BayerPlaneSample{*value,
-                            channelAtSourcePixel(parameters_->bayerPattern, sourcePixel),
+                            channelAtSourcePixel(parameters_->bayerPattern, sourcePixel,
+                                                 parameters_->bayerSampling),
                             sourcePixel};
 }
 
@@ -127,15 +128,24 @@ QString RawPlaneAccessor::pixelDescriptionAtDisplayPixel(const QPoint& displayPi
     if (!sample) {
         return {};
     }
-    return QStringLiteral("RAW(%1, %2)")
-        .arg(sample->value)
-        .arg(channelName(sample->channel));
+    switch (sample->channel) {
+    case BayerSampleChannel::Red:
+        return QStringLiteral("RGB(%1,0,0)").arg(sample->value);
+    case BayerSampleChannel::GreenRedRow:
+    case BayerSampleChannel::GreenBlueRow:
+        return QStringLiteral("RGB(0,%1,0)").arg(sample->value);
+    case BayerSampleChannel::Blue:
+        return QStringLiteral("RGB(0,0,%1)").arg(sample->value);
+    }
+    return {};
 }
 
 BayerSampleChannel RawPlaneAccessor::channelAtSourcePixel(BayerPattern pattern,
-                                                           const QPoint& sourcePixel) {
-    const bool evenX = (sourcePixel.x() & 1) == 0;
-    const bool evenY = (sourcePixel.y() & 1) == 0;
+                                                           const QPoint& sourcePixel,
+                                                           BayerSampling sampling) {
+    const int blockSize = bayerSampleBlockSize(sampling);
+    const bool evenX = ((sourcePixel.x() / blockSize) & 1) == 0;
+    const bool evenY = ((sourcePixel.y() / blockSize) & 1) == 0;
     switch (pattern) {
     case BayerPattern::RGGB:
         return evenY ? (evenX ? BayerSampleChannel::Red

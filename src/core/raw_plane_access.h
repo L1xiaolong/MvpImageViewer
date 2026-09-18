@@ -50,8 +50,9 @@ class RawPlaneAccessor final {
 
     [[nodiscard]] QString pixelDescriptionAtDisplayPixel(const QPoint& displayPixel) const;
 
-    [[nodiscard]] static BayerSampleChannel channelAtSourcePixel(BayerPattern pattern,
-                                                                  const QPoint& sourcePixel);
+    [[nodiscard]] static BayerSampleChannel
+    channelAtSourcePixel(BayerPattern pattern, const QPoint& sourcePixel,
+                         BayerSampling sampling = BayerSampling::Standard2x2);
     [[nodiscard]] static QString channelName(BayerSampleChannel channel);
 
   private:

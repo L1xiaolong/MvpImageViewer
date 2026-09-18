@@ -4,7 +4,7 @@ layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 fragColor;
 layout(binding = 1) uniform sampler2D rawTexture;
 layout(std140, binding = 4) uniform BayerParameters {
-    vec4 imageAndStorage; // width, height, row stride bytes, format: RAW10/RAW12/RAW16
+    vec4 imageAndStorage; // width, height, CFA sample-block edge, format: RAW10/RAW12/RAW16
     vec4 layoutFlags;     // CFA pattern, little endian, MSB aligned, valid bits
     vec4 levelsAndGamma;  // black level, white level, display gamma, orientation
     vec4 whiteBalance;    // R, G, B, reserved
@@ -47,8 +47,9 @@ int rawValueAt(ivec2 pixel) {
 }
 
 int cfaChannel(ivec2 pixel) {
-    bool evenX = (pixel.x & 1) == 0;
-    bool evenY = (pixel.y & 1) == 0;
+    int blockSize = int(round(imageAndStorage.z));
+    bool evenX = ((pixel.x / blockSize) & 1) == 0;
+    bool evenY = ((pixel.y / blockSize) & 1) == 0;
     int pattern = int(round(layoutFlags.x));
     if (pattern == 0) { // RGGB
         return evenY ? (evenX ? 0 : 1) : (evenX ? 1 : 2);
@@ -87,14 +88,20 @@ void main() {
     ivec2 center =
         clamp(ivec2(floor(sourceUv * vec2(imageSize))), ivec2(0), imageSize - ivec2(1));
     if (whiteBalance.w < 0.5) {
-        float encoded = pow(normalizedRaw(center), 1.0 / levelsAndGamma.z);
-        fragColor = vec4(vec3(encoded), 1.0);
+        int validBits = int(round(layoutFlags.w));
+        float encoded = float(rawValueAt(center)) / float((1 << validBits) - 1);
+        int channel = cfaChannel(center);
+        fragColor = vec4(channel == 0 ? encoded : 0.0,
+                         channel == 1 ? encoded : 0.0,
+                         channel == 2 ? encoded : 0.0, 1.0);
         return;
     }
     vec3 sums = vec3(0.0);
     vec3 counts = vec3(0.0);
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
+    int radius = int(round(imageAndStorage.z));
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            if (abs(dx) > radius || abs(dy) > radius) continue;
             ivec2 samplePixel = clamp(center + ivec2(dx, dy), ivec2(0), imageSize - ivec2(1));
             int channel = cfaChannel(samplePixel);
             float sampleValue = normalizedRaw(samplePixel);
@@ -110,7 +117,7 @@ void main() {
             }
         }
     }
-    vec3 balanced = (sums / counts) * whiteBalance.rgb;
+    vec3 balanced = (sums / max(counts, vec3(1.0))) * whiteBalance.rgb;
     vec3 corrected = clamp(colorCorrection * balanced, 0.0, 1.0);
     vec3 encoded = pow(corrected, vec3(1.0 / levelsAndGamma.z));
     fragColor = vec4(encoded, 1.0);

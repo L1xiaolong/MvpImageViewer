@@ -166,17 +166,19 @@ std::array<int, 3> displayRgbAt(const RawPlaneAccessor& accessor,
                               static_cast<double>(white - parameters.blackLevel),
                           0.0, 1.0);
     };
-    // The unified histogram always reconstructs RGB, even when the canvas shows mosaic gray.
+    // The unified histogram always reconstructs RGB, even when the canvas shows CFA false colour.
 
     std::array<double, 3> sums{};
     std::array<int, 3> counts{};
     const QRect sourceBounds(QPoint{}, parameters.size);
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
+    const int radius = bayerSampleBlockSize(parameters.bayerSampling);
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
             const QPoint point(std::clamp(center->sourcePixel.x() + dx, 0, sourceBounds.right()),
                                std::clamp(center->sourcePixel.y() + dy, 0, sourceBounds.bottom()));
             const BayerSampleChannel channel =
-                RawPlaneAccessor::channelAtSourcePixel(parameters.bayerPattern, point);
+                RawPlaneAccessor::channelAtSourcePixel(parameters.bayerPattern, point,
+                                                       parameters.bayerSampling);
             const int index = channel == BayerSampleChannel::Red
                                   ? 0
                                   : channel == BayerSampleChannel::Blue ? 2 : 1;

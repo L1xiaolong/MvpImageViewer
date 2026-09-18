@@ -1040,10 +1040,10 @@ void QmlWorkspaceControllerTests::fullScreenCanvasPromotesRawPreviewWhenProbingS
     QCoreApplication::sendEvent(&canvas, &hover);
     QCOMPARE(probeSpy.count(), 1);
     // Proxy pixels are never presented as source samples: either the pending state or, when the
-    // controller's own promotion already landed, the real RAW value.
+    // controller's own promotion already landed, the real RAW-depth RGB value.
     const QString firstText = probeSpy.last().at(2).toString();
     QVERIFY2(firstText == QStringLiteral("Loading pixel data…") ||
-                 firstText == QStringLiteral("RAW(11)"),
+                 firstText == QStringLiteral("RGB(11,0,0)"),
              qPrintable(firstText));
     QCOMPARE(fullSpy.count(), 1);
 
@@ -1057,7 +1057,7 @@ void QmlWorkspaceControllerTests::fullScreenCanvasPromotesRawPreviewWhenProbingS
     QCoreApplication::sendEvent(&canvas, &promoted);
     QCOMPARE(probeSpy.count(), 1);
     QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(2, 2));
-    QCOMPARE(probeSpy.last().at(2).toString(), QStringLiteral("RAW(11)"));
+    QCOMPARE(probeSpy.last().at(2).toString(), QStringLiteral("RGB(11,0,0)"));
     QVERIFY(probeSpy.last().at(3).toBool());
     // Repeating the hover does not request the full decode again.
     QCoreApplication::sendEvent(&canvas, &promoted);
@@ -1338,6 +1338,13 @@ void QmlWorkspaceControllerTests::rawParameterEditorAppliesValuesAndManagesPrese
     QTRY_VERIFY_WITH_TIMEOUT(!appliedSpy.isEmpty(), 2000);
     QCOMPARE(loader.rawParameters(rawPath)->size.width(), 8);
     QCOMPARE(loader.rawParameters(rawPath)->rowStride, 8);
+
+    controller.setValue(QStringLiteral("format"), static_cast<int>(RawPixelFormat::Raw16));
+    controller.setValue(QStringLiteral("rowStride"), 16);
+    controller.setValue(QStringLiteral("bayerSampling"),
+                        static_cast<int>(BayerSampling::QuadBayer4x4));
+    QTRY_COMPARE_WITH_TIMEOUT(
+        loader.rawParameters(rawPath)->bayerSampling, BayerSampling::QuadBayer4x4, 2000);
 
     const QString presetName = QStringLiteral("qml-editor-test");
     QCOMPARE(controller.savePreset(presetName), QString{});

@@ -129,29 +129,26 @@ void sampleGrid(const QRect& region, qint64 maximumSamples, Callback&& callback)
     }
 }
 
-QPoint parityForChannel(BayerPattern pattern, RawHistogramChannelId channel) {
-    for (int y = 0; y < 2; ++y) {
-        for (int x = 0; x < 2; ++x) {
-            const BayerSampleChannel candidate =
-                RawPlaneAccessor::channelAtSourcePixel(pattern, QPoint(x, y));
-            const bool matches =
-                (channel == RawHistogramChannelId::Red && candidate == BayerSampleChannel::Red) ||
-                (channel == RawHistogramChannelId::GreenRedRow &&
-                 candidate == BayerSampleChannel::GreenRedRow) ||
-                (channel == RawHistogramChannelId::GreenBlueRow &&
-                 candidate == BayerSampleChannel::GreenBlueRow) ||
-                (channel == RawHistogramChannelId::Blue && candidate == BayerSampleChannel::Blue);
-            if (matches) {
-                return {x, y};
-            }
-        }
-    }
-    return {};
+bool matchesChannel(RawHistogramChannelId channel, BayerSampleChannel candidate) {
+    return (channel == RawHistogramChannelId::Red && candidate == BayerSampleChannel::Red) ||
+           (channel == RawHistogramChannelId::GreenRedRow &&
+            candidate == BayerSampleChannel::GreenRedRow) ||
+           (channel == RawHistogramChannelId::GreenBlueRow &&
+            candidate == BayerSampleChannel::GreenBlueRow) ||
+           (channel == RawHistogramChannelId::Blue && candidate == BayerSampleChannel::Blue);
 }
 
-int firstWithParity(int minimum, int parity) {
-    return (minimum & 1) == parity ? minimum : minimum + 1;
+int firstWithResidue(int minimum, int residue, int period) {
+    const int current = ((minimum % period) + period) % period;
+    return minimum + (residue - current + period) % period;
 }
+
+struct BayerSampleGrid {
+    int firstX = 0;
+    int firstY = 0;
+    int columns = 0;
+    int rows = 0;
+};
 
 RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normalizedRegion,
                                     qint64 maximumSamplesPerChannel) {
@@ -213,23 +210,55 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
         RawHistogramChannelId::GreenBlueRow, RawHistogramChannelId::Blue};
     for (RawHistogramChannelId id : ids) {
         ChannelAccumulator accumulator = makeAccumulator(id, maximumValue);
-        const QPoint parity = parityForChannel(parameters.bayerPattern, id);
-        const int firstX = firstWithParity(result.sourceRegion.left(), parity.x());
-        const int firstY = firstWithParity(result.sourceRegion.top(), parity.y());
-        if (firstX > result.sourceRegion.right() || firstY > result.sourceRegion.bottom()) {
-            result.channels.push_back(std::move(accumulator.channel));
-            continue;
-        }
-        const int sampleColumns = (result.sourceRegion.right() - firstX) / 2 + 1;
-        const int sampleRows = (result.sourceRegion.bottom() - firstY) / 2 + 1;
-        accumulator.channel.availableSampleCount = static_cast<qint64>(sampleColumns) * sampleRows;
-        const QRect indexRegion(0, 0, sampleColumns, sampleRows);
-        sampleGrid(indexRegion, maximumSamplesPerChannel, [&](const QPoint& index) {
-            const QPoint sourcePoint(firstX + index.x() * 2, firstY + index.y() * 2);
-            if (const auto sample = accessor.bayerAtSourcePixel(sourcePoint)) {
-                addSample(accumulator, sample->value);
+        const int blockSize = bayerSampleBlockSize(parameters.bayerSampling);
+        const int period = blockSize * 2;
+        QVector<BayerSampleGrid> grids;
+        grids.reserve(blockSize * blockSize);
+        for (int residueY = 0; residueY < period; ++residueY) {
+            for (int residueX = 0; residueX < period; ++residueX) {
+                const QPoint residue(residueX, residueY);
+                const auto candidate = RawPlaneAccessor::channelAtSourcePixel(
+                    parameters.bayerPattern, residue, parameters.bayerSampling);
+                if (!matchesChannel(id, candidate)) continue;
+                const int firstX = firstWithResidue(result.sourceRegion.left(), residueX, period);
+                const int firstY = firstWithResidue(result.sourceRegion.top(), residueY, period);
+                if (firstX > result.sourceRegion.right() || firstY > result.sourceRegion.bottom())
+                    continue;
+                BayerSampleGrid grid;
+                grid.firstX = firstX;
+                grid.firstY = firstY;
+                grid.columns = (result.sourceRegion.right() - firstX) / period + 1;
+                grid.rows = (result.sourceRegion.bottom() - firstY) / period + 1;
+                grids.push_back(grid);
+                accumulator.channel.availableSampleCount +=
+                    static_cast<qint64>(grid.columns) * grid.rows;
             }
-        });
+        }
+        const qint64 target = std::min(maximumSamplesPerChannel,
+                                       accumulator.channel.availableSampleCount);
+        qsizetype gridIndex = 0;
+        qint64 gridStart = 0;
+        qint64 gridEnd = grids.isEmpty()
+                             ? 0
+                             : static_cast<qint64>(grids.constFirst().columns) *
+                                   grids.constFirst().rows;
+        for (qint64 sampleIndex = 0; sampleIndex < target; ++sampleIndex) {
+            const qint64 ordinal =
+                (sampleIndex + 1) * accumulator.channel.availableSampleCount / target - 1;
+            while (ordinal >= gridEnd && gridIndex + 1 < grids.size()) {
+                gridStart = gridEnd;
+                ++gridIndex;
+                gridEnd += static_cast<qint64>(grids.at(gridIndex).columns) *
+                           grids.at(gridIndex).rows;
+            }
+            const BayerSampleGrid& grid = grids.at(gridIndex);
+            const qint64 local = ordinal - gridStart;
+            const int row = static_cast<int>(local / grid.columns);
+            const int column = static_cast<int>(local % grid.columns);
+            const QPoint point(grid.firstX + column * period, grid.firstY + row * period);
+            if (const auto sample = accessor.bayerAtSourcePixel(point))
+                addSample(accumulator, sample->value);
+        }
         finishChannel(accumulator);
         result.channels.push_back(std::move(accumulator.channel));
     }

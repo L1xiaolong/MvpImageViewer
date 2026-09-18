@@ -83,9 +83,9 @@ int unpackCandidate(ivec2 pixel) {
     return value;
 }
 
-int cfaChannel(ivec2 pixel, int pattern) {
-    bool evenX = (pixel.x & 1) == 0;
-    bool evenY = (pixel.y & 1) == 0;
+int cfaChannel(ivec2 pixel, int pattern, int blockSize) {
+    bool evenX = ((pixel.x / blockSize) & 1) == 0;
+    bool evenY = ((pixel.y / blockSize) & 1) == 0;
     if (pattern == 0) {
         return evenY ? (evenX ? 0 : 1) : (evenX ? 1 : 2);
     }
@@ -139,15 +139,22 @@ vec3 primaryDisplayRgb(vec2 displayUv) {
     ivec2 size = ivec2(round(primaryImageAndStorage.xy));
     ivec2 center = primaryPixel(displayUv);
     if (primaryWhiteBalance.w < 0.5) {
-        float encoded = pow(primaryDisplayValue(center), 1.0 / primaryLevelsAndGamma.z);
-        return vec3(encoded);
+        int validBits = int(round(primaryLayoutFlags.w));
+        float encoded = float(unpackPrimary(center)) / float((1 << validBits) - 1);
+        int channel = cfaChannel(center, int(round(primaryLayoutFlags.x)),
+                                 int(round(primaryImageAndStorage.z)));
+        return vec3(channel == 0 ? encoded : 0.0,
+                    channel == 1 ? encoded : 0.0,
+                    channel == 2 ? encoded : 0.0);
     }
     vec3 sums = vec3(0.0);
     vec3 counts = vec3(0.0);
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
+    int radius = int(round(primaryImageAndStorage.z));
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            if (abs(dx) > radius || abs(dy) > radius) continue;
             ivec2 pixel = clamp(center + ivec2(dx, dy), ivec2(0), size - ivec2(1));
-            int channel = cfaChannel(pixel, int(round(primaryLayoutFlags.x)));
+            int channel = cfaChannel(pixel, int(round(primaryLayoutFlags.x)), radius);
             float sampleValue = primaryDisplayValue(pixel);
             if (channel == 0) {
                 sums.x += sampleValue;
@@ -161,7 +168,7 @@ vec3 primaryDisplayRgb(vec2 displayUv) {
             }
         }
     }
-    vec3 balanced = (sums / counts) * primaryWhiteBalance.rgb;
+    vec3 balanced = (sums / max(counts, vec3(1.0))) * primaryWhiteBalance.rgb;
     vec3 corrected = clamp(primaryColorCorrection * balanced, 0.0, 1.0);
     return pow(corrected, vec3(1.0 / primaryLevelsAndGamma.z));
 }
@@ -170,15 +177,22 @@ vec3 candidateDisplayRgb(vec2 displayUv) {
     ivec2 size = ivec2(round(candidateImageAndStorage.xy));
     ivec2 center = candidatePixel(displayUv);
     if (candidateWhiteBalance.w < 0.5) {
-        float encoded = pow(candidateDisplayValue(center), 1.0 / candidateLevelsAndGamma.z);
-        return vec3(encoded);
+        int validBits = int(round(candidateLayoutFlags.w));
+        float encoded = float(unpackCandidate(center)) / float((1 << validBits) - 1);
+        int channel = cfaChannel(center, int(round(candidateLayoutFlags.x)),
+                                 int(round(candidateImageAndStorage.z)));
+        return vec3(channel == 0 ? encoded : 0.0,
+                    channel == 1 ? encoded : 0.0,
+                    channel == 2 ? encoded : 0.0);
     }
     vec3 sums = vec3(0.0);
     vec3 counts = vec3(0.0);
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
+    int radius = int(round(candidateImageAndStorage.z));
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            if (abs(dx) > radius || abs(dy) > radius) continue;
             ivec2 pixel = clamp(center + ivec2(dx, dy), ivec2(0), size - ivec2(1));
-            int channel = cfaChannel(pixel, int(round(candidateLayoutFlags.x)));
+            int channel = cfaChannel(pixel, int(round(candidateLayoutFlags.x)), radius);
             float sampleValue = candidateDisplayValue(pixel);
             if (channel == 0) {
                 sums.x += sampleValue;
@@ -192,7 +206,7 @@ vec3 candidateDisplayRgb(vec2 displayUv) {
             }
         }
     }
-    vec3 balanced = (sums / counts) * candidateWhiteBalance.rgb;
+    vec3 balanced = (sums / max(counts, vec3(1.0))) * candidateWhiteBalance.rgb;
     vec3 corrected = clamp(candidateColorCorrection * balanced, 0.0, 1.0);
     return pow(corrected, vec3(1.0 / candidateLevelsAndGamma.z));
 }

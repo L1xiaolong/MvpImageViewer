@@ -98,6 +98,8 @@ QVariantList rawFieldRows(const RawImageParameters& parameters) {
     } else {
         appendField(result, QStringLiteral("Valid Bits"), QString::number(parameters.validBits()));
         appendField(result, QStringLiteral("Bayer Pattern"), bayerPatternName(parameters.bayerPattern));
+        appendField(result, QStringLiteral("CFA Sampling"),
+                    bayerSamplingName(parameters.bayerSampling));
         appendField(result, QStringLiteral("Demosaic"),
                     parameters.demosaic ? QStringLiteral("Yes") : QStringLiteral("No"));
         appendField(result, QStringLiteral("Black Level"), QString::number(parameters.blackLevel));

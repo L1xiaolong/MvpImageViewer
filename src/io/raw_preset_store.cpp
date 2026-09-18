@@ -47,6 +47,7 @@ QVariantMap toMap(const RawImageParameters& parameters) {
     values.insert(QStringLiteral("msbAligned"), parameters.msbAligned);
     values.insert(QStringLiteral("validBits"), parameters.validBitsOverride);
     values.insert(QStringLiteral("bayerPattern"), static_cast<int>(parameters.bayerPattern));
+    values.insert(QStringLiteral("bayerSampling"), static_cast<int>(parameters.bayerSampling));
     values.insert(QStringLiteral("matrix"), static_cast<int>(parameters.yuvMatrix));
     values.insert(QStringLiteral("range"), static_cast<int>(parameters.range));
     values.insert(QStringLiteral("orientation"), static_cast<int>(parameters.orientation));
@@ -70,12 +71,15 @@ QVariantMap toMap(const RawImageParameters& parameters) {
 bool parametersAreValid(const RawImageParameters& result) {
     const int format = static_cast<int>(result.format);
     const int pattern = static_cast<int>(result.bayerPattern);
+    const int sampling = static_cast<int>(result.bayerSampling);
     const int matrix = static_cast<int>(result.yuvMatrix);
     const int range = static_cast<int>(result.range);
     return format >= static_cast<int>(RawPixelFormat::NV12) &&
            format <= static_cast<int>(RawPixelFormat::Raw16) &&
            pattern >= static_cast<int>(BayerPattern::RGGB) &&
            pattern <= static_cast<int>(BayerPattern::BGGR) &&
+           sampling >= static_cast<int>(BayerSampling::Standard2x2) &&
+           sampling <= static_cast<int>(BayerSampling::QuadBayer4x4) &&
            matrix >= static_cast<int>(YuvMatrix::BT601) &&
            matrix <= static_cast<int>(YuvMatrix::BT2020) &&
            range >= static_cast<int>(QuantizationRange::Full) &&
@@ -86,6 +90,7 @@ bool parametersAreValid(const RawImageParameters& result) {
            (result.whiteLevel == 0 || (result.whiteLevel > result.blackLevel &&
                                        result.whiteLevel <= result.maximumSampleValue())) &&
            result.hasValidDisplayTransform() && result.hasValidOrientation() &&
+           result.hasValidBayerSampling() &&
            frameByteSize(result) > 0;
 }
 
@@ -106,6 +111,8 @@ std::optional<RawImageParameters> fromMap(const QVariantMap& values) {
     result.validBitsOverride = values.value(QStringLiteral("validBits"), 0).toInt();
     result.bayerPattern =
         static_cast<BayerPattern>(values.value(QStringLiteral("bayerPattern")).toInt());
+    result.bayerSampling = static_cast<BayerSampling>(
+        values.value(QStringLiteral("bayerSampling"), 0).toInt());
     result.yuvMatrix = static_cast<YuvMatrix>(values.value(QStringLiteral("matrix"), 1).toInt());
     result.range = static_cast<QuantizationRange>(values.value(QStringLiteral("range"), 1).toInt());
     result.orientation =
@@ -243,8 +250,9 @@ RawImageParameters RawPresetStore::inferFromFileName(const QString& path) {
     const QString name = QFileInfo(path).completeBaseName().toLower();
     RawImageParameters result;
     const QRegularExpression sizeExpression(QStringLiteral(R"((\d{2,6})[x_](\d{2,6}))"));
-    const auto match = sizeExpression.match(name);
-    if (match.hasMatch()) {
+    auto matches = sizeExpression.globalMatch(name);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
         result.size = {match.captured(1).toInt(), match.captured(2).toInt()};
     }
     if (name.contains(QStringLiteral("nv21"))) {
@@ -264,12 +272,32 @@ RawImageParameters RawPresetStore::inferFromFileName(const QString& path) {
     } else if (name.contains(QStringLiteral("raw16"))) {
         result.format = RawPixelFormat::Raw16;
     }
+    // Names such as "raw_8000_6000_10bits.raw" describe unpacked samples in a
+    // 16-bit container, not MIPI RAW10 packing. Explicit raw10/raw12 markers above
+    // keep their packed interpretation.
+    if (!name.contains(QStringLiteral("raw10")) &&
+        !name.contains(QStringLiteral("raw12"))) {
+        for (int bits : {10, 12, 14, 16}) {
+            if (name.contains(QStringLiteral("%1bits").arg(bits)) ||
+                name.contains(QStringLiteral("%1bit").arg(bits))) {
+                result.format = RawPixelFormat::Raw16;
+                result.validBitsOverride = bits;
+                break;
+            }
+        }
+    }
     if (name.contains(QStringLiteral("bggr"))) {
         result.bayerPattern = BayerPattern::BGGR;
     } else if (name.contains(QStringLiteral("gbrg"))) {
         result.bayerPattern = BayerPattern::GBRG;
     } else if (name.contains(QStringLiteral("grbg"))) {
         result.bayerPattern = BayerPattern::GRBG;
+    }
+    if (name.contains(QStringLiteral("quadbayer")) ||
+        name.contains(QStringLiteral("quad_bayer")) ||
+        name.contains(QStringLiteral("4x4bin")) ||
+        name.contains(QStringLiteral("4x4_bin"))) {
+        result.bayerSampling = BayerSampling::QuadBayer4x4;
     }
     return result;
 }

@@ -324,10 +324,12 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     }
     ImageMetadata metadata = metadataFor(request.path, *processor);
     std::optional<RawImageParameters> rawParameters = rawParametersFor(*processor);
-    // The RAW parameters editor owns the processing values; the file owns the geometry.
+    // The RAW parameters editor owns processing values and the optional Quad Bayer sampling
+    // override; the file owns dimensions and the base CFA phase.
     if (rawParameters && request.rawParameters) {
         const RawImageParameters& requested = *request.rawParameters;
         rawParameters->demosaic = requested.demosaic;
+        rawParameters->bayerSampling = requested.bayerSampling;
         rawParameters->blackLevel = requested.blackLevel;
         rawParameters->whiteLevel = requested.whiteLevel;
         rawParameters->validBitsOverride = requested.validBitsOverride;
@@ -375,6 +377,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
         if (rawParameters && request.rawParameters) {
             const RawImageParameters& requested = *request.rawParameters;
             rawParameters->demosaic = requested.demosaic;
+            rawParameters->bayerSampling = requested.bayerSampling;
             rawParameters->blackLevel = requested.blackLevel;
             rawParameters->whiteLevel = requested.whiteLevel;
             rawParameters->validBitsOverride = requested.validBitsOverride;
@@ -417,12 +420,12 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                                   ? QSize{}
                                   : rawParameters->size.scaled(request.maximumSize,
                                                                Qt::KeepAspectRatio);
-        QImage gray = grayMosaicImage(mosaic->storage, *rawParameters, bounded);
-        if (!gray.isNull()) {
+        QImage falseColour = cfaMosaicImage(mosaic->storage, *rawParameters, bounded);
+        if (!falseColour.isNull()) {
             // LibRaw's demosaic and colour conversion are skipped entirely: the mosaic is the
             // image, and the same parameter set drives the pixel probe.
             const bool attachMosaic = request.purpose == DecodePurpose::Full;
-            return frameFromImage(std::move(gray), std::move(metadata),
+            return frameFromImage(std::move(falseColour), std::move(metadata),
                                   std::move(rawParameters), {},
                                   attachMosaic ? mosaic : nullptr,
                                   request.purpose != DecodePurpose::Full);
@@ -475,7 +478,7 @@ QStringList CameraRawDecoder::supportedSuffixes() {
 QString CameraRawDecoder::cacheIdentity() const {
 #if ISPVIEW_HAS_LIBRAW
     // v3: 16-bit output, orientation applied during decode, and the retained sensor mosaic.
-    return QStringLiteral("camera-raw-v3|libraw-%1")
+    return QStringLiteral("camera-raw-v5|libraw-%1")
         .arg(QString::fromLatin1(libraw_version()));
 #else
     return QStringLiteral("camera-raw-disabled");

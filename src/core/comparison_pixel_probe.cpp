@@ -187,13 +187,15 @@ std::array<double, 3> bayerLinearRgb(const RawImageParameters& parameters,
     };
     std::array<double, 3> sums{};
     std::array<int, 3> counts{};
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
+    const int radius = bayerSampleBlockSize(parameters.bayerSampling);
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
             const QPoint samplePixel(
                 std::clamp(center.sourcePixel.x() + dx, 0, parameters.size.width() - 1),
                 std::clamp(center.sourcePixel.y() + dy, 0, parameters.size.height() - 1));
             const auto channel =
-                RawPlaneAccessor::channelAtSourcePixel(parameters.bayerPattern, samplePixel);
+                RawPlaneAccessor::channelAtSourcePixel(parameters.bayerPattern, samplePixel,
+                                                       parameters.bayerSampling);
             const int channelIndex = channel == BayerSampleChannel::Red
                                          ? 0
                                      : channel == BayerSampleChannel::Blue ? 2
@@ -225,18 +227,22 @@ QColor bayerDisplayColor(const RawImageParameters& parameters,
                          const RawPlaneAccessor& accessor,
                          const BayerPlaneSample& center) {
     if (!parameters.demosaic) {
-        const int white = parameters.whiteLevel > parameters.blackLevel
-                              ? parameters.whiteLevel
-                              : parameters.maximumSampleValue();
         const auto sample = accessor.bayerAtSourcePixel(center.sourcePixel);
         const double normalized =
-            sample && white > parameters.blackLevel
-                ? std::clamp((sample->value - parameters.blackLevel) /
-                                 static_cast<double>(white - parameters.blackLevel),
-                             0.0, 1.0)
+            sample && parameters.maximumSampleValue() > 0
+                ? sample->value / static_cast<double>(parameters.maximumSampleValue())
                 : 0.0;
-        const int gray = toByte(std::pow(normalized, 1.0 / parameters.displayGamma));
-        return QColor::fromRgb(gray, gray, gray);
+        const int encoded = toByte(normalized);
+        switch (sample ? sample->channel : center.channel) {
+        case BayerSampleChannel::Red:
+            return QColor::fromRgb(encoded, 0, 0);
+        case BayerSampleChannel::GreenRedRow:
+        case BayerSampleChannel::GreenBlueRow:
+            return QColor::fromRgb(0, encoded, 0);
+        case BayerSampleChannel::Blue:
+            return QColor::fromRgb(0, 0, encoded);
+        }
+        return {};
     }
     const auto corrected = bayerLinearRgb(parameters, accessor, center);
     const auto encoded = [&parameters](double value) {
@@ -263,10 +269,18 @@ QString ComparisonPixelSample::sourceValueText() const {
         return text;
     }
     if (bayer) {
-        // Without demosaicing only the CFA sample at this position is meaningful. Demosaiced
-        // frames report the pipeline RGB in the RAW container's own value range.
+        // Without demosaicing the CFA sample occupies only its physical filter channel.
+        // Demosaiced frames report the pipeline RGB in the RAW container's own value range.
         if (sourceRgbText.isEmpty()) {
-            return QStringLiteral("RAW(%1)").arg(bayer->value);
+            switch (bayer->channel) {
+            case BayerSampleChannel::Red:
+                return QStringLiteral("RGB(%1,0,0)").arg(bayer->value);
+            case BayerSampleChannel::GreenRedRow:
+            case BayerSampleChannel::GreenBlueRow:
+                return QStringLiteral("RGB(0,%1,0)").arg(bayer->value);
+            case BayerSampleChannel::Blue:
+                return QStringLiteral("RGB(0,0,%1)").arg(bayer->value);
+            }
         }
         return sourceRgbText;
     }

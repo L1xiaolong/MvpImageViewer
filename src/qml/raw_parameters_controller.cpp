@@ -28,6 +28,7 @@ QVariantMap valuesFor(const RawImageParameters& value) {
             {QStringLiteral("headerOffset"), value.headerOffset},
             {QStringLiteral("validBits"), value.validBitsOverride},
             {QStringLiteral("bayerPattern"), static_cast<int>(value.bayerPattern)},
+            {QStringLiteral("bayerSampling"), static_cast<int>(value.bayerSampling)},
             {QStringLiteral("yuvMatrix"), static_cast<int>(value.yuvMatrix)},
             {QStringLiteral("range"), static_cast<int>(value.range)},
             {QStringLiteral("orientation"), static_cast<int>(value.orientation)},
@@ -184,6 +185,8 @@ RawImageParameters RawParametersController::parameters() const {
         ? values_.value(QStringLiteral("validBits")).toInt() : 0;
     value.bayerPattern = static_cast<BayerPattern>(
         values_.value(QStringLiteral("bayerPattern")).toInt());
+    value.bayerSampling = static_cast<BayerSampling>(
+        values_.value(QStringLiteral("bayerSampling")).toInt());
     value.yuvMatrix = static_cast<YuvMatrix>(values_.value(QStringLiteral("yuvMatrix")).toInt());
     value.range = static_cast<QuantizationRange>(values_.value(QStringLiteral("range")).toInt());
     value.orientation = static_cast<ImageOrientation>(

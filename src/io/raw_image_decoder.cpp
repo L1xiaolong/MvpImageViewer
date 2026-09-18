@@ -194,9 +194,10 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     return image;
 }
 
-int cfaChannel(BayerPattern pattern, int x, int y) {
-    const bool evenX = (x & 1) == 0;
-    const bool evenY = (y & 1) == 0;
+int cfaChannel(BayerPattern pattern, BayerSampling sampling, int x, int y) {
+    const int blockSize = bayerSampleBlockSize(sampling);
+    const bool evenX = ((x / blockSize) & 1) == 0;
+    const bool evenY = ((y / blockSize) & 1) == 0;
     switch (pattern) {
     case BayerPattern::RGGB:
         return evenY ? (evenX ? 0 : 1) : (evenX ? 1 : 2);
@@ -259,8 +260,9 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
                               static_cast<double>(maximum - parameters.blackLevel),
                           0.0, 1.0);
     };
-    const auto encodedRaw = [&](int x, int y) {
-        return std::pow(normalized(x, y), 1.0 / parameters.displayGamma);
+    const auto mosaicDisplayValue = [&](int x, int y) {
+        return packedBayerValue(bytes, parameters, x, y).value_or(0) /
+               static_cast<double>(parameters.maximumSampleValue());
     };
 
     QImage image(outputSize, QImage::Format_RGBA8888);
@@ -277,20 +279,25 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
                          : std::clamp(static_cast<int>((y + 0.5) * height / outputSize.height()), 0,
                                       height - 1);
             if (!parameters.demosaic) {
-                const uchar gray = static_cast<uchar>(toByte(encodedRaw(centerX, centerY)));
-                destination[x * 4 + 0] = gray;
-                destination[x * 4 + 1] = gray;
-                destination[x * 4 + 2] = gray;
+                const uchar encoded =
+                    static_cast<uchar>(toByte(mosaicDisplayValue(centerX, centerY)));
+                const int channel = cfaChannel(parameters.bayerPattern,
+                                               parameters.bayerSampling, centerX, centerY);
+                destination[x * 4 + 0] = channel == 0 ? encoded : 0;
+                destination[x * 4 + 1] = channel == 1 ? encoded : 0;
+                destination[x * 4 + 2] = channel == 2 ? encoded : 0;
                 destination[x * 4 + 3] = 255;
                 continue;
             }
             double channels[3]{};
             int counts[3]{};
-            for (int dy = -1; dy <= 1; ++dy) {
-                for (int dx = -1; dx <= 1; ++dx) {
+            const int radius = bayerSampleBlockSize(parameters.bayerSampling);
+            for (int dy = -radius; dy <= radius; ++dy) {
+                for (int dx = -radius; dx <= radius; ++dx) {
                     const int sx = std::clamp(centerX + dx, 0, width - 1);
                     const int sy = std::clamp(centerY + dy, 0, height - 1);
-                    const int channel = cfaChannel(parameters.bayerPattern, sx, sy);
+                    const int channel = cfaChannel(parameters.bayerPattern,
+                                                   parameters.bayerSampling, sx, sy);
                     channels[channel] += normalized(sx, sy);
                     ++counts[channel];
                 }
@@ -320,7 +327,7 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
 
 } // namespace
 
-QString RawImageDecoder::cacheIdentity() const { return QStringLiteral("headerless-raw-v1"); }
+QString RawImageDecoder::cacheIdentity() const { return QStringLiteral("headerless-raw-v3"); }
 
 bool RawImageDecoder::canDecode(const QString& path) const {
     const QString suffix = QFileInfo(path).suffix().toLower();
@@ -343,7 +350,7 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
                                        parameters.whiteLevel > formatMaximum))) {
         return {{}, QStringLiteral("Black/white levels must fit the effective sample bit depth")};
     }
-    if (!parameters.hasValidDisplayTransform()) {
+    if (!parameters.hasValidDisplayTransform() || !parameters.hasValidBayerSampling()) {
         return {{}, QStringLiteral("White balance, CCM, or display gamma is invalid")};
     }
     if (!parameters.hasValidOrientation()) {

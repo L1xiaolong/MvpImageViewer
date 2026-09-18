@@ -25,6 +25,23 @@ qsizetype effectiveStride(qsizetype configured, qsizetype minimum) {
     return configured > 0 ? configured : minimum;
 }
 
+int cfaDisplayChannel(BayerPattern pattern, BayerSampling sampling, int x, int y) {
+    const int blockSize = bayerSampleBlockSize(sampling);
+    const bool evenX = ((x / blockSize) & 1) == 0;
+    const bool evenY = ((y / blockSize) & 1) == 0;
+    switch (pattern) {
+    case BayerPattern::RGGB:
+        return evenY ? (evenX ? 0 : 1) : (evenX ? 1 : 2);
+    case BayerPattern::GRBG:
+        return evenY ? (evenX ? 1 : 0) : (evenX ? 2 : 1);
+    case BayerPattern::GBRG:
+        return evenY ? (evenX ? 1 : 2) : (evenX ? 0 : 1);
+    case BayerPattern::BGGR:
+        return evenY ? (evenX ? 2 : 1) : (evenX ? 1 : 0);
+    }
+    return 1;
+}
+
 } // namespace
 
 BayerPattern shiftedBayerPattern(BayerPattern pattern, int dx, int dy) {
@@ -90,21 +107,19 @@ QByteArray packedMosaicPlane(const quint16* samples, qsizetype strideInSamples,
     return plane;
 }
 
-QImage grayMosaicImage(const QByteArray& plane, const RawImageParameters& parameters,
-                       const QSize& outputSize) {
+QImage cfaMosaicImage(const QByteArray& plane, const RawImageParameters& parameters,
+                      const QSize& outputSize) {
     const QSize sourceSize = parameters.size;
     const qsizetype rowBytes = static_cast<qsizetype>(sourceSize.width()) * 2;
     if (sourceSize.isEmpty() || plane.size() < rowBytes * sourceSize.height() ||
-        parameters.maximumSampleValue() <= parameters.blackLevel) {
+        parameters.maximumSampleValue() <= 0) {
         return {};
     }
     const QSize target = outputSize.isEmpty() ? sourceSize : outputSize;
     if (target.isEmpty()) {
         return {};
     }
-    const int maximum = parameters.whiteLevel > parameters.blackLevel
-                            ? parameters.whiteLevel
-                            : parameters.maximumSampleValue();
+    const int maximum = parameters.maximumSampleValue();
     const quint16 mask = static_cast<quint16>(parameters.validBits() >= 16
                                                   ? 0xFFFFU
                                                   : ((1U << parameters.validBits()) - 1U));
@@ -133,17 +148,15 @@ QImage grayMosaicImage(const QByteArray& plane, const RawImageParameters& parame
                          : std::clamp(static_cast<int>((y + 0.5) * sourceSize.height() /
                                                        target.height()),
                                       0, sourceSize.height() - 1);
-            const double normalized =
-                std::clamp((sampleAt(sourceX, sourceY) - parameters.blackLevel) /
-                               static_cast<double>(maximum - parameters.blackLevel),
-                           0.0, 1.0);
-            const auto gray = static_cast<uchar>(std::clamp(
-                static_cast<int>(std::lround(std::pow(normalized, 1.0 / parameters.displayGamma) *
-                                             255.0)),
+            const double normalized = sampleAt(sourceX, sourceY) / static_cast<double>(maximum);
+            const auto encoded = static_cast<uchar>(std::clamp(
+                static_cast<int>(std::lround(normalized * 255.0)),
                 0, 255));
-            destination[x * 4 + 0] = gray;
-            destination[x * 4 + 1] = gray;
-            destination[x * 4 + 2] = gray;
+            const int channel = cfaDisplayChannel(parameters.bayerPattern,
+                                                  parameters.bayerSampling, sourceX, sourceY);
+            destination[x * 4 + 0] = channel == 0 ? encoded : 0;
+            destination[x * 4 + 1] = channel == 1 ? encoded : 0;
+            destination[x * 4 + 2] = channel == 2 ? encoded : 0;
             destination[x * 4 + 3] = 255;
         }
     }
@@ -196,6 +209,12 @@ bool RawImageParameters::hasValidOrientation() const {
            value <= static_cast<int>(ImageOrientation::Rotate270Clockwise);
 }
 
+bool RawImageParameters::hasValidBayerSampling() const {
+    const int value = static_cast<int>(bayerSampling);
+    return value >= static_cast<int>(BayerSampling::Standard2x2) &&
+           value <= static_cast<int>(BayerSampling::QuadBayer4x4);
+}
+
 QString RawImageParameters::cacheKey() const {
     QString result = QStringLiteral("%1x%2|%3|%4|%5|%6|%7|%8|%9|%10|%11|%12|%13|%14|%15|%16")
                          .arg(size.width())
@@ -217,6 +236,7 @@ QString RawImageParameters::cacheKey() const {
     if (isYuv()) {
         return result;
     }
+    result += QLatin1Char('|') + QString::number(static_cast<int>(bayerSampling));
     result += QLatin1Char('|') + QString::number(demosaic);
     for (double gain : whiteBalanceGains) {
         result += QLatin1Char('|') + QString::number(gain, 'g', 17);
@@ -260,6 +280,20 @@ QString bayerPatternName(BayerPattern pattern) {
         return QStringLiteral("BGGR");
     }
     return {};
+}
+
+QString bayerSamplingName(BayerSampling sampling) {
+    switch (sampling) {
+    case BayerSampling::Standard2x2:
+        return QStringLiteral("2x2 Bayer");
+    case BayerSampling::QuadBayer4x4:
+        return QStringLiteral("4x4 Quad Bayer");
+    }
+    return QStringLiteral("Unknown");
+}
+
+int bayerSampleBlockSize(BayerSampling sampling) {
+    return sampling == BayerSampling::QuadBayer4x4 ? 2 : 1;
 }
 
 QString yuvMatrixName(YuvMatrix matrix) {

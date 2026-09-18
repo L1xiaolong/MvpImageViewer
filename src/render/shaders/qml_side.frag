@@ -87,8 +87,9 @@ int rawValueAt(ivec2 pixel) {
 }
 
 int cfaChannel(ivec2 pixel) {
-    bool evenX = (pixel.x & 1) == 0;
-    bool evenY = (pixel.y & 1) == 0;
+    int blockSize = int(round(imageAndStorage.z));
+    bool evenX = ((pixel.x / blockSize) & 1) == 0;
+    bool evenY = ((pixel.y / blockSize) & 1) == 0;
     int pattern = int(round(layoutFlags.x));
     if (pattern == 0) return evenY ? (evenX ? 0 : 1) : (evenX ? 1 : 2);
     if (pattern == 1) return evenY ? (evenX ? 1 : 0) : (evenX ? 2 : 1);
@@ -107,13 +108,19 @@ vec4 sampleBayer() {
     ivec2 center = clamp(ivec2(floor(sourceUv * vec2(imageSize))),
                          ivec2(0), imageSize - ivec2(1));
     if (whiteBalance.w < 0.5) {
-        float encoded = pow(normalizedRaw(center), 1.0 / levelsAndGamma.z);
-        return vec4(vec3(encoded), 1.0);
+        int validBits = int(round(layoutFlags.w));
+        float encoded = float(rawValueAt(center)) / float((1 << validBits) - 1);
+        int channel = cfaChannel(center);
+        return vec4(channel == 0 ? encoded : 0.0,
+                    channel == 1 ? encoded : 0.0,
+                    channel == 2 ? encoded : 0.0, 1.0);
     }
     vec3 sums = vec3(0.0);
     vec3 counts = vec3(0.0);
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
+    int radius = int(round(imageAndStorage.z));
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            if (abs(dx) > radius || abs(dy) > radius) continue;
             ivec2 samplePixel = clamp(center + ivec2(dx, dy), ivec2(0), imageSize - ivec2(1));
             int channel = cfaChannel(samplePixel);
             float value = normalizedRaw(samplePixel);
@@ -122,7 +129,7 @@ vec4 sampleBayer() {
             else { sums.z += value; counts.z += 1.0; }
         }
     }
-    vec3 balanced = (sums / counts) * whiteBalance.rgb;
+    vec3 balanced = (sums / max(counts, vec3(1.0))) * whiteBalance.rgb;
     vec3 corrected = clamp(colorCorrection * balanced, 0.0, 1.0);
     return vec4(pow(corrected, vec3(1.0 / levelsAndGamma.z)), 1.0);
 }

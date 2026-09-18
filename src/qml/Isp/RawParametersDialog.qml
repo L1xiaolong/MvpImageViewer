@@ -20,6 +20,7 @@ Dialog {
     readonly property var formatNames: ["NV12", "NV21", "I420", "P010",
         "MIPI RAW10", "MIPI RAW12", "RAW in 16-bit container"]
     readonly property var bayerNames: ["RGGB", "GRBG", "GBRG", "BGGR"]
+    readonly property var bayerSamplingNames: [qsTr("2 × 2 Bayer"), qsTr("4 × 4 Quad Bayer")]
     readonly property var matrixNames: ["BT.601", "BT.709", "BT.2020"]
     readonly property var rangeNames: ["Full", "Limited"]
     readonly property var orientationNames: ["Normal", "Rotate 90° clockwise",
@@ -297,6 +298,8 @@ Dialog {
                         rowSpacing: 6
                         Text { text: qsTr("Bayer pattern"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawParameterComboBox { Layout.fillWidth: true; model: root.bayerNames; currentIndex: Number(root.value("bayerPattern", 0)); onActivated: root.controller.setValue("bayerPattern", index) }
+                        Text { text: qsTr("CFA sampling"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
+                        RawParameterComboBox { Layout.fillWidth: true; model: root.bayerSamplingNames; currentIndex: Number(root.value("bayerSampling", 0)); onActivated: root.controller.setValue("bayerSampling", index) }
                         Text { text: qsTr("Black level"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }
                         RawNumberField { Layout.fillWidth: true; controller: root.controller; parameterKey: "blackLevel"; parameterValue: root.value("blackLevel", 0) }
                         Text { text: qsTr("White level (0 = maximum)"); color: Theme.mutedInk; font.family: Theme.uiFont; font.pixelSize: 11 }

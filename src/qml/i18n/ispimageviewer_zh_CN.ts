@@ -768,6 +768,21 @@ Choose another folder or drop images here</source>
         <translation>Bayer 排列</translation>
     </message>
     <message>
+        <location filename="../Isp/RawParametersDialog.qml" line="23"/>
+        <source>2 × 2 Bayer</source>
+        <translation>2 × 2 Bayer</translation>
+    </message>
+    <message>
+        <location filename="../Isp/RawParametersDialog.qml" line="23"/>
+        <source>4 × 4 Quad Bayer</source>
+        <translation>4 × 4 四像素 Bayer</translation>
+    </message>
+    <message>
+        <location filename="../Isp/RawParametersDialog.qml" line="301"/>
+        <source>CFA sampling</source>
+        <translation>CFA 采样结构</translation>
+    </message>
+    <message>
         <location filename="../Isp/RawParametersDialog.qml" line="300"/>
         <source>Black level</source>
         <translation>黑电平</translation>

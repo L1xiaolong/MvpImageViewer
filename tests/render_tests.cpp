@@ -43,6 +43,7 @@ void RenderTests::bayerUniformsDescribePackingAndDisplayTransform() {
     parameters.format = RawPixelFormat::MipiRaw12;
     parameters.rowStride = 16;
     parameters.bayerPattern = BayerPattern::GBRG;
+    parameters.bayerSampling = BayerSampling::QuadBayer4x4;
     parameters.blackLevel = 64;
     parameters.whiteLevel = 4095;
     parameters.whiteBalanceGains = {2.0, 1.0, 0.5};
@@ -53,7 +54,7 @@ void RenderTests::bayerUniformsDescribePackingAndDisplayTransform() {
     const auto values = makeBayerRenderUniformData(parameters);
     QCOMPARE(values[0], 8.0F);
     QCOMPARE(values[1], 6.0F);
-    QCOMPARE(values[2], 16.0F);
+    QCOMPARE(values[2], 2.0F);
     QCOMPARE(values[3], 1.0F);
     QCOMPARE(values[4], 2.0F);
     QCOMPARE(values[7], 12.0F);

@@ -190,20 +190,27 @@ struct RawPlanes {
     std::vector<quint16> third;
 };
 
-int bayerChannel(BayerPattern pattern, int x, int y) {
+int bayerChannel(BayerPattern pattern, BayerSampling sampling, int x, int y) {
     static constexpr int layouts[4][4] = {
         {0, 1, 1, 2}, {1, 0, 2, 1}, {1, 2, 0, 1}, {2, 1, 1, 0}};
-    return layouts[static_cast<int>(pattern)][(y & 1) * 2 + (x & 1)];
+    const int blockSize = bayerSampleBlockSize(sampling);
+    return layouts[static_cast<int>(pattern)]
+                  [((y / blockSize) & 1) * 2 + ((x / blockSize) & 1)];
 }
 
-BayerPattern rotatedBayerPattern(BayerPattern source, int width, int height,
+BayerPattern rotatedBayerPattern(BayerPattern source, BayerSampling sampling,
+                                 int width, int height,
                                  QuarterTurn direction) {
     std::array<int, 4> target{};
+    const int blockSize = bayerSampleBlockSize(sampling);
     for (int y = 0; y < 2; ++y) {
         for (int x = 0; x < 2; ++x) {
-            const int sx = direction == QuarterTurn::Clockwise ? y : width - 1 - y;
-            const int sy = direction == QuarterTurn::Clockwise ? height - 1 - x : x;
-            target[static_cast<std::size_t>(y * 2 + x)] = bayerChannel(source, sx, sy);
+            const int tx = x * blockSize;
+            const int ty = y * blockSize;
+            const int sx = direction == QuarterTurn::Clockwise ? ty : width - 1 - ty;
+            const int sy = direction == QuarterTurn::Clockwise ? height - 1 - tx : tx;
+            target[static_cast<std::size_t>(y * 2 + x)] =
+                bayerChannel(source, sampling, sx, sy);
         }
     }
     static constexpr std::array<std::array<int, 4>, 4> layouts{{
@@ -388,8 +395,9 @@ QString transformRaw(const QString& path, RawImageParameters sourceParameters,
     targetParameters.chromaStride = 0;
     if (turn && !sourceParameters.isYuv())
         targetParameters.bayerPattern =
-            rotatedBayerPattern(sourceParameters.bayerPattern, sourceParameters.size.width(),
-                                sourceParameters.size.height(), *turn);
+            rotatedBayerPattern(sourceParameters.bayerPattern, sourceParameters.bayerSampling,
+                                sourceParameters.size.width(), sourceParameters.size.height(),
+                                *turn);
     const int maximum = sourceParameters.maximumSampleValue();
     QByteArray output = bytes.left(sourceParameters.headerOffset);
     for (qsizetype frameIndex = 0; frameIndex < frameCount; ++frameIndex) {

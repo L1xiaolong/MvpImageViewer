@@ -22,8 +22,7 @@ std::array<float, 28> makeBayerRenderUniformData(const RawImageParameters& param
     std::array<float, 28> values{};
     values[0] = static_cast<float>(parameters.size.width());
     values[1] = static_cast<float>(parameters.size.height());
-    values[2] = static_cast<float>(parameters.rowStride > 0 ? parameters.rowStride
-                                                            : minimumRowStride(parameters));
+    values[2] = static_cast<float>(bayerSampleBlockSize(parameters.bayerSampling));
     values[3] = shaderFormat(parameters.format);
     values[4] = static_cast<float>(parameters.bayerPattern);
     values[5] = parameters.littleEndian ? 1.0F : 0.0F;
