@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(ISPImageViewer VERSION 0.2.10 LANGUAGES CXX)
+project(ISPImageViewer VERSION 0.2.11 LANGUAGES CXX)
 enable_language(C)
 
 option(ISPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
