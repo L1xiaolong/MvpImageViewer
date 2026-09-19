@@ -16,7 +16,7 @@ foreach(_notice IN ITEMS LICENSE THIRD_PARTY_NOTICES.md licenses/Lucide-LICENSE)
 endforeach()
 
 configure_file("${_source_root}/third_party/miniz/LICENSE" "${NOTICE_DESTINATION}/licenses/miniz-LICENSE" COPYONLY)
-if(CMAKE_HOST_APPLE)
+if(CMAKE_HOST_APPLE AND ISPVIEW_INCLUDE_CRASHPAD_LICENSES)
     if(ISPVIEW_CRASHPAD_ROOT)
         set(_crashpad "${ISPVIEW_CRASHPAD_ROOT}")
     else()
