@@ -1284,6 +1284,9 @@ void QmlWorkspaceControllerTests::fullScreenSessionKeepsNavigationAndFileOperati
     QCOMPARE(controller.currentPath(), first);
     QCOMPARE(controller.fileType(), QStringLiteral("PNG"));
     QVERIFY(!controller.fileSizeText().isEmpty());
+    for (const QChar character : controller.fileSizeText())
+        QVERIFY2(!character.isSpace(), qPrintable(controller.fileSizeText()));
+    QTRY_VERIFY_WITH_TIMEOUT(controller.imageSize().isValid(), 2000);
     QVERIFY(!controller.canGoPrevious());
     QVERIFY(controller.canGoNext());
     controller.showNext();
@@ -1466,11 +1469,13 @@ void QmlWorkspaceControllerTests::comparePreferencesPersistAndHorizontalModeIsUn
     QVERIFY(!first.exifVisible());
     QVERIFY(!first.histogramVisible());
     QVERIFY(!first.pixelValueVisible());
+    QVERIFY(first.thumbnailVisible());
 
     first.setFileInformationVisible(false);
     first.setExifVisible(true);
     first.setHistogramVisible(true);
     first.setPixelValueVisible(true);
+    first.setThumbnailVisible(false);
     first.setPresentationMode(2);
     QCOMPARE(first.presentationMode(), 1);
 
@@ -1479,6 +1484,7 @@ void QmlWorkspaceControllerTests::comparePreferencesPersistAndHorizontalModeIsUn
     QVERIFY(restored.exifVisible());
     QVERIFY(restored.histogramVisible());
     QVERIFY(restored.pixelValueVisible());
+    QVERIFY(!restored.thumbnailVisible());
 }
 
 void QmlWorkspaceControllerTests::compareUsesSourcePixelTextAndLumaOnlyHistogram() {
@@ -1494,6 +1500,13 @@ void QmlWorkspaceControllerTests::compareUsesSourcePixelTextAndLumaOnlyHistogram
     QSignalSpy frameSpy(&compare, &CompareController::frameChanged);
     compare.setPaths({path, path});
     QTRY_VERIFY_WITH_TIMEOUT(frameSpy.size() >= 2, 5000);
+
+    const QStringList fileInformation = compare.fileText(0).split(QLatin1Char(','));
+    QCOMPARE(fileInformation.size(), 3);
+    QCOMPARE(fileInformation.at(0), QStringLiteral("rgba.png"));
+    QCOMPARE(fileInformation.at(1), QStringLiteral("2*2"));
+    for (const QChar character : fileInformation.at(2))
+        QVERIFY2(!character.isSpace(), qPrintable(fileInformation.at(2)));
 
     const QVariantList values = compare.pixelTexts(0, 0, 0);
     QCOMPARE(values.size(), 2);
@@ -1537,6 +1550,11 @@ void QmlWorkspaceControllerTests::compareViewSyncTemporarilyBypassesWithControl(
     canvas.setPresentationMode(2);
     QCOMPARE(canvas.presentationMode(), 1);
     canvas.setPresentationMode(0);
+    const QVariantMap fittedNavigation = canvas.navigationState(0);
+    QVERIFY(fittedNavigation.value(QStringLiteral("visible")).toBool());
+    QVERIFY(!fittedNavigation.value(QStringLiteral("zoom")).toString().isEmpty());
+    const QRectF fittedViewport = fittedNavigation.value(QStringLiteral("viewport")).toRectF();
+    QCOMPARE(fittedViewport, QRectF(0.0, 0.0, 1.0, 1.0));
     canvas.actualPixelsAll();
 
     const double initialScale = canvas.effectiveViewState(0).pixelsPerImagePixel;

@@ -12,6 +12,7 @@ QtObject {
     property bool exifVisible: true
     property bool histogramVisible: true
     property bool pixelValueVisible: true
+    property bool thumbnailVisible: true
     property int revision: 1
     property int histogramRevision: 1
     property var previewUrls: ["", ""]
@@ -28,11 +29,15 @@ QtObject {
     function setExifVisible(value) { exifVisible = value }
     function setHistogramVisible(value) { histogramVisible = value }
     function setPixelValueVisible(value) { pixelValueVisible = value }
+    function setThumbnailVisible(value) { thumbnailVisible = value }
     function attachCanvas(canvas) {}
     function fitAll() {}
     function actualPixelsAll() {}
     function requestHistogram(slot) { histogramChanged(slot) }
-    function fileText(slot) { return ["sample_0001.jpg", "sample_0002.jpg"][slot] || "" }
+    function fileText(slot) {
+        return ["sample_0001.jpg,4000*3000,13.9MB",
+                "sample_0002.jpg,6000*4000,18.2MB"][slot] || ""
+    }
     function cameraText(slot) {
         return slot === 0 ? "Demo Camera A  •  1/320 s  •  f/5.6  •  ISO 100"
                           : "Demo Camera B  •  1/640 s  •  f/2.8  •  ISO 100"

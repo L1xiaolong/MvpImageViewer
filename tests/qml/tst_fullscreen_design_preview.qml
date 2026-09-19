@@ -51,6 +51,8 @@ TestCase {
         const oldBottomPanel = findChild(page, "fullScreenBottomPanel")
         const navigation = findChild(page, "fullScreenNavigationOverlay")
         const zoomLabel = findChild(page, "fullScreenZoomLabel")
+        const imageInfoText = findChild(page, "fullScreenImageInfoText")
+        const pixelInfoText = findChild(page, "fullScreenPixelInfoText")
         verify(page !== null)
         verify(canvas !== null)
         verify(imageInfo !== null)
@@ -58,11 +60,73 @@ TestCase {
         compare(oldTopPanel, null)
         compare(oldBottomPanel, null)
         verify(navigation !== null)
-        verify(zoomLabel !== null)
+        compare(zoomLabel, null)
+        verify(imageInfoText !== null)
+        verify(pixelInfoText !== null)
         verify(imageInfo.visible)
         verify(pixelInfo.visible)
         verify(navigation.visible)
-        compare(zoomLabel.text, "135%")
+        compare(imageInfoText.text,
+                "sample_0001.jpg,4000*3000,13.9MB,135%")
+        compare(imageInfoText.color, "#00ff00")
+        compare(imageInfoText.font.weight, Font.Bold)
+        compare(pixelInfoText.color, "#00ff00")
+    }
+
+    function test_pixelValueTracksEveryHoverMove() {
+        const page = findChild(preview, "fullScreenPage")
+        const canvas = findChild(page, "designFullScreenCanvas")
+        const pixelInfoText = findChild(page, "fullScreenPixelInfoText")
+
+        mouseMove(canvas, 120, 160)
+        tryCompare(pixelInfoText, "text", "(120,160) RGB(80,120,160)")
+        mouseMove(canvas, 360, 280)
+        tryCompare(pixelInfoText, "text", "(360,280) RGB(80,120,160)")
+    }
+
+    function test_contextMenuSeparatesDisplayAndScaleControls() {
+        const page = findChild(preview, "fullScreenPage")
+        const imageInfo = findChild(page, "fullScreenImageInfo")
+        const pixelInfo = findChild(page, "fullScreenPixelInfo")
+        const navigation = findChild(page, "fullScreenNavigationOverlay")
+        const displayMenu = findChild(page, "fullScreenDisplayMenu")
+        const scaleMenu = findChild(page, "fullScreenScaleMenu")
+        const fileInfoAction = findChild(page, "toggleFullScreenFileInformationAction")
+        const thumbnailAction = findChild(page, "toggleFullScreenThumbnailAction")
+        const pixelAction = findChild(page, "toggleFullScreenPixelValueAction")
+        const fitAction = findChild(page, "fullScreenFitAction")
+        const actualPixelsAction = findChild(page, "fullScreenActualPixelsAction")
+
+        verify(displayMenu !== null)
+        verify(scaleMenu !== null)
+        compare(displayMenu.title, "Display")
+        compare(scaleMenu.title, "Scale")
+        compare(fitAction.text, "Fit to window")
+        compare(actualPixelsAction.text, "1:1")
+
+        fileInfoAction.triggered()
+        thumbnailAction.triggered()
+        pixelAction.triggered()
+        verify(!imageInfo.visible)
+        verify(!navigation.visible)
+        verify(!pixelInfo.visible)
+        compare(fileInfoAction.text, "Show file information")
+        compare(thumbnailAction.text, "Show thumbnail")
+        compare(pixelAction.text, "Show pixel value")
+
+        fileInfoAction.triggered()
+        thumbnailAction.triggered()
+        pixelAction.triggered()
+        verify(imageInfo.visible)
+        verify(navigation.visible)
+        verify(pixelInfo.visible)
+
+        const fitCount = page.controller.fitRequestCount
+        const actualCount = page.controller.actualPixelsRequestCount
+        fitAction.triggered()
+        actualPixelsAction.triggered()
+        compare(page.controller.fitRequestCount, fitCount + 1)
+        compare(page.controller.actualPixelsRequestCount, actualCount + 1)
     }
 
     function test_propertyTabsExposeAllInspectorSections() {

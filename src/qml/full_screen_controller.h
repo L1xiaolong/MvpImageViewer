@@ -23,6 +23,7 @@ class FullScreenController final : public QObject {
     Q_PROPERTY(QString fileName READ fileName NOTIFY stateChanged)
     Q_PROPERTY(QString fileType READ fileType NOTIFY stateChanged)
     Q_PROPERTY(QString fileSizeText READ fileSizeText NOTIFY stateChanged)
+    Q_PROPERTY(QSize imageSize READ imageSize NOTIFY stateChanged)
     Q_PROPERTY(QString positionText READ positionText NOTIFY stateChanged)
     Q_PROPERTY(bool canGoPrevious READ canGoPrevious NOTIFY stateChanged)
     Q_PROPERTY(bool canGoNext READ canGoNext NOTIFY stateChanged)
@@ -38,6 +39,7 @@ class FullScreenController final : public QObject {
     [[nodiscard]] QString fileName() const;
     [[nodiscard]] QString fileType() const;
     [[nodiscard]] QString fileSizeText() const;
+    [[nodiscard]] QSize imageSize() const;
     [[nodiscard]] QString positionText() const;
     [[nodiscard]] bool canGoPrevious() const { return currentIndex_ > 0; }
     [[nodiscard]] bool canGoNext() const {

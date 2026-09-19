@@ -1,6 +1,7 @@
 #include "diagnostics/diagnostics.h"
 #include "qml/full_screen_controller.h"
 
+#include "core/comparison_pixel_probe.h"
 #include "io/image_loader.h"
 #include "io/single_file_rename.h"
 #include "platform/platform_services.h"
@@ -48,9 +49,23 @@ QString FullScreenController::fileType() const {
 
 QString FullScreenController::fileSizeText() const {
     const QFileInfo info(currentPath());
-    return info.isFile()
-               ? QLocale().formattedDataSize(info.size(), 1, QLocale::DataSizeTraditionalFormat)
-               : QString{};
+    if (!info.isFile())
+        return {};
+
+    QString text =
+        QLocale().formattedDataSize(info.size(), 1, QLocale::DataSizeTraditionalFormat);
+    // QLocale separates the number and unit with locale-dependent whitespace (often a normal,
+    // non-breaking, or narrow non-breaking space). The fullscreen HUD intentionally keeps the
+    // compact "100MB" form regardless of the active locale.
+    for (qsizetype index = text.size(); index > 0; --index) {
+        if (text.at(index - 1).isSpace())
+            text.remove(index - 1, 1);
+    }
+    return text;
+}
+
+QSize FullScreenController::imageSize() const {
+    return frame_ ? ComparisonPixelProbe::logicalFrameSize(*frame_) : QSize{};
 }
 
 QString FullScreenController::positionText() const {

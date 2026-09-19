@@ -88,6 +88,7 @@ set(_ispview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/grid.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/list.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/gallery.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/thumbnail-preview.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/info.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/actual-size.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/smooth-display.svg

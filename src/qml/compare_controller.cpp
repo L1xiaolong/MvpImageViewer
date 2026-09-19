@@ -12,6 +12,7 @@
 
 #include <QFileInfo>
 #include <QJsonArray>
+#include <QLocale>
 #include <QPointer>
 #include <QQuickWindow>
 #include <QSettings>
@@ -67,6 +68,16 @@ QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
             {QStringLiteral("channels"), channels}};
 }
 
+QString compactDataSize(qint64 bytes) {
+    QString text =
+        QLocale().formattedDataSize(bytes, 1, QLocale::DataSizeTraditionalFormat);
+    for (qsizetype index = text.size(); index > 0; --index) {
+        if (text.at(index - 1).isSpace())
+            text.remove(index - 1, 1);
+    }
+    return text;
+}
+
 } // namespace
 
 CompareController::CompareController(ImageLoader* loader, QObject* parent)
@@ -83,6 +94,8 @@ CompareController::CompareController(ImageLoader* loader, QObject* parent)
         settings.value(QStringLiteral("compare/histogramVisible"), false).toBool();
     pixelValueVisible_ =
         settings.value(QStringLiteral("compare/pixelValueVisible"), false).toBool();
+    thumbnailVisible_ =
+        settings.value(QStringLiteral("compare/thumbnailVisible"), true).toBool();
 }
 
 ImageFramePtr CompareController::frame(int slot) const {
@@ -91,7 +104,23 @@ ImageFramePtr CompareController::frame(int slot) const {
 
 QString CompareController::fileText(int slot) const {
     const auto value = frame(slot);
-    return value ? value->metadata.fileName : errors_.value(slot);
+    if (!value)
+        return errors_.value(slot);
+
+    const QString path = paths_.value(slot);
+    const QFileInfo info(path);
+    const QString fileName = !value->metadata.fileName.isEmpty()
+                                 ? value->metadata.fileName
+                                 : info.fileName();
+    const QSize imageSize = ComparisonPixelProbe::logicalFrameSize(*value);
+    const QString resolution = imageSize.isValid()
+                                   ? QStringLiteral("%1*%2")
+                                         .arg(imageSize.width())
+                                         .arg(imageSize.height())
+                                   : QStringLiteral("—*—");
+    const qint64 fileSize = info.isFile() ? info.size() : value->metadata.fileSize;
+    const QString sizeText = fileSize > 0 ? compactDataSize(fileSize) : QStringLiteral("—");
+    return QStringLiteral("%1,%2,%3").arg(fileName, resolution, sizeText);
 }
 
 QString CompareController::cameraText(int slot) const {
@@ -360,6 +389,13 @@ void CompareController::setPixelValueVisible(bool visible) {
     }
     QSettings().setValue(QStringLiteral("compare/pixelValueVisible"), visible);
     emit pixelValueVisibleChanged();
+}
+
+void CompareController::setThumbnailVisible(bool visible) {
+    if (thumbnailVisible_ == visible) return;
+    thumbnailVisible_ = visible;
+    QSettings().setValue(QStringLiteral("compare/thumbnailVisible"), visible);
+    emit thumbnailVisibleChanged();
 }
 
 void CompareController::applyHoldFrame() {

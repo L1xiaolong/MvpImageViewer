@@ -89,9 +89,10 @@ Item {
         }
     }
 
-    function comparisonFileText(slot) {
+    function comparisonFileText(slot, navigationData) {
         const currentRevision = root.controller.revision
-        return root.controller.fileText(slot) || "Loading…"
+        const fileText = root.controller.fileText(slot) || "Loading…"
+        return fileText + "," + (navigationData.zoom || "—%")
     }
 
     function comparisonExifText(slot) {
@@ -357,6 +358,17 @@ Item {
                 toolTipText: qsTr("Pixel values")
                 onClicked: root.controller.setPixelValueVisible(checked)
             }
+            AppIconButton {
+                id: thumbnailButton
+                objectName: "compareThumbnailButton"
+                controlSize: 28
+                renderedIconSize: 16
+                checkable: true
+                checked: root.controller.thumbnailVisible
+                iconSource: root.iconPrefix + "thumbnail-preview.svg"
+                toolTipText: qsTr("Thumbnail")
+                onClicked: root.controller.setThumbnailVisible(checked)
+            }
 
             Rectangle {
                 Layout.leftMargin: 4
@@ -477,7 +489,9 @@ Item {
                 }
 
                 Rectangle {
-                    visible: comparisonCell.navigationData.visible === true
+                    objectName: "compareNavigationOverlay_" + comparisonCell.index
+                    visible: root.controller.thumbnailVisible
+                             && comparisonCell.navigationData.visible === true
                     anchors.left: parent.left
                     anchors.bottom: parent.bottom
                     anchors.margins: 8
@@ -510,17 +524,6 @@ Item {
                         border.width: 1
                         border.color: "white"
                     }
-                    Label {
-                        anchors.left: parent.left
-                        anchors.top: parent.top
-                        anchors.margins: 5
-                        text: comparisonCell.navigationData.zoom || ""
-                        color: "white"
-                        font.pixelSize: 8
-                        font.weight: Font.DemiBold
-                        style: Text.Outline
-                        styleColor: "#D9000000"
-                    }
                 }
 
                 Column {
@@ -529,61 +532,53 @@ Item {
                     anchors.margins: 8
                     spacing: 2
 
-                Rectangle {
+                Item {
                     visible: root.controller.fileInformationVisible
-                    width: Math.min(comparisonCell.width - 16,
-                                    Math.min(320, fileInformation.implicitWidth + 18))
-                    height: 26
-                    radius: 5
-                    color: Theme.inspectionOverlay
-                    border.width: 1
-                    border.color: Theme.inspectionOverlayBorder
+                    width: Math.max(0, comparisonCell.width - 16)
+                    height: fileInformation.implicitHeight
 
-                    Label {
+                    Text {
                         id: fileInformation
-                        anchors.fill: parent
-                        anchors.leftMargin: 9
-                        anchors.rightMargin: 9
-                        verticalAlignment: Text.AlignVCenter
-                        text: root.comparisonFileText(comparisonCell.index)
-                        color: Theme.inspectionText
-                        font.family: Theme.uiFont
+                        objectName: "compareFileInformation_" + comparisonCell.index
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        text: root.comparisonFileText(comparisonCell.index,
+                                                      comparisonCell.navigationData)
+                        color: "#00FF00"
+                        font.family: Theme.monoFont
                         font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideMiddle
+                        font.weight: Font.Bold
+                        elide: Text.ElideRight
                     }
                 }
 
-                Rectangle {
+                Item {
                     visible: root.controller.exifVisible
-                    width: Math.min(comparisonCell.width - 16,
-                                    Math.min(430, exifInformation.implicitWidth + 18))
-                    height: 24
-                    radius: 5
-                    color: Theme.inspectionOverlayMuted
-                    border.width: 1
-                    border.color: Theme.inspectionOverlayBorder
+                    width: Math.max(0, comparisonCell.width - 16)
+                    height: exifInformation.implicitHeight
 
-                    Label {
+                    Text {
                         id: exifInformation
-                        anchors.fill: parent
-                        anchors.leftMargin: 9
-                        anchors.rightMargin: 9
-                        verticalAlignment: Text.AlignVCenter
+                        objectName: "compareExifInformation_" + comparisonCell.index
+                        anchors.left: parent.left
+                        anchors.right: parent.right
                         text: root.comparisonExifText(comparisonCell.index)
-                        color: Theme.inspectionMutedText
+                        color: "#00FF00"
                         font.family: Theme.monoFont
-                        font.pixelSize: 10
+                        font.pixelSize: 12
+                        font.weight: Font.Bold
                         elide: Text.ElideRight
                     }
                 }
 
                 CompareLumaHistogram {
+                    objectName: "compareLumaHistogram_" + comparisonCell.index
                     controller: root.controller
                     visible: root.controller.histogramVisible
                     width: Math.min(implicitWidth, comparisonCell.width - 16)
                     height: implicitHeight
-                    slot: comparisonCell.index
+                    slot: root.controller.holdCandidate && comparisonCell.index === 0
+                          ? 1 : comparisonCell.index
 
                     Component.onCompleted: {
                         if (visible)
@@ -596,30 +591,26 @@ Item {
                 }
             }
 
-            Rectangle {
+            Item {
                 visible: root.controller.pixelValueVisible
                          && root.pixelValues[comparisonCell.index]
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: 8
-                width: Math.min(parent.width - 16, pixelValue.implicitWidth + 18)
-                height: 26
-                radius: 5
-                color: Theme.inspectionOverlay
-                border.width: 1
-                border.color: Theme.inspectionOverlayBorder
+                width: Math.min(parent.width - 16, pixelValue.implicitWidth)
+                height: pixelValue.implicitHeight
 
-                Label {
+                Text {
                     id: pixelValue
-                    anchors.fill: parent
-                    anchors.leftMargin: 9
-                    anchors.rightMargin: 9
-                    verticalAlignment: Text.AlignVCenter
+                    objectName: "comparePixelValue_" + comparisonCell.index
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     text: root.pixelValues[comparisonCell.index] || ""
-                    color: Theme.inspectionAccentText
-                    font.pixelSize: 10
-                    font.weight: Font.Medium
+                    color: "#00FF00"
+                    font.pixelSize: 12
+                    font.weight: Font.Bold
                     font.family: Theme.monoFont
+                    elide: Text.ElideRight
                 }
             }
         }

@@ -508,6 +508,11 @@ Choose another folder or drop images here</source>
         <translation>像素值</translation>
     </message>
     <message>
+        <location filename="../Pages/ComparePage.qml" line="368"/>
+        <source>Thumbnail</source>
+        <translation>缩略图</translation>
+    </message>
+    <message>
         <location filename="../Pages/ComparePage.qml" line="374"/>
         <source>Save screenshot</source>
         <translation>保存截图</translation>
@@ -730,19 +735,54 @@ Choose another folder or drop images here</source>
         <translation>移入回收站</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="295"/>
+        <location filename="../Pages/FullScreenPage.qml" line="275"/>
         <source>Display</source>
         <translation>显示</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="296"/>
-        <source>1:1</source>
-        <translation>1:1</translation>
+        <location filename="../Pages/FullScreenPage.qml" line="279"/>
+        <source>Hide file information</source>
+        <translation>隐藏文件信息</translation>
     </message>
     <message>
-        <location filename="../Pages/FullScreenPage.qml" line="297"/>
-        <source>Fit</source>
+        <location filename="../Pages/FullScreenPage.qml" line="280"/>
+        <source>Show file information</source>
+        <translation>显示文件信息</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="285"/>
+        <source>Hide thumbnail</source>
+        <translation>隐藏缩略图</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="285"/>
+        <source>Show thumbnail</source>
+        <translation>显示缩略图</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="290"/>
+        <source>Hide pixel value</source>
+        <translation>隐藏像素值</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="291"/>
+        <source>Show pixel value</source>
+        <translation>显示像素值</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="296"/>
+        <source>Scale</source>
+        <translation>比例</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="300"/>
+        <source>Fit to window</source>
         <translation>适应窗口</translation>
+    </message>
+    <message>
+        <location filename="../Pages/FullScreenPage.qml" line="305"/>
+        <source>1:1</source>
+        <translation>1:1</translation>
     </message>
     <message>
         <location filename="../Pages/FullScreenPage.qml" line="302"/>

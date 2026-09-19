@@ -18,6 +18,9 @@ Item {
     property string iconPrefix: Theme.iconPrefix
     property string pixelText: qsTr("Move over the image")
     property string inspectedPath: ""
+    property bool fileInformationVisible: true
+    property bool thumbnailVisible: true
+    property bool pixelValueVisible: true
     readonly property var imageCanvas: canvasLoader.item
     property Item messageParent: root
     property bool loadingMessageVisible: false
@@ -36,6 +39,10 @@ Item {
         const currentNavigationRevision = imageCanvas.navigationRevision
         return imageCanvas.navigationState(0)
     }
+    readonly property string resolutionText:
+        controller.imageSize && controller.imageSize.width > 0 && controller.imageSize.height > 0
+            ? controller.imageSize.width + "*" + controller.imageSize.height : "—*—"
+    readonly property string zoomText: navigationData.zoom || "—%"
 
     signal closeRequested()
 
@@ -129,64 +136,49 @@ Item {
         }
     }
 
-    Rectangle {
+    Item {
         id: imageInfo
         objectName: "fullScreenImageInfo"
+        visible: root.fileInformationVisible
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.margins: 16
-        width: Math.min(420, Math.max(220, imageName.implicitWidth + 32))
-        height: 56
-        radius: 7
-        color: "#B81E2227"
-        border.width: 1
-        border.color: "#4DFFFFFF"
+        width: Math.max(0, parent.width - 32)
+        height: imageName.implicitHeight
         z: 25
 
         Text {
             id: imageName
+            objectName: "fullScreenImageInfoText"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.margins: 10
-            text: root.controller.fileName
-            color: "white"
-            elide: Text.ElideMiddle
-            font.family: Theme.uiFont
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
-        }
-        Text {
-            anchors.left: imageName.left
-            anchors.right: imageName.right
-            anchors.top: imageName.bottom
-            anchors.topMargin: 5
-            text: root.controller.fileType + " · " + root.controller.fileSizeText
-            color: "#D9FFFFFF"
+            text: root.controller.fileName + "," + root.resolutionText + "," +
+                  root.controller.fileSizeText + "," + root.zoomText
+            color: "#00FF00"
+            elide: Text.ElideRight
             font.family: Theme.monoFont
-            font.pixelSize: 10
+            font.pixelSize: 12
+            font.weight: Font.Bold
         }
     }
 
-    Rectangle {
+    Item {
         id: pixelInfo
         objectName: "fullScreenPixelInfo"
+        visible: root.pixelValueVisible
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 16
-        width: Math.min(460, Math.max(190, pixelLabel.implicitWidth + 24))
-        height: 34
-        radius: 6
-        color: "#B81E2227"
-        border.width: 1
-        border.color: "#4DFFFFFF"
+        width: pixelLabel.implicitWidth
+        height: pixelLabel.implicitHeight
         z: 25
 
         Text {
             id: pixelLabel
+            objectName: "fullScreenPixelInfoText"
             anchors.centerIn: parent
             text: root.pixelText
-            color: "white"
+            color: "#00FF00"
             font.family: Theme.monoFont
             font.pixelSize: 11
         }
@@ -195,7 +187,7 @@ Item {
     Rectangle {
         id: navigationOverlay
         objectName: "fullScreenNavigationOverlay"
-        visible: root.navigationData.visible === true
+        visible: root.thumbnailVisible && root.navigationData.visible === true
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 16
@@ -228,18 +220,6 @@ Item {
             color: "#18FFFFFF"
             border.width: 1
             border.color: "white"
-        }
-        Label {
-            objectName: "fullScreenZoomLabel"
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.margins: 5
-            text: root.navigationData.zoom || ""
-            color: "white"
-            font.pixelSize: 8
-            font.weight: Font.DemiBold
-            style: Text.Outline
-            styleColor: "#D9000000"
         }
     }
 
@@ -293,8 +273,38 @@ Item {
         AppMenuSeparator {}
         AppMenu {
             title: qsTr("Display")
-            AppMenuItem { text: qsTr("1:1"); onTriggered: root.controller.actualPixels() }
-            AppMenuItem { text: qsTr("Fit"); onTriggered: root.controller.fitImage() }
+            objectName: "fullScreenDisplayMenu"
+            AppMenuItem {
+                objectName: "toggleFullScreenFileInformationAction"
+                text: root.fileInformationVisible ? qsTr("Hide file information")
+                                                  : qsTr("Show file information")
+                onTriggered: root.fileInformationVisible = !root.fileInformationVisible
+            }
+            AppMenuItem {
+                objectName: "toggleFullScreenThumbnailAction"
+                text: root.thumbnailVisible ? qsTr("Hide thumbnail") : qsTr("Show thumbnail")
+                onTriggered: root.thumbnailVisible = !root.thumbnailVisible
+            }
+            AppMenuItem {
+                objectName: "toggleFullScreenPixelValueAction"
+                text: root.pixelValueVisible ? qsTr("Hide pixel value")
+                                             : qsTr("Show pixel value")
+                onTriggered: root.pixelValueVisible = !root.pixelValueVisible
+            }
+        }
+        AppMenu {
+            title: qsTr("Scale")
+            objectName: "fullScreenScaleMenu"
+            AppMenuItem {
+                objectName: "fullScreenFitAction"
+                text: qsTr("Fit to window")
+                onTriggered: root.controller.fitImage()
+            }
+            AppMenuItem {
+                objectName: "fullScreenActualPixelsAction"
+                text: qsTr("1:1")
+                onTriggered: root.controller.actualPixels()
+            }
         }
         AppMenuSeparator {}
         AppMenuItem {

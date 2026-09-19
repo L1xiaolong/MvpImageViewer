@@ -29,6 +29,8 @@ class CompareController final : public QObject {
                    NOTIFY histogramVisibleChanged)
     Q_PROPERTY(bool pixelValueVisible READ pixelValueVisible WRITE setPixelValueVisible
                    NOTIFY pixelValueVisibleChanged)
+    Q_PROPERTY(bool thumbnailVisible READ thumbnailVisible WRITE setThumbnailVisible
+                   NOTIFY thumbnailVisibleChanged)
     Q_PROPERTY(int revision READ revision NOTIFY revisionChanged)
     Q_PROPERTY(int histogramRevision READ histogramRevision NOTIFY histogramRevisionChanged)
 
@@ -43,6 +45,7 @@ class CompareController final : public QObject {
     bool exifVisible() const { return exifVisible_; }
     bool histogramVisible() const { return histogramVisible_; }
     bool pixelValueVisible() const { return pixelValueVisible_; }
+    bool thumbnailVisible() const { return thumbnailVisible_; }
     ImageFramePtr frame(int slot) const;
     int revision() const { return revision_; }
     int histogramRevision() const { return histogramRevision_; }
@@ -60,6 +63,7 @@ class CompareController final : public QObject {
     Q_INVOKABLE void setExifVisible(bool visible);
     Q_INVOKABLE void setHistogramVisible(bool visible);
     Q_INVOKABLE void setPixelValueVisible(bool visible);
+    Q_INVOKABLE void setThumbnailVisible(bool visible);
     Q_INVOKABLE void attachCanvas(QObject* canvas);
     Q_INVOKABLE void fitAll();
     Q_INVOKABLE void actualPixelsAll();
@@ -79,6 +83,7 @@ class CompareController final : public QObject {
     void exifVisibleChanged();
     void histogramVisibleChanged();
     void pixelValueVisibleChanged();
+    void thumbnailVisibleChanged();
     void frameChanged(int slot, bool fullResolution);
     void loadFailed(int slot, const QString& error);
     void revisionChanged();
@@ -110,6 +115,7 @@ class CompareController final : public QObject {
     bool exifVisible_ = false;
     bool histogramVisible_ = false;
     bool pixelValueVisible_ = false;
+    bool thumbnailVisible_ = true;
     int revision_ = 0;
     int histogramRevision_ = 0;
     QVector<quint64> histogramGenerations_;

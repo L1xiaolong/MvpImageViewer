@@ -137,7 +137,7 @@ QtObject {
                 row.fileType = row.isDirectory ? "Folder" : row.fileName.split(".").pop().toUpperCase()
                 row.dimensions = Qt.size(4000, 3000)
                 row.bitDepth = 8
-                row.fileSizeText = "12.4 MB"
+                row.fileSizeText = "12.4MB"
                 append(row)
             }
         }

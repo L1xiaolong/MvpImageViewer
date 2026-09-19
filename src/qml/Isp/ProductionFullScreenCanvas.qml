@@ -18,4 +18,18 @@ ImageCanvas {
         if (controller)
             controller.attachCanvas(root)
     }
+
+    // A native borderless-fullscreen transition can leave QQuickRhiItem hover delivery stale
+    // until the next click on some platforms. Pointer handlers continue receiving movement, so
+    // feed their local position directly into the canvas probe for a live pixel readout.
+    HoverHandler {
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onPointChanged: root.probePixelAt(point.position)
+        onHoveredChanged: {
+            if (hovered)
+                root.probePixelAt(point.position)
+            else
+                root.clearPixelProbe()
+        }
+    }
 }

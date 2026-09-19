@@ -2,9 +2,11 @@ import QtQuick
 
 Rectangle {
     id: root
+    objectName: "compareLumaHistogram_" + root.slot
 
     required property var controller
     property int slot: 0
+    readonly property color plotColor: "#000000"
     property var histogramData: {
         const revision = root.controller.histogramRevision
         return root.controller.histogram(root.slot)
@@ -13,9 +15,9 @@ Rectangle {
     implicitWidth: 156
     implicitHeight: 64
     radius: 3
-    color: Theme.inspectionOverlayMuted
+    color: "#FFFFFF"
     border.width: 1
-    border.color: Theme.inspectionOverlayBorder
+    border.color: "#80000000"
     clip: true
 
     function request() {
@@ -23,6 +25,11 @@ Rectangle {
     }
 
     onHistogramDataChanged: graph.requestPaint()
+    onSlotChanged: {
+        graph.requestPaint()
+        if (visible && root.controller)
+            request()
+    }
 
     Canvas {
         id: graph
@@ -65,9 +72,9 @@ Rectangle {
             }
             context.lineTo(width, bottom)
             context.closePath()
-            context.fillStyle = channel.color || "#F4F5F2"
+            context.fillStyle = root.plotColor
             context.fill()
-            context.strokeStyle = "#E8F4F5F2"
+            context.strokeStyle = root.plotColor
             context.lineWidth = 1
             context.stroke()
         }

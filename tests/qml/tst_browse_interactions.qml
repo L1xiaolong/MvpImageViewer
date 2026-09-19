@@ -398,7 +398,7 @@ TestCase {
         fileType: "PNG"
         dimensions: Qt.size(1920, 1080)
         bitDepth: 10
-        fileSizeText: "12.4 MB"
+        fileSizeText: "12.4MB"
         directory: false
         displayMode: 0
     }
@@ -530,7 +530,7 @@ TestCase {
         compare(badge.radius, 4)
         compare(badge.border.width, 1)
         compare(badge.color, Theme.encodedBadgeSurface)
-        compare(details.text, "| 1920×1080 | 10 bit | 12.4 MB")
+        compare(details.text, "| 1920×1080 | 10 bit | 12.4MB")
 
         metadataTile.fileType = "YUV"
         wait(0)

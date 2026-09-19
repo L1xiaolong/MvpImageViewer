@@ -942,16 +942,16 @@ QVariantMap QmlImageCanvas::navigationState(int slot) const {
     const QSize imageSize = logicalImageSize(slot);
     const QRectF cell = cellRect(slot);
     const ViewState state = effectiveViewState(slot);
-    if (!frame || imageSize.isEmpty() || cell.isEmpty() || state.fitMode == FitMode::Fit)
+    if (!frame || imageSize.isEmpty() || cell.isEmpty())
         return {{QStringLiteral("visible"), false}};
-    const int availableWidth = std::max(24, std::min(90, qRound(cell.width()) / 6));
-    const int availableHeight = std::max(18, std::min(65, qRound(cell.height()) / 6));
-    const QSize contentSize =
-        imageSize.scaled(availableWidth, availableHeight, Qt::KeepAspectRatio);
     const double percent = state.pixelsPerImagePixel * 100.0;
     const QString zoom = std::abs(percent - std::round(percent)) < 0.05
                              ? QStringLiteral("%1%").arg(qRound(percent))
                              : QStringLiteral("%1%").arg(QString::number(percent, 'f', 1));
+    const int availableWidth = std::max(24, std::min(90, qRound(cell.width()) / 6));
+    const int availableHeight = std::max(18, std::min(65, qRound(cell.height()) / 6));
+    const QSize contentSize =
+        imageSize.scaled(availableWidth, availableHeight, Qt::KeepAspectRatio);
     return {
         {QStringLiteral("visible"), true},
         {QStringLiteral("width"), contentSize.width() + 6},
@@ -1057,6 +1057,10 @@ void QmlImageCanvas::emitPixelAt(const QPointF& position) {
         emit pixelProbeFullResolutionRequested(slot);
     }
     emit pixelHovered(slot, *pixel, sample.sourceValueText(), sample.valid);
+}
+
+void QmlImageCanvas::probePixelAt(const QPointF& position) {
+    probeHoverScenePosition(mapToScene(position));
 }
 
 void QmlImageCanvas::clearPixelProbe() {

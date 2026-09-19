@@ -17,7 +17,8 @@ Item {
     signal pixelHovered(int sourceSlot, point pixel, string valueText, bool valid)
 
     function navigationState(slot) {
-        return { "visible": false }
+        return { "visible": true, "width": 82, "height": 58,
+            "viewport": Qt.rect(0.22, 0.18, 0.52, 0.56), "zoom": "84%" }
     }
 
     Rectangle {
