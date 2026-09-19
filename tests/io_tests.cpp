@@ -44,6 +44,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <thread>
 #include <vector>
@@ -194,6 +195,14 @@ bool writeSyntheticMetadata(const QString& path) {
 
 class IoTests final : public QObject {
     Q_OBJECT
+
+  public:
+    static void initMain() {
+        // Preserve the last completed QtTest case when a platform plug-in aborts the process.
+        // This is especially useful for diagnosing codec failures on Windows CI.
+        std::setvbuf(stdout, nullptr, _IONBF, 0);
+        std::setvbuf(stderr, nullptr, _IONBF, 0);
+    }
 
   private slots:
     void decoderScalesPreviewAndKeepsMetadata();
