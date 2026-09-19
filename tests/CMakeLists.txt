@@ -18,7 +18,14 @@ if(ISPVIEW_HAS_EXIV2)
     target_link_libraries(ispview_io_tests PRIVATE Exiv2::exiv2lib)
 endif()
 ispview_enable_warnings(ispview_io_tests)
-add_test(NAME ispview_io_tests COMMAND ispview_io_tests)
+if(WIN32)
+    # QtTest's text logger is not forwarded through CTest's captured stdout on MSYS2.
+    # Keep a dedicated report so the release gate can expose the actual failing assertion.
+    add_test(NAME ispview_io_tests COMMAND ispview_io_tests
+        -o "${CMAKE_CURRENT_BINARY_DIR}/ispview_io_tests.log,txt")
+else()
+    add_test(NAME ispview_io_tests COMMAND ispview_io_tests)
+endif()
 
 qt_add_executable(ispview_qml_workspace_tests
     qml_workspace_controller_tests.cpp
