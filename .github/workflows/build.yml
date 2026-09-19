@@ -59,7 +59,11 @@ jobs:
         run: cmake --build --preset macos-debug
       - name: Test (macOS)
         if: runner.os == 'macOS'
-        run: ctest --preset macos-debug
+        run: |
+          if ! ctest --preset macos-debug; then
+            cat build/macos-preset-debug/Testing/Temporary/LastTest.log
+            exit 1
+          fi
       - name: QML static analysis (macOS)
         if: runner.os == 'macOS'
         run: cmake --build --preset macos-debug --target ISPImageViewerQml_qmllint
@@ -79,7 +83,11 @@ jobs:
       - name: Test (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: ctest --preset windows-msys2-debug
+        run: |
+          if ! ctest --preset windows-msys2-debug; then
+            cat build/windows-msys2-debug/Testing/Temporary/LastTest.log
+            exit 1
+          fi
       - name: QML static analysis (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
