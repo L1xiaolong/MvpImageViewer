@@ -1,4 +1,6 @@
 qt_add_library(ispview_core STATIC
+    bayer_image_renderer.h
+    bayer_image_renderer.cpp
     color_conversion.h
     color_conversion.cpp
     display_color_space.h

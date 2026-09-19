@@ -1,6 +1,6 @@
 #include "io/camera_raw_decoder.h"
+#include "core/bayer_image_renderer.h"
 #include "io/encoded_color_management.h"
-#include "io/raw_image_decoder.h"
 
 #include <QBuffer>
 #include <QColorSpace>
