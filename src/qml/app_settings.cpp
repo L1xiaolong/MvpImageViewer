@@ -35,6 +35,7 @@
 
 namespace ispview {
 namespace {
+constexpr auto kDefaultRepositorySlug = "L1xiaolong/IspImageViewer";
 constexpr auto kLanguageKey = "general/language";
 constexpr auto kThemeKey = "appearance/theme";
 constexpr auto kRestoreLastDirectoryKey = "general/restoreLastDirectory";
@@ -58,22 +59,6 @@ QString platformInstallerSuffix() {
 #endif
 }
 
-QString repositorySlug() { return QString::fromUtf8(ISPVIEW_GITHUB_REPOSITORY).trimmed(); }
-
-QUrl repositoryUrl(const QString& suffix = {}) {
-    const QString slug = repositorySlug();
-    if (slug.isEmpty())
-        return {};
-    return QUrl(QStringLiteral("https://github.com/%1%2").arg(slug, suffix));
-}
-
-QUrl latestReleaseApiUrl() {
-    const QString slug = repositorySlug();
-    if (slug.isEmpty())
-        return {};
-    return QUrl(QStringLiteral("https://api.github.com/repos/%1/releases/latest").arg(slug));
-}
-
 struct ShortcutDefinition {
     const char* id;
     const char* defaultSequence;
@@ -93,6 +78,20 @@ const ShortcutDefinition* shortcutDefinition(const QString& action) {
     return nullptr;
 }
 } // namespace
+
+QString AppSettings::repositorySlug() {
+    const QString configured = QString::fromUtf8(ISPVIEW_GITHUB_REPOSITORY).trimmed();
+    return configured.isEmpty() ? QString::fromLatin1(kDefaultRepositorySlug) : configured;
+}
+
+QUrl AppSettings::repositoryUrl(const QString& suffix) {
+    return QUrl(QStringLiteral("https://github.com/%1%2").arg(repositorySlug(), suffix));
+}
+
+QUrl AppSettings::latestReleaseApiUrl() {
+    return QUrl(
+        QStringLiteral("https://api.github.com/repos/%1/releases/latest").arg(repositorySlug()));
+}
 
 AppSettings::AppSettings(QGuiApplication* application, QObject* parent)
     : QObject(parent), application_(application) {

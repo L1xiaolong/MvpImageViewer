@@ -89,6 +89,9 @@ class AppSettings final : public QObject {
     [[nodiscard]] QVariantList shortcutEntries() const;
     [[nodiscard]] int shortcutsRevision() const;
     [[nodiscard]] QString applicationVersion() const;
+    [[nodiscard]] static QString repositorySlug();
+    [[nodiscard]] static QUrl repositoryUrl(const QString& suffix = {});
+    [[nodiscard]] static QUrl latestReleaseApiUrl();
 
     bool loggingEnabled() const { return loggingEnabled_; }
     QString logLevel() const { return logLevel_; }

@@ -297,6 +297,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void compareDefersOversizedAutomaticFullLoadsButExactToolsStillPromote();
     void compareAutomaticallyPromotesBudgetedImages();
     void applicationSettingsPersistAndRestoreDefaults();
+    void repositoryLinksFallBackWhenBuildConfigurationIsEmpty();
     void otaDownloadsAndVerifiesPlatformInstaller();
     void otaRejectsInstallerWithWrongChecksum();
     void otaDownloadCanBeCancelled();
@@ -314,6 +315,17 @@ void QmlWorkspaceControllerTests::diagnosticSettingsPersistAndNormalize() {
     QCOMPARE(restored.logLevel(), QStringLiteral("Info"));
     restored.restoreDefaults();
     QVERIFY(restored.loggingEnabled()); QVERIFY(restored.crashReportingEnabled());
+}
+
+void QmlWorkspaceControllerTests::repositoryLinksFallBackWhenBuildConfigurationIsEmpty() {
+    QCOMPARE(AppSettings::repositorySlug(), QStringLiteral("L1xiaolong/IspImageViewer"));
+    QCOMPARE(AppSettings::repositoryUrl(),
+             QUrl(QStringLiteral("https://github.com/L1xiaolong/IspImageViewer")));
+    QCOMPARE(AppSettings::repositoryUrl(QStringLiteral("/releases")),
+             QUrl(QStringLiteral("https://github.com/L1xiaolong/IspImageViewer/releases")));
+    QCOMPARE(AppSettings::latestReleaseApiUrl(),
+             QUrl(QStringLiteral(
+                 "https://api.github.com/repos/L1xiaolong/IspImageViewer/releases/latest")));
 }
 
 void QmlWorkspaceControllerTests::initTestCase() {

@@ -54,6 +54,7 @@ target_link_libraries(ispview_qml_workspace_tests PRIVATE
 )
 target_compile_definitions(ispview_qml_workspace_tests PRIVATE
     ISPVIEW_HAS_LIBRAW=$<BOOL:${ISPVIEW_HAS_LIBRAW}>
+    ISPVIEW_GITHUB_REPOSITORY=""
 )
 ispview_enable_warnings(ispview_qml_workspace_tests)
 add_test(NAME ispview_qml_workspace_tests COMMAND ispview_qml_workspace_tests)
