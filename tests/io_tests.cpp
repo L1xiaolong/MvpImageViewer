@@ -2267,11 +2267,15 @@ void IoTests::imageTransformerRotatesResizesAndRestoresEncodedImage() {
     QCOMPARE(QImageReader(path).size(), QSize(2, 3));
     QCOMPARE(ImageTransformer::resize(path, QSize(8, 6)), QString{});
     QCOMPARE(QImageReader(path).size(), QSize(8, 6));
-    QImageReader editedReader(path);
-    const QImage edited = editedReader.read();
-    QVERIFY2(!edited.isNull(), qPrintable(editedReader.errorString()));
-    QCOMPARE(edited.colorSpace(), sourceColorSpace);
+    {
+        QImageReader editedReader(path);
+        const QImage edited = editedReader.read();
+        QVERIFY2(!edited.isNull(), qPrintable(editedReader.errorString()));
+        QCOMPARE(edited.colorSpace(), sourceColorSpace);
+    }
 
+    // Destroy the reader before replacing the file: Windows keeps its source handle open for
+    // the reader's lifetime and rejects QSaveFile's atomic rename while that handle exists.
     QCOMPARE(ImageTransformer::restore(path), QString{});
     QVERIFY(!ImageTransformer::canRestore(path));
     QFile restored(path);
