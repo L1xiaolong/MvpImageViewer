@@ -1,8 +1,11 @@
 # Runtime inventory and license collection
 
 Packaging requires Python 3.9+ and runs `scripts/collect_runtime_licenses.py`
-after deployment and pruning, before producing an installer. A nonzero exit
-blocks packaging; `RUNTIME_DEPENDENCIES.md` and `.json` explain the findings.
+after deployment and pruning, before producing an installer. The standalone
+collector returns nonzero for unresolved findings, while the macOS and Windows
+packaging flows treat that result as a warning and continue producing the
+installer. `RUNTIME_DEPENDENCIES.md` and `.json` explain the findings and remain
+available in the package and CI diagnostic artifacts.
 The collector does not download files, guess ownership from DLL names, or
 grant permission to redistribute vendor components.
 
@@ -21,8 +24,9 @@ grant permission to redistribute vendor components.
   cover tools or documentation absent from the installed application; they
   are not a conclusion that every DLL uses every listed license.
 - Unknown files, changed hashes, missing or empty notices, and stale catalog
-  entries are blocking findings. A successful collection is labeled
-  `collected`, not a full legal-compliance approval.
+  entries are marked as blocking findings in the audit report. They make the
+  standalone collector fail, but do not stop release packaging. A successful
+  collection is labeled `collected`, not a full legal-compliance approval.
 
 The JSON lists every copied evidence file and its SHA-256. The two reports
 and all evidence are shipped at the Windows installation root or under
@@ -103,9 +107,9 @@ catalog. No macOS SDK catalog is fabricated or supplied by this repository.
 
 For GitHub releases, repository variables `ISPVIEW_RUNTIME_CATALOG_MACOS` and
 `ISPVIEW_RUNTIME_CATALOG_WINDOWS` can point to reviewed catalogs checked out
-with the release commit. Without the necessary catalog, that platform's
-packaging job intentionally stops. Diagnostics are retained as separate
-workflow artifacts; they are not uploaded as public release installers.
+with the release commit. Without a catalog, packaging continues and records
+the unresolved findings as warnings. Diagnostics are retained as separate
+workflow artifacts and are also included in the staged package.
 
 ## Remaining source and licensing review
 

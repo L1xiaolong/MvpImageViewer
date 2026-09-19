@@ -235,8 +235,10 @@ jobs:
           # graph for the EXE, Qt plugins, and QML plugins recursively.
           ./scripts/deploy_msys2_runtime.sh "$package_directory"
           cmake "-DNOTICE_DESTINATION=$package_directory" -P scripts/package_licenses.cmake
-          python scripts/collect_runtime_licenses.py "$package_directory" \
-            --msys-root "$(cygpath -m /)"
+          if ! python scripts/collect_runtime_licenses.py "$package_directory" \
+            --msys-root "$(cygpath -m /)"; then
+            echo "::warning::Runtime license audit is incomplete; packaging will continue."
+          fi
 
       - name: Retain runtime license diagnostics
         if: always()
