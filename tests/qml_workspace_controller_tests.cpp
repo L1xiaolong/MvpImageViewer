@@ -18,6 +18,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QCryptographicHash>
+#include <QCursor>
 #include <QFile>
 #include <QGuiApplication>
 #include <QHash>
@@ -286,6 +287,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void imageCanvasSmoothDisplayCanBeToggled();
     void fullScreenCanvasPromotesRawPreviewWhenProbingSourceSamples();
     void canvasProbesPixelsFromWindowHoverEvents();
+    void canvasKeepsProbingTheLiveCursorWhenHoverIsStale();
     void canvasPixelProbeReportsExactPixelAtHighZoom();
     void fullScreenSessionKeepsNavigationAndFileOperationsOutOfQml();
     void fullScreenExactPixelsPromotePreviewWithoutLosingFullResolution();
@@ -1200,6 +1202,9 @@ void QmlWorkspaceControllerTests::canvasProbesPixelsFromWindowHoverEvents() {
 
     QSignalSpy probeSpy(&canvas, &QmlImageCanvas::pixelHovered);
     const QPointF center(200, 150);
+    // Platform hover positions are only trusted while they agree with the cursor, so the test
+    // cursor has to sit on the hovered pixel.
+    QCursor::setPos(window.mapToGlobal(center.toPoint()));
     QHoverEvent centerHover(QEvent::HoverMove, center, center, center);
     // Only the window sees this event. Full-display presentation can leave item-level hover
     // tracking stale, so the canvas observes the window directly.
@@ -1215,16 +1220,75 @@ void QmlWorkspaceControllerTests::canvasProbesPixelsFromWindowHoverEvents() {
     QCOMPARE(probeSpy.count(), 1);
 
     const QPointF offset = center + QPointF(4.0, 4.0);
+    QCursor::setPos(window.mapToGlobal(offset.toPoint()));
     QHoverEvent offsetHover(QEvent::HoverMove, offset, offset, offset);
     QCoreApplication::sendEvent(&window, &offsetHover);
     QCOMPARE(probeSpy.count(), 2);
     QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(4, 4));
     QVERIFY(probeSpy.last().at(3).toBool());
 
+    // A leave is only honoured once the cursor has really left the canvas.
+    QCursor::setPos(window.mapToGlobal(QPoint(-40, -40)));
     QHoverEvent leave(QEvent::HoverLeave, QPointF(-40, -40), QPointF(-40, -40), center);
     QCoreApplication::sendEvent(&window, &leave);
     QCOMPARE(probeSpy.count(), 3);
     QVERIFY(!probeSpy.last().at(3).toBool());
+}
+
+void QmlWorkspaceControllerTests::canvasKeepsProbingTheLiveCursorWhenHoverIsStale() {
+    QQuickWindow window;
+    window.resize(400, 300);
+    window.show();
+    QmlImageCanvas canvas(window.contentItem());
+    canvas.setWidth(400);
+    canvas.setHeight(300);
+
+    auto frame = std::make_shared<ImageFrame>();
+    QImage image(8, 8, QImage::Format_RGBA8888);
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            image.setPixelColor(x, y, QColor(x * 16, y * 16, 0, 255));
+        }
+    }
+    frame->descriptor.size = image.size();
+    frame->storage = std::move(image);
+    canvas.setFrames({frame});
+
+    QSignalSpy probeSpy(&canvas, &QmlImageCanvas::pixelHovered);
+    const QPointF liveScene(200, 150);
+    QCursor::setPos(window.mapToGlobal(liveScene.toPoint()));
+    QTRY_VERIFY_WITH_TIMEOUT(probeSpy.count() >= 1, 1000);
+    QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(4, 4));
+    QCOMPARE(probeSpy.last().at(2).toString(), QStringLiteral("RGB(64,64,0)"));
+    QVERIFY(probeSpy.last().at(3).toBool());
+
+    // Converting the window into a borderless full-display window in place leaves the platform
+    // replaying hover positions that still describe the previous window placement (a windowed
+    // window sitting 62 px below its full-display origin, as in the reported bug). Such a replay
+    // must never replace the reading that the live cursor produces.
+    probeSpy.clear();
+    const QPointF staleScene = liveScene + QPointF(0, 62);
+    QHoverEvent staleHover(QEvent::HoverMove, staleScene, staleScene, staleScene);
+    QCoreApplication::sendEvent(&window, &staleHover);
+    QCoreApplication::sendEvent(&canvas, &staleHover);
+    canvas.probePixelAt(staleHover.position());
+    QCOMPARE(probeSpy.count(), 0);
+
+    // The stale replay also publishes a leave while the pointer never left.
+    QHoverEvent staleLeave(QEvent::HoverLeave, QPointF(-40, -40), QPointF(-40, -40), staleScene);
+    QCoreApplication::sendEvent(&window, &staleLeave);
+    QCoreApplication::sendEvent(&canvas, &staleLeave);
+    QCOMPARE(probeSpy.count(), 0);
+
+    // The readout follows the live cursor position again: the cursor poll publishes it and the
+    // stale replay can no longer replace it. The fitted image occupies the 300 px center of the
+    // 400 px wide cell.
+    const QPointF movedScene(140, 150);
+    QCursor::setPos(window.mapToGlobal(movedScene.toPoint()));
+    QTRY_VERIFY_WITH_TIMEOUT(probeSpy.count() >= 1, 1000);
+    QCOMPARE(probeSpy.last().at(1).toPoint(), QPoint(2, 4));
+    QCOMPARE(probeSpy.last().at(2).toString(), QStringLiteral("RGB(32,64,0)"));
+    QVERIFY(probeSpy.last().at(3).toBool());
 }
 
 void QmlWorkspaceControllerTests::canvasPixelProbeReportsExactPixelAtHighZoom() {

@@ -39,6 +39,10 @@ bool isIndependentViewAdjustment(Qt::KeyboardModifiers modifiers) {
 
 constexpr int kMaximumImages = 4;
 constexpr qreal kCellSpacing = 2.0;
+// Hover positions arrive with sub-pixel accuracy while QCursor reports whole pixels, so a small
+// rounding difference is expected. Anything larger means the position does not describe the
+// current pointer.
+constexpr qreal kHoverPositionTolerance = 2.0;
 constexpr std::array<float, 24> kQuadVertices{
     -1.F, -1.F, 0.F, 1.F, 1.F, -1.F, 1.F, 1.F, -1.F, 1.F, 0.F, 0.F,
     -1.F, 1.F,  0.F, 0.F, 1.F, -1.F, 1.F, 1.F, 1.F,  1.F, 1.F, 0.F,
@@ -786,13 +790,18 @@ bool QmlImageCanvas::eventFilter(QObject* watched, QEvent* event) {
     switch (event->type()) {
     case QEvent::HoverEnter:
     case QEvent::HoverMove:
-        probeHoverScenePosition(static_cast<QHoverEvent*>(event)->scenePosition());
+        probePlatformHoverPosition(static_cast<QHoverEvent*>(event)->scenePosition());
         break;
     case QEvent::MouseMove:
-        probeHoverScenePosition(static_cast<QMouseEvent*>(event)->scenePosition());
+        probePlatformHoverPosition(static_cast<QMouseEvent*>(event)->scenePosition());
         break;
     case QEvent::HoverLeave:
     case QEvent::Leave:
+        // The platform also republishes a stale leave; only a cursor that really left closes the
+        // readout.
+        if (!liveCursorIsInside())
+            clearPixelProbe();
+        break;
     case QEvent::WindowDeactivate:
         clearPixelProbe();
         break;
@@ -800,6 +809,35 @@ bool QmlImageCanvas::eventFilter(QObject* watched, QEvent* event) {
         break;
     }
     return QQuickRhiItem::eventFilter(watched, event);
+}
+
+QPointF QmlImageCanvas::liveCursorScenePosition() const {
+    const QQuickWindow* quickWindow = window();
+    if (!quickWindow)
+        return {};
+    return QPointF(quickWindow->mapFromGlobal(QCursor::pos()));
+}
+
+bool QmlImageCanvas::liveCursorIsInside() const {
+    return window() && contains(mapFromScene(liveCursorScenePosition()));
+}
+
+void QmlImageCanvas::probePlatformHoverPosition(const QPointF& scenePosition) {
+    // Converting the main window into a borderless full-display window in place leaves the
+    // platform publishing hover positions that still describe the previous window placement: the
+    // pointer movement itself stops being reported, while Qt Quick keeps re-delivering the last
+    // hover position it saw. Publishing such a replay overwrites every live reading the cursor
+    // poll below produces, which is what froze the pixel readout until the next click.
+    // A position that disagrees with the cursor cannot describe the current pointer, so it is
+    // dropped and the poll stays authoritative.
+    if (window()) {
+        const QPointF livePosition = liveCursorScenePosition();
+        if (std::abs(scenePosition.x() - livePosition.x()) > kHoverPositionTolerance ||
+            std::abs(scenePosition.y() - livePosition.y()) > kHoverPositionTolerance) {
+            return;
+        }
+    }
+    probeHoverScenePosition(scenePosition);
 }
 
 void QmlImageCanvas::probeHoverScenePosition(const QPointF& scenePosition, bool force) {
@@ -1060,7 +1098,7 @@ void QmlImageCanvas::emitPixelAt(const QPointF& position) {
 }
 
 void QmlImageCanvas::probePixelAt(const QPointF& position) {
-    probeHoverScenePosition(mapToScene(position));
+    probePlatformHoverPosition(mapToScene(position));
 }
 
 void QmlImageCanvas::clearPixelProbe() {
@@ -1178,7 +1216,7 @@ void QmlImageCanvas::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void QmlImageCanvas::hoverMoveEvent(QHoverEvent* event) {
-    probeHoverScenePosition(event->scenePosition());
+    probePlatformHoverPosition(event->scenePosition());
     if (presentationMode_ != 0 && !dragging_ && !dividerDragging_) {
         const qreal pointer =
             presentationMode_ == 1 ? event->position().x() : event->position().y();
@@ -1192,7 +1230,8 @@ void QmlImageCanvas::hoverMoveEvent(QHoverEvent* event) {
 
 void QmlImageCanvas::hoverLeaveEvent(QHoverEvent* event) {
     unsetCursor();
-    clearPixelProbe();
+    if (!liveCursorIsInside())
+        clearPixelProbe();
     QQuickRhiItem::hoverLeaveEvent(event);
 }
 

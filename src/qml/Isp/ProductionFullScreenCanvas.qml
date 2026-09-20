@@ -20,8 +20,9 @@ ImageCanvas {
     }
 
     // A native borderless-fullscreen transition can leave QQuickRhiItem hover delivery stale
-    // until the next click on some platforms. Pointer handlers continue receiving movement, so
-    // feed their local position directly into the canvas probe for a live pixel readout.
+    // until the next click on some platforms. Feed the handler position into the canvas probe as
+    // well; the canvas drops it while it disagrees with the live cursor and keeps its own cursor
+    // poll authoritative.
     HoverHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onPointChanged: root.probePixelAt(point.position)
