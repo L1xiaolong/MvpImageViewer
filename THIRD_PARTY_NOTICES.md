@@ -49,7 +49,7 @@ dark variants and must accompany redistributed copies.
 
 ## Other runtime dependencies
 
-Qt and any enabled Exiv2, LibRaw, LittleCMS or transitive runtime dependencies
+Qt, Exiv2, LibRaw, and any enabled LittleCMS or transitive runtime dependencies
 retain their respective licenses. The icon notices above are not a complete
 runtime license inventory. Packaged builds additionally contain
 `RUNTIME_DEPENDENCIES.json`, `RUNTIME_DEPENDENCIES.md`, and the collected
@@ -58,7 +58,7 @@ and available notices, not a complete compatibility or source-delivery approval.
 Distributors must supply the notices and source
 materials required by the actual libraries included in their packages.
 
-Exiv2 is GPL-2.0-or-later; enabling it requires a compatible distribution
+Exiv2 is GPL-2.0-or-later; bundling it requires a compatible distribution
 of the combined application, independently of the project's own license.
 
 ## Diagnostic archives and crash capture

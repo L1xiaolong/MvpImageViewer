@@ -250,6 +250,7 @@ class IoTests final : public QObject {
     void imageLoaderSerializedQueuePrioritizesAndCancelsWithoutBlockingParallelWork();
     void imageLoaderEnforcesCombinedMemoryBudget();
     void imageTransformerRotatesResizesAndRestoresEncodedImage();
+    void imageTransformerPreservesExifIptcAndXmpMetadata();
     void imageTransformerRotatesAndRestoresNv12Data();
 };
 
@@ -523,6 +524,14 @@ void IoTests::decoderMapsTypedExifIptcAndXmpMetadata() {
     QCOMPARE(result.frame->metadata.descriptive->title, QStringLiteral("XMP title"));
     QCOMPARE(result.frame->metadata.descriptive->creator, QStringLiteral("XMP creator"));
     QCOMPARE(result.frame->metadata.descriptive->description, QStringLiteral("EXIF description"));
+
+    const QString unicodePath = directory.filePath(QStringLiteral("📷-测试.jpg"));
+    QVERIFY(QFile::copy(path, unicodePath));
+    const DecodeResult unicodeResult = decoder.decode({unicodePath, DecodePurpose::Full, {}});
+    QVERIFY2(unicodeResult.succeeded(), qPrintable(unicodeResult.error));
+    QVERIFY2(unicodeResult.frame->metadata.camera.has_value(),
+             qPrintable(unicodeResult.frame->metadata.metadataWarning));
+    QCOMPARE(unicodeResult.frame->metadata.camera->make, QStringLiteral("ISPView"));
 #else
     QSKIP("This build does not include Exiv2");
 #endif
@@ -2281,6 +2290,59 @@ void IoTests::imageTransformerRotatesResizesAndRestoresEncodedImage() {
     QFile restored(path);
     QVERIFY(restored.open(QIODevice::ReadOnly));
     QCOMPARE(restored.readAll(), originalBytes);
+}
+
+void IoTests::imageTransformerPreservesExifIptcAndXmpMetadata() {
+#if ISPVIEW_HAS_EXIV2
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("metadata-edit.jpg"));
+    QImage original(6, 4, QImage::Format_RGB32);
+    original.fill(QColor(30, 80, 140));
+    QVERIFY(original.save(path, "JPEG", 95));
+    QVERIFY(writeSyntheticMetadata(path));
+
+    const auto verifyMetadata = [&path](const QSize& expectedSize) {
+        auto image = Exiv2::ImageFactory::open(path.toStdString());
+        QVERIFY(image);
+        image->readMetadata();
+        const Exiv2::ExifData& exif = image->exifData();
+        const Exiv2::IptcData& iptc = image->iptcData();
+        const Exiv2::XmpData& xmp = image->xmpData();
+
+        QCOMPARE(QString::fromStdString(
+                     exif.findKey(Exiv2::ExifKey("Exif.Image.Make"))->toString()),
+                 QStringLiteral("ISPView"));
+        QCOMPARE(exif.findKey(Exiv2::ExifKey("Exif.Image.Orientation"))->toUint32(), 1U);
+        QCOMPARE(exif.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"))->toUint32(),
+                 static_cast<uint32_t>(expectedSize.width()));
+        QCOMPARE(exif.findKey(Exiv2::ExifKey("Exif.Photo.PixelYDimension"))->toUint32(),
+                 static_cast<uint32_t>(expectedSize.height()));
+        QCOMPARE(QString::fromStdString(
+                     iptc.findKey(Exiv2::IptcKey("Iptc.Application2.Keywords"))->toString()),
+                 QStringLiteral("calibration"));
+        QCOMPARE(xmp.findKey(Exiv2::XmpKey("Xmp.xmp.Rating"))->toInt64(), 4);
+    };
+
+    QCOMPARE(ImageTransformer::rotate(path, QuarterTurn::Clockwise), QString{});
+    QCOMPARE(QImageReader(path).size(), QSize(6, 4));
+    verifyMetadata(QSize(6, 4));
+
+    QCOMPARE(ImageTransformer::resize(path, QSize(8, 6)), QString{});
+    QCOMPARE(QImageReader(path).size(), QSize(8, 6));
+    verifyMetadata(QSize(8, 6));
+
+    const DecodeResult decoded =
+        QtImageDecoder().decode({path, DecodePurpose::Full, {}, std::nullopt});
+    QVERIFY2(decoded.succeeded(), qPrintable(decoded.error));
+    QVERIFY(decoded.frame->metadata.camera.has_value());
+    QCOMPARE(decoded.frame->metadata.camera->make, QStringLiteral("ISPView"));
+    QCOMPARE(decoded.frame->metadata.camera->model, QStringLiteral("Synthetic Camera"));
+    QVERIFY(decoded.frame->metadata.descriptive.has_value());
+    QCOMPARE(decoded.frame->metadata.descriptive->title, QStringLiteral("XMP title"));
+#else
+    QSKIP("Exiv2 support is unavailable");
+#endif
 }
 
 void IoTests::imageTransformerRotatesAndRestoresNv12Data() {

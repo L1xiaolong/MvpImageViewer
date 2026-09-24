@@ -1,7 +1,9 @@
 #include "io/image_transformer.h"
 
+#include "io/metadata_writer.h"
 #include "io/raw_preset_store.h"
 
+#include <QBuffer>
 #include <QFile>
 #include <QFileInfo>
 #include <QColorSpace>
@@ -171,13 +173,26 @@ QString writeEncoded(const QString& path, const QImage& image) {
         // the fixed sRGB interchange space before writing.
         outputImage = outputImage.convertedToColorSpace(srgb);
     }
-    QSaveFile output(path);
-    if (!output.open(QIODevice::WriteOnly)) return output.errorString();
-    QImageWriter writer(&output, QFileInfo(path).suffix().toLatin1());
+    QByteArray encodedImage;
+    QBuffer encodedBuffer(&encodedImage);
+    if (!encodedBuffer.open(QIODevice::WriteOnly)) return encodedBuffer.errorString();
+    QImageWriter writer(&encodedBuffer, QFileInfo(path).suffix().toLatin1());
     writer.setQuality(95);
     if (!writer.write(outputImage)) {
-        output.cancelWriting();
         return writer.errorString();
+    }
+    encodedBuffer.close();
+    if (const QString metadataError =
+            MetadataWriter::copyForImageTransform(path, encodedImage, outputImage.size());
+        !metadataError.isEmpty()) {
+        return metadataError;
+    }
+
+    QSaveFile output(path);
+    if (!output.open(QIODevice::WriteOnly)) return output.errorString();
+    if (output.write(encodedImage) != encodedImage.size()) {
+        output.cancelWriting();
+        return output.errorString();
     }
     if (!output.commit()) return output.errorString();
     return {};

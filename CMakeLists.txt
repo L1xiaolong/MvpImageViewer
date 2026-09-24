@@ -4,8 +4,6 @@ project(ISPImageViewer VERSION 0.2.11 LANGUAGES CXX)
 enable_language(C)
 
 option(ISPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
-option(ISPVIEW_ENABLE_LIBRAW "Enable camera RAW decoding when LibRaw is available" ON)
-option(ISPVIEW_ENABLE_EXIV2 "Enable EXIF/IPTC/XMP metadata when Exiv2 is available" ON)
 option(ISPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
 option(ISPVIEW_ENABLE_CRASHPAD "Enable macOS Crashpad crash capture when the pinned build succeeds" ON)
 set(ISPVIEW_GITHUB_REPOSITORY "L1xiaolong/IspImageViewer" CACHE STRING
@@ -17,53 +15,36 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-set(ISPVIEW_HAS_LIBRAW OFF)
-if(ISPVIEW_ENABLE_LIBRAW)
-    find_package(LibRaw QUIET)
-    if(LibRaw_FOUND)
-        set(_ispview_libraw_usable TRUE)
-        if(APPLE AND NOT CMAKE_CROSSCOMPILING)
-            include(CheckCXXSourceRuns)
-            set(CMAKE_REQUIRED_INCLUDES "${LibRaw_INCLUDE_DIR}/libraw")
-            set(CMAKE_REQUIRED_LIBRARIES "${LibRaw_LIBRARY}")
-            check_cxx_source_runs(
-                "#include <libraw.h>\nint main() { return libraw_version() ? 0 : 1; }"
-                ISPVIEW_LIBRAW_RUNTIME_WORKS
-            )
-            unset(CMAKE_REQUIRED_INCLUDES)
-            unset(CMAKE_REQUIRED_LIBRARIES)
-            if(NOT ISPVIEW_LIBRAW_RUNTIME_WORKS)
-                set(_ispview_libraw_usable FALSE)
-                message(WARNING
-                    "LibRaw was found but its runtime dependencies are unusable; "
-                    "camera RAW support is disabled for this build")
-            endif()
+find_package(LibRaw 0.21 REQUIRED)
+find_package(exiv2 CONFIG REQUIRED)
+if(DEFINED exiv2_VERSION AND exiv2_VERSION VERSION_LESS 0.28)
+    message(FATAL_ERROR "Exiv2 0.28 or newer is required (found ${exiv2_VERSION})")
+endif()
+if(NOT TARGET Exiv2::exiv2lib)
+    message(FATAL_ERROR "Exiv2 was found but Exiv2::exiv2lib is unavailable")
+endif()
+set(ISPVIEW_HAS_LIBRAW ON)
+set(ISPVIEW_HAS_EXIV2 ON)
+if(APPLE)
+    # LibRaw installations using @rpath must also run in the build tree.
+    list(APPEND CMAKE_BUILD_RPATH "${LibRaw_LIBRARY_DIR}")
+    if(NOT CMAKE_CROSSCOMPILING)
+        include(CheckCXXSourceRuns)
+        set(CMAKE_REQUIRED_INCLUDES "${LibRaw_INCLUDE_DIR}/libraw")
+        set(CMAKE_REQUIRED_LIBRARIES "${LibRaw_LIBRARY}")
+        check_cxx_source_runs(
+            "#include <libraw.h>\nint main() { return libraw_version() ? 0 : 1; }"
+            ISPVIEW_LIBRAW_RUNTIME_WORKS
+        )
+        unset(CMAKE_REQUIRED_INCLUDES)
+        unset(CMAKE_REQUIRED_LIBRARIES)
+        if(NOT ISPVIEW_LIBRAW_RUNTIME_WORKS)
+            message(FATAL_ERROR "LibRaw was found but its runtime dependencies are unusable")
         endif()
-        if(_ispview_libraw_usable)
-            set(ISPVIEW_HAS_LIBRAW ON)
-            if(APPLE)
-                # Locally discovered LibRaw builds commonly use an @rpath install name.
-                # Derive the build-tree search path from discovery; packaging will copy
-                # dependencies and use application-relative paths in a later phase.
-                list(APPEND CMAKE_BUILD_RPATH "${LibRaw_LIBRARY_DIR}")
-            endif()
-            message(STATUS "Camera RAW support: LibRaw ${PC_LibRaw_VERSION}")
-        endif()
-    else()
-        message(STATUS "Camera RAW support disabled: LibRaw was not found")
     endif()
 endif()
-
-set(ISPVIEW_HAS_EXIV2 OFF)
-if(ISPVIEW_ENABLE_EXIV2)
-    find_package(exiv2 CONFIG QUIET)
-    if(TARGET Exiv2::exiv2lib)
-        set(ISPVIEW_HAS_EXIV2 ON)
-        message(STATUS "Image metadata support: Exiv2 enabled")
-    else()
-        message(STATUS "Image metadata support disabled: Exiv2 was not found")
-    endif()
-endif()
+message(STATUS "Camera RAW support: LibRaw ${LibRaw_VERSION}")
+message(STATUS "Image metadata support: Exiv2 ${exiv2_VERSION}")
 
 set(ISPVIEW_HAS_LCMS2 OFF)
 if(ISPVIEW_ENABLE_LCMS2)

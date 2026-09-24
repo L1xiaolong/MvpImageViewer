@@ -123,7 +123,7 @@ function Find-MakeNsis {
     )) {
         if (Test-Path -LiteralPath $candidate) { return $candidate }
     }
-    throw "NSIS was not found. Install NSIS 3.x and add makensis.exe to PATH."
+    throw "NSIS was not found. For MSYS2/UCRT64, run 'pacman -S mingw-w64-ucrt-x86_64-nsis'; otherwise install NSIS 3.x and add makensis.exe to PATH."
 }
 
 function New-WindowsInstaller {
@@ -168,6 +168,10 @@ function Publish-WindowsPackage {
 
     $targetExe = Join-Path $stageDir "MVPImageViewer.exe"
     Copy-Item -LiteralPath $Executable -Destination $targetExe
+    # vcpkg's app-local deployment places non-Qt runtime DLLs beside the
+    # executable. Preserve those dependencies when staging an MSVC package.
+    Get-ChildItem -LiteralPath (Split-Path -Parent $Executable) -Filter "*.dll" -File |
+        ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $stageDir }
     $crashHelper = Join-Path (Split-Path -Parent $Executable) "ispview_crash_handler.exe"
     if (-not (Test-Path -LiteralPath $crashHelper)) { throw "Crash helper is missing: $crashHelper" }
     Copy-Item -LiteralPath $crashHelper -Destination (Split-Path -Parent $targetExe)
@@ -196,6 +200,17 @@ Translations=translations
 
     if (-not [string]::IsNullOrWhiteSpace($MsysPrefix)) {
         Copy-Msys2DependencyClosure -TargetDir $stageDir -Prefix $MsysPrefix
+    }
+
+    foreach ($dependency in @(
+        @{ Name = "Exiv2"; Pattern = "*exiv2*.dll" },
+        @{ Name = "LibRaw"; Pattern = "*raw*.dll" }
+    )) {
+        $runtimeDll = Get-ChildItem -LiteralPath $stageDir -Filter $dependency.Pattern -File |
+            Select-Object -First 1
+        if ($null -eq $runtimeDll) {
+            throw "$($dependency.Name) runtime DLL was not deployed to $stageDir"
+        }
     }
 
     cmake "-DNOTICE_DESTINATION=$stageDir" -P (Join-Path $ScriptDir "scripts\package_licenses.cmake")

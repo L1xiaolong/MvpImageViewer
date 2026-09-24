@@ -13,8 +13,11 @@ endif()
 ispview_enable_warnings(ispview_io_libraw_adapter)
 
 add_library(ispview_io_exiv2_adapter STATIC
+    metadata_exiv2_lock.h
     metadata_reader.h
     metadata_reader.cpp
+    metadata_writer.h
+    metadata_writer.cpp
 )
 target_include_directories(ispview_io_exiv2_adapter PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ispview_io_exiv2_adapter PUBLIC ispview_core Qt6::Core Qt6::Gui)

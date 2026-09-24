@@ -29,7 +29,7 @@ MVP Image Viewer 是一款基于 Qt 6 的轻量级跨平台桌面图片浏览与
 
 软件不追求功能数量，而追求核心流程足够快、足够清晰。复杂功能只有在确实服务于图片检查时才会出现。
 
-项目当前处于 Release Candidate 稳定化阶段。JPEG、PNG 浏览与对比是主要发布范围；无头 RAW/YUV 和相机 RAW 支持作为可选的高级能力保留。
+项目当前处于 Release Candidate 稳定化阶段。JPEG、PNG、相机 RAW 浏览与对比均包含在默认安装包中；无头 RAW/YUV 是高级功能。
 
 ## 界面预览
 
@@ -111,8 +111,8 @@ MVPImageViewer /path/to/images
 | HEIC / HEIF | 依赖系统能力 | 当前 Qt/操作系统提供 HEIF 插件时自动启用并读取主图；不播放图像序列 |
 | NV12 / NV21 / I420 / P010 | 内置高级功能 | 无头数据；支持矩阵、原色、传递函数、量化范围和色度位置解释，并转换到 sRGB 显示缓冲区 |
 | Bayer RAW10 / RAW12 / RAW16 | 内置高级功能 | 支持标准 2×2 Bayer 与 4×4 Quad Bayer、CFA、有效位、字节序、黑白电平、白平衡、CCM 和 Gamma 参数 |
-| DNG / 相机 RAW | 可选 | 需要 LibRaw 0.21+；16-bit 解码，保留传感器马赛克；完整画面使用应用的白平衡、CCM 和 Gamma 参数 |
-| EXIF / IPTC / XMP | 可选 | JPEG/PNG 元数据读取需要 Exiv2 0.28+ |
+| DNG / 相机 RAW | 内置 | 随安装包提供 LibRaw 0.21+；16-bit 解码，保留传感器马赛克；完整画面使用应用的白平衡、CCM 和 Gamma 参数 |
+| EXIF / IPTC / XMP | 内置 | 随安装包提供 Exiv2 0.28+ |
 | 嵌入式 RGB ICC | 可选 | 需要 LittleCMS 2.x；8-bit、16-bit 和浮点 RGB 均转换到显示交换空间 |
 
 应用的显示交换空间有四个可选编码：**sRGB、Display P3、Adobe RGB (1998) 和 BT.2020**，另加 **"自动（跟随显示）"**——它是默认值，会读取平台为窗口表面报告的色彩空间并选择匹配的编码（识别不了时回落到 sRGB）。可随时在"设置 → 色彩与显示"中切换，卡片会显示当前实际生效的空间。所选的显示空间决定：画布上 YUV/Bayer 画面的编码方式、嵌入式 ICC 配置文件的转换目标、解码结果的色彩空间标记，以及直方图与像素探针的颜色读数。切换后解码缓存会按空间自动失效，不会混用不同空间的画面。
@@ -131,15 +131,20 @@ TIFF、WebP、OpenEXR、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当前不在支
 - macOS：Apple Silicon；Qt 6.9.x 为当前验证版本
 - Windows：x64；推荐 MSYS2/UCRT64 + GCC + Ninja
 
-可选依赖：
+必需依赖：
 
 - LibRaw 0.21+
 - Exiv2 0.28+
+
+可选依赖：
+
 - LittleCMS 2.x
 
 ## 构建
 
 ### macOS
+
+先安装图像库：`brew install libraw exiv2 pkgconf`。
 
 使用项目脚本：
 
@@ -156,7 +161,7 @@ TIFF、WebP、OpenEXR、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当前不在支
 也可以直接使用 CMake Preset：
 
 ```sh
-cmake --preset macos-debug
+cmake --preset macos-debug -DCMAKE_PREFIX_PATH="$(brew --prefix)"
 cmake --build --preset macos-debug
 ctest --preset macos-debug --output-on-failure
 ```
@@ -179,6 +184,12 @@ ctest --preset macos-debug --output-on-failure
 
 推荐使用 MSYS2/UCRT64：
 
+先在 UCRT64 环境安装构建与打包依赖：
+
+```bash
+pacman -S --needed mingw-w64-ucrt-x86_64-libraw mingw-w64-ucrt-x86_64-exiv2 mingw-w64-ucrt-x86_64-nsis
+```
+
 ```powershell
 $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
 .\build_windows.ps1 -Toolchain msys2 -Mode dev -Test
@@ -200,26 +211,22 @@ ctest --preset windows-msys2-debug --output-on-failure
 
 脚本仍保留 `-Toolchain msvc` 作为可选的 Visual Studio 构建路径。
 
-## 可选功能
+## 依赖配置
 
-CMake 在发现依赖时会自动启用对应适配器，也可以显式关闭：
+LibRaw 和 Exiv2 是必需依赖；缺少任一库时 CMake 配置会失败。LittleCMS 仍可选：
 
 ```sh
 cmake --preset macos-debug \
-  -DISPVIEW_ENABLE_LIBRAW=OFF \
-  -DISPVIEW_ENABLE_EXIV2=OFF \
   -DISPVIEW_ENABLE_LCMS2=OFF
 ```
 
-使用 vcpkg 时，可选择以下 manifest feature：
+使用 vcpkg 时，LibRaw 和 Exiv2 是默认依赖。可选 manifest feature：
 
-- `camera-raw`
-- `metadata-exiv2`
 - `color-management`
 
-项目的 GitHub Release 构建目前关闭这三个可选组件，只发布 macOS DMG 和 Windows Setup.exe 安装器中的基础 JPEG/PNG 功能，以缩小包体并隔离可选依赖的许可证要求。
+GitHub Release 的 macOS DMG 和 Windows 安装器都会附带 LibRaw、Exiv2 及其所需运行库。
 
-> **许可证提示：** Exiv2 采用 GPL-2.0-or-later。启用并分发 Exiv2 的构建前，请确认整个分发方案与其许可证兼容。Qt、LibRaw、LittleCMS 及打包产生的传递依赖也各自保留原有许可证。
+> **许可证提示：** Exiv2 采用 GPL-2.0-or-later。分发前须确认整个应用的分发方案符合其许可证，包括相应的源码交付要求。Qt、LibRaw、LittleCMS 及打包产生的传递依赖也各自保留原有许可证。
 
 ## 测试与性能工具
 

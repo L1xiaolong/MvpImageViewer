@@ -101,6 +101,10 @@ jobs:
           archives: 'qtbase qtdeclarative qtsvg qttools'
           cache: true
 
+      - name: Install image libraries (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libraw exiv2 pkgconf
+
       - name: Set up MSYS2/UCRT64
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -117,6 +121,8 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-shadertools
             mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-libraw
+            mingw-w64-ucrt-x86_64-exiv2
             mingw-w64-ucrt-x86_64-python
             zip
             unzip
@@ -160,8 +166,6 @@ jobs:
         run: |
           cmake --preset windows-msys2-release \
             -DISPVIEW_BUILD_BENCHMARKS=OFF \
-            -DISPVIEW_ENABLE_LIBRAW=OFF \
-            -DISPVIEW_ENABLE_EXIV2=OFF \
             -DISPVIEW_ENABLE_LCMS2=OFF \
             -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
           cmake --build --preset windows-msys2-release --parallel
@@ -234,6 +238,8 @@ jobs:
           # windeployqt --compiler-runtime does not deploy. Resolve the import
           # graph for the EXE, Qt plugins, and QML plugins recursively.
           ./scripts/deploy_msys2_runtime.sh "$package_directory"
+          test -n "$(find "$package_directory" -maxdepth 1 -iname 'libexiv2*.dll' -print -quit)"
+          test -n "$(find "$package_directory" -maxdepth 1 -iname 'libraw*.dll' -print -quit)"
           cmake "-DNOTICE_DESTINATION=$package_directory" -P scripts/package_licenses.cmake
           if ! python scripts/collect_runtime_licenses.py "$package_directory" \
             --msys-root "$(cygpath -m /)"; then

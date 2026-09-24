@@ -11,6 +11,22 @@ find_path(LibRaw_INCLUDE_DIR
     HINTS ${PC_LibRaw_INCLUDE_DIRS}
 )
 
+set(LibRaw_VERSION "${PC_LibRaw_VERSION}")
+if(NOT LibRaw_VERSION AND LibRaw_INCLUDE_DIR AND
+   EXISTS "${LibRaw_INCLUDE_DIR}/libraw/libraw_version.h")
+    file(STRINGS "${LibRaw_INCLUDE_DIR}/libraw/libraw_version.h" version_defines
+        REGEX "^#define LIBRAW_(MAJOR|MINOR|PATCH)_VERSION [0-9]+$")
+    foreach(component IN ITEMS MAJOR MINOR PATCH)
+        string(REGEX MATCH "#define LIBRAW_${component}_VERSION ([0-9]+)"
+            version_match "${version_defines}")
+        set(_libraw_${component} "${CMAKE_MATCH_1}")
+    endforeach()
+    if(NOT "${_libraw_MAJOR}" STREQUAL "" AND NOT "${_libraw_MINOR}" STREQUAL "" AND
+       NOT "${_libraw_PATCH}" STREQUAL "")
+        set(LibRaw_VERSION "${_libraw_MAJOR}.${_libraw_MINOR}.${_libraw_PATCH}")
+    endif()
+endif()
+
 # Prefer the reentrant variant when a distribution provides both libraries.
 find_library(LibRaw_REENTRANT_LIBRARY
     NAMES raw_r libraw_r
@@ -33,7 +49,7 @@ get_filename_component(LibRaw_LIBRARY_DIR "${LibRaw_LIBRARY}" DIRECTORY)
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(LibRaw
     REQUIRED_VARS LibRaw_INCLUDE_DIR LibRaw_LIBRARY
-    VERSION_VAR PC_LibRaw_VERSION
+    VERSION_VAR LibRaw_VERSION
 )
 
 if(LibRaw_FOUND AND NOT TARGET LibRaw::LibRaw)

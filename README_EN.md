@@ -29,7 +29,7 @@ MVP Image Viewer is a lightweight cross-platform desktop application built with 
 
 The product is intentionally focused. Complexity is added only when it directly improves the image-inspection workflow.
 
-The project is currently in release-candidate stabilization. JPEG and PNG browsing and comparison are the primary release scope; headerless RAW/YUV and camera RAW support remain available as optional advanced capabilities.
+The project is currently in release-candidate stabilization. Default packages include JPEG, PNG, and camera RAW browsing and comparison; headerless RAW/YUV remains an advanced feature.
 
 ## Screenshots
 
@@ -111,8 +111,8 @@ The app checks GitHub Releases at most once every 24 hours when automatic checks
 | HEIC / HEIF | System-dependent | Enabled when the current Qt/OS HEIF plugin is available; reads the primary image without sequence playback |
 | NV12 / NV21 / I420 / P010 | Built-in advanced feature | Headerless data; matrix, primaries, transfer, range, and chroma location are interpreted and converted into the sRGB display buffer |
 | Bayer RAW10 / RAW12 / RAW16 | Built-in advanced feature | Standard 2×2 Bayer and 4×4 Quad Bayer, CFA, valid bits, byte order, black/white levels, white balance, CCM, and gamma parameters |
-| DNG / camera RAW | Optional | Requires LibRaw 0.21+; decoded at 16-bit with the sensor mosaic retained; full images use the app's white-balance, CCM, and gamma parameters |
-| EXIF / IPTC / XMP | Optional | JPEG/PNG metadata requires Exiv2 0.28+ |
+| DNG / camera RAW | Built in | Packages include LibRaw 0.21+; decoded at 16-bit with the sensor mosaic retained; full images use the app's white-balance, CCM, and gamma parameters |
+| EXIF / IPTC / XMP | Built in | Packages include Exiv2 0.28+ |
 | Embedded RGB ICC | Optional | Requires LittleCMS 2.x; 8-bit, 16-bit, and floating-point RGB are converted into the display interchange space |
 
 The display interchange space offers four encodings: **sRGB, Display P3, Adobe RGB (1998), and BT.2020**, plus **Auto (follow display)**, which is the default: it reads the colour space the platform reports for the window surface and picks the matching encoding, falling back to sRGB when it cannot be recognised. Switch it at any time under Settings → Color & display; the card shows the space that is actually in effect. The selected space decides how YUV and Bayer frames are encoded for the canvas, the destination of embedded ICC conversion, the colour space tagged on decoded frames, and the colour readouts of the histogram and pixel probe. Decode caches are invalidated per space, so frames from different spaces are never mixed.
@@ -131,15 +131,20 @@ TIFF, WebP, OpenEXR, AVIF, JPEG XL, PSD, SVG, PDF, and GIF are currently outside
 - macOS: Apple Silicon; Qt 6.9.x is the currently validated version
 - Windows: x64; MSYS2/UCRT64 with GCC and Ninja is recommended
 
-Optional dependencies:
+Required dependencies:
 
 - LibRaw 0.21+
 - Exiv2 0.28+
+
+Optional dependency:
+
 - LittleCMS 2.x
 
 ## Building
 
 ### macOS
+
+Install the image libraries first: `brew install libraw exiv2 pkgconf`.
 
 Use the project wrapper:
 
@@ -156,7 +161,7 @@ Use the project wrapper:
 Equivalent CMake Preset commands:
 
 ```sh
-cmake --preset macos-debug
+cmake --preset macos-debug -DCMAKE_PREFIX_PATH="$(brew --prefix)"
 cmake --build --preset macos-debug
 ctest --preset macos-debug --output-on-failure
 ```
@@ -181,6 +186,12 @@ cannot reuse the macOS artifacts.
 
 The recommended toolchain is MSYS2/UCRT64:
 
+Install the build and packaging dependencies in UCRT64 first:
+
+```bash
+pacman -S --needed mingw-w64-ucrt-x86_64-libraw mingw-w64-ucrt-x86_64-exiv2 mingw-w64-ucrt-x86_64-nsis
+```
+
 ```powershell
 $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
 .\build_windows.ps1 -Toolchain msys2 -Mode dev -Test
@@ -202,26 +213,22 @@ ctest --preset windows-msys2-debug --output-on-failure
 
 The wrapper also retains `-Toolchain msvc` as an optional Visual Studio path.
 
-## Optional features
+## Dependencies
 
-CMake enables an adapter automatically when its dependency is available. Each adapter can also be disabled explicitly:
+LibRaw and Exiv2 are required; CMake configuration fails if either is missing. LittleCMS remains optional:
 
 ```sh
 cmake --preset macos-debug \
-  -DISPVIEW_ENABLE_LIBRAW=OFF \
-  -DISPVIEW_ENABLE_EXIV2=OFF \
   -DISPVIEW_ENABLE_LCMS2=OFF
 ```
 
-The vcpkg manifest exposes these optional features:
+The vcpkg manifest installs LibRaw and Exiv2 by default. Its optional feature is:
 
-- `camera-raw`
-- `metadata-exiv2`
 - `color-management`
 
-The current GitHub Release workflow disables all three optional components and ships the core JPEG/PNG feature set in a macOS DMG and Windows Setup.exe. This keeps release packages smaller and isolates the licensing requirements of optional dependencies.
+GitHub Release packages include LibRaw, Exiv2, and their runtime dependencies in both the macOS DMG and Windows installer.
 
-> **License note:** Exiv2 is licensed under GPL-2.0-or-later. Before enabling and distributing an Exiv2-backed build, make sure the complete distribution is compatible with that license. Qt, LibRaw, LittleCMS, and transitive packaged dependencies retain their respective licenses as well.
+> **License note:** Exiv2 is licensed under GPL-2.0-or-later. Before distributing, make sure the combined application's distribution complies with it, including applicable source-delivery requirements. Qt, LibRaw, LittleCMS, and transitive packaged dependencies retain their respective licenses as well.
 
 ## Tests and benchmarks
 

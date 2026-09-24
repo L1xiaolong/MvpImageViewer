@@ -132,6 +132,12 @@ fi
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$script_dir"
 
+command -v brew >/dev/null 2>&1 || {
+    echo "Homebrew is required for LibRaw and Exiv2; install both libraries first." >&2
+    exit 1
+}
+brew_prefix="$(brew --prefix)"
+
 preset="macos-${mode}"
 if [[ -n "$qt_prefix" ]]; then
     [[ -d "$qt_prefix" ]] || {
@@ -172,7 +178,7 @@ if [[ -n "$qt_prefix" ]]; then
         -DISPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
         -DISPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
         -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}" \
-        -DCMAKE_PREFIX_PATH="$qt_prefix" \
+        -DCMAKE_PREFIX_PATH="$qt_prefix;$brew_prefix" \
         -DQt6_DIR="$qt_prefix/lib/cmake/Qt6"
     echo "Building custom Qt configuration (-j $jobs)"
     cmake --build "$build_dir" -j "$jobs"
@@ -180,6 +186,7 @@ else
     echo "Configuring preset: $preset"
     cmake --preset "$preset" \
         -DISPVIEW_BUILD_BENCHMARKS=OFF \
+        -DCMAKE_PREFIX_PATH="$brew_prefix" \
         -DISPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
         -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}"
     echo "Building preset: $preset (-j $jobs)"
@@ -307,6 +314,68 @@ cmake \
     -DPACKAGE_PLATFORM=macos \
     -P "$script_dir/scripts/prune_qt_runtime.cmake"
 
+# macdeployqt handles Qt, but third-party dylibs must be copied explicitly.
+# Follow the Homebrew dependency graph until every referenced library is staged.
+echo "Bundling LibRaw, Exiv2, and their runtime dependencies"
+while :; do
+    copied_dependency=0
+    while IFS= read -r -d '' macho_binary; do
+        if ! file -b "$macho_binary" | grep -q 'Mach-O'; then
+            continue
+        fi
+        while IFS= read -r local_dependency; do
+            dependency_source=
+            case "$local_dependency" in
+                /opt/homebrew/*|/usr/local/*)
+                    dependency_source="$local_dependency"
+                    ;;
+                @rpath/*.dylib)
+                    dependency_name="${local_dependency##*/}"
+                    for candidate in "$brew_prefix/lib/$dependency_name" \
+                                     "$brew_prefix"/opt/*/lib/"$dependency_name"; do
+                        if [[ -f "$candidate" ]]; then
+                            dependency_source="$candidate"
+                            break
+                        fi
+                    done
+                    ;;
+            esac
+            [[ -n "$dependency_source" ]] || continue
+            [[ -f "$dependency_source" ]] || {
+                echo "Missing dependency: $local_dependency (required by $macho_binary)" >&2
+                exit 1
+            }
+            if [[ "$dependency_source" =~ /([^/]+\.framework)/Versions/[^/]+/ ]]; then
+                framework_name="${BASH_REMATCH[1]}"
+                framework_root="${dependency_source%%/$framework_name/*}/$framework_name"
+                dependency_target="$staged_app/Contents/Frameworks/$framework_name"
+                if [[ ! -d "$dependency_target" ]]; then
+                    ditto "$framework_root" "$dependency_target"
+                    copied_dependency=1
+                fi
+            elif [[ "$dependency_source" == *.dylib ]]; then
+                dependency_target="$staged_app/Contents/Frameworks/$(basename "$dependency_source")"
+                if [[ ! -f "$dependency_target" ]]; then
+                    cp -L "$dependency_source" "$dependency_target"
+                    copied_dependency=1
+                fi
+            fi
+        done < <(otool -L "$macho_binary" | awk 'NR > 1 { print $1 }')
+    done < <(find "$staged_app/Contents/MacOS" \
+                  "$staged_app/Contents/Frameworks" \
+                  "$staged_app/Contents/PlugIns" \
+                  "$staged_app/Contents/Resources/qml" \
+                  -type f -print0)
+    [[ "$copied_dependency" -eq 1 ]] || break
+done
+for library_pattern in 'libraw*.dylib' 'libexiv2*.dylib'; do
+    if [[ -z "$(find "$staged_app/Contents/Frameworks" -maxdepth 1 \
+        -name "$library_pattern" -type f -print -quit)" ]]; then
+        echo "Required image library was not bundled: $library_pattern" >&2
+        exit 1
+    fi
+done
+
 # macdeployqt cannot rewrite frameworks that were absent during its scan. Relocate every
 # package-manager dependency after completing the QML plugin closure. A local dependency that
 # was not bundled is a packaging error, rather than something an end-user machine can resolve.
@@ -328,7 +397,7 @@ for macho_binary in "${macho_candidates[@]}"; do
     while IFS= read -r local_dependency; do
         [[ -n "$local_dependency" ]] || continue
         case "$local_dependency" in
-            /opt/homebrew/*|/usr/local/*)
+            /opt/homebrew/*|/usr/local/*|@rpath/*.dylib)
                 ;;
             *)
                 continue

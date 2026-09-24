@@ -1,7 +1,10 @@
 #include "io/metadata_reader.h"
 
+#include "io/metadata_exiv2_lock.h"
+
 #include <QCache>
 #include <QDateTime>
+#include <QFile>
 #include <QRegularExpression>
 #include <QStringList>
 
@@ -69,7 +72,11 @@ QString sanitized(QString text, qsizetype maximumLength = kMaximumTextLength) {
 }
 
 QString textFrom(const Exiv2::Metadatum& datum) {
-    return sanitized(QString::fromUtf8(datum.toString()));
+    try {
+        return sanitized(QString::fromUtf8(datum.toString()));
+    } catch (const std::exception&) {
+        return {};
+    }
 }
 
 QString exifText(const Exiv2::ExifData& data, const char* key) {
@@ -103,8 +110,12 @@ std::optional<double> optionalNumericValue(const Data& data, const Key& key) {
     if (position == data.end() || position->count() == 0) {
         return std::nullopt;
     }
-    const double value = position->toFloat();
-    return std::isfinite(value) ? std::optional<double>(value) : std::nullopt;
+    try {
+        const double value = position->toFloat();
+        return std::isfinite(value) ? std::optional<double>(value) : std::nullopt;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
 }
 
 template <typename Data, typename Key> double numericValue(const Data& data, const Key& key) {
@@ -321,9 +332,8 @@ void MetadataReader::enrich(const QString& path, ImageMetadata& metadata) {
 #if ISPVIEW_HAS_EXIV2
     // XMP has process-global initialization state. Serializing this optional adapter keeps
     // decoding deterministic until profiling justifies a narrower lock.
-    static std::mutex mutex;
     static QCache<QString, CachedMetadata> cache(kMaximumCachedMetadataEntries);
-    const std::scoped_lock lock(mutex);
+    const std::scoped_lock lock(exiv2MetadataMutex());
     const QString key = cacheKey(metadata);
     if (const CachedMetadata* cached = cache.object(key)) {
         applyCached(*cached, metadata);
@@ -332,7 +342,28 @@ void MetadataReader::enrich(const QString& path, ImageMetadata& metadata) {
     metadata.metadataReaderName = QStringLiteral("Exiv2");
     metadata.metadataReaderVersion = version();
     try {
-        auto image = Exiv2::ImageFactory::open(path.toStdString());
+        // Exiv2 0.28 accepts a narrow file name. QFile supplies the native
+        // encoding on Windows and the file-system encoding on macOS.
+        const QByteArray nativePath = QFile::encodeName(path);
+        Exiv2::Image::UniquePtr image;
+#if defined(Q_OS_WIN)
+        QByteArray encodedImage;
+        if (QFile::decodeName(nativePath) != path) {
+            // Some names cannot be represented in the active Windows code page.
+            // Let Qt open the Unicode path and let Exiv2 parse its memory input.
+            QFile source(path);
+            if (!source.open(QIODevice::ReadOnly)) {
+                throw std::runtime_error("could not open image for metadata");
+            }
+            encodedImage = source.readAll();
+            image = Exiv2::ImageFactory::open(
+                reinterpret_cast<const Exiv2::byte*>(encodedImage.constData()),
+                static_cast<std::size_t>(encodedImage.size()));
+        } else
+#endif
+        {
+            image = Exiv2::ImageFactory::open(nativePath.toStdString());
+        }
         if (!image) {
             throw std::runtime_error("unsupported metadata container");
         }

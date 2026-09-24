@@ -1,32 +1,13 @@
 {
   "name": "isp-image-viewer",
-  "version-string": "0.2.4",
+  "version-string": "0.2.11",
   "description": "Lightweight cross-platform image browser and comparison tool",
   "license": "MIT",
-  "dependencies": [],
+  "dependencies": [
+    { "name": "libraw", "default-features": false },
+    { "name": "exiv2", "default-features": false, "features": ["png", "xmp"] }
+  ],
   "features": {
-    "camera-raw": {
-      "description": "Decode DNG and camera RAW files with LibRaw",
-      "dependencies": [
-        {
-          "name": "libraw",
-          "default-features": false
-        }
-      ]
-    },
-    "metadata-exiv2": {
-      "description": "Read EXIF, IPTC, and XMP metadata with Exiv2 (GPL-2.0-or-later)",
-      "dependencies": [
-        {
-          "name": "exiv2",
-          "default-features": false,
-          "features": [
-            "png",
-            "xmp"
-          ]
-        }
-      ]
-    },
     "color-management": {
       "description": "Convert embedded ICC profiles to sRGB with LittleCMS",
       "dependencies": [

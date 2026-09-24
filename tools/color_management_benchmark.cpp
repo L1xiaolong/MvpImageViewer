@@ -37,7 +37,8 @@ std::optional<Measurement> measure(const QSize& size) {
         ImageMetadata metadata;
         QElapsedTimer timer;
         timer.start();
-        EncodedColorManagement::normalizeToSrgb(image, metadata);
+        EncodedColorManagement::normalizeToDisplay(image, metadata,
+                                                   DisplayColorSpace::Srgb);
         nanoseconds = timer.nsecsElapsed();
         if (!metadata.colorProfile || !metadata.colorProfile->converted ||
             !metadata.colorWarning.isEmpty() || image.pixelColor(0, 0).alpha() != 192) {
