@@ -174,7 +174,7 @@ Rectangle {
                 property: "text"
                 value: root.controller.currentDirectory
                 when: !locationField.activeFocus
-                restoreMode: Binding.RestoreBindingOrValue
+                restoreMode: Binding.RestoreNone
             }
 
             AppIconButton {

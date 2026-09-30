@@ -1063,6 +1063,10 @@ Rectangle {
                         if (galleryWorkspace.currentPreviewPath === galleryDelegate.path)
                             galleryWorkspace.currentPreviewTechnicalLabel = technicalLabel;
                     }
+                    onThumbnailUrlChanged: {
+                        if (galleryWorkspace.currentPreviewPath === galleryDelegate.path)
+                            galleryWorkspace.currentPreviewUrl = thumbnailUrl;
+                    }
 
                     Component.onCompleted: {
                         if (galleryDelegate.index === 0 && galleryWorkspace.currentPreviewUrl.toString().length === 0) {

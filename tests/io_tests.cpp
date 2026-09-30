@@ -199,6 +199,7 @@ class IoTests final : public QObject {
     void decoderScalesPreviewAndKeepsMetadata();
     void qtDecoderAcceptsOnlyMvpEncodedFormats();
     void qtDecoderReadsBmpAndDibAliases();
+    void qtDecoderReadsPngStoredWithBmpExtension();
     void heifCapabilityMatchesRuntimePlugins();
     void singleFileRenameMovesSidecarAndRejectsConflicts();
     void dropCopyCopiesFilesAndFoldersWithoutOverwriting();
@@ -220,6 +221,7 @@ class IoTests final : public QObject {
     void colorManagementRejectsNonRgbProfileWithoutChangingPixels();
     void colorManagementCachedTransformIsThreadSafe();
     void thumbnailDiskCacheRoundTripsImage();
+    void thumbnailDiskCacheHandlesConcurrentAccess();
     void imageLoaderDiskCacheKeepsSourceDimensions();
     void nv12LimitedRangeProducesReferencePixels();
     void mipiRawPackingReturnsExactSensorValues();
@@ -307,6 +309,23 @@ void IoTests::qtDecoderReadsBmpAndDibAliases() {
         QCOMPARE(result.frame->metadata.format, QFileInfo(path).suffix().toUpper());
         QCOMPARE(result.frame->qImage()->pixelColor(0, 0), QColor(21, 42, 84));
     }
+}
+
+void IoTests::qtDecoderReadsPngStoredWithBmpExtension() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("camera.bmp"));
+    QImage source(20, 10, QImage::Format_RGBA8888);
+    source.fill(QColor(21, 42, 84));
+    QVERIFY(source.save(path, "PNG"));
+
+    const DecodeResult result =
+        QtImageDecoder().decode({path, DecodePurpose::Preview, QSize(10, 10)});
+    QVERIFY2(result.succeeded(), qPrintable(result.error));
+    QCOMPARE(result.frame->descriptor.size, QSize(10, 5));
+    QCOMPARE(result.frame->metadata.sourceSize, QSize(20, 10));
+    QCOMPARE(result.frame->metadata.format, QStringLiteral("PNG"));
+    QCOMPARE(result.frame->qImage()->pixelColor(0, 0), QColor(21, 42, 84));
 }
 
 void IoTests::heifCapabilityMatchesRuntimePlugins() {
@@ -1020,6 +1039,29 @@ void IoTests::thumbnailDiskCacheRoundTripsImage() {
     QCOMPARE(restored.text(QStringLiteral("ispview.sourceHeight")), QStringLiteral("480"));
     QCOMPARE(restored.text(QStringLiteral("ispview.validBits")), QStringLiteral("12"));
     QVERIFY(cache.load(QStringLiteral("missing-key")).isNull());
+}
+
+void IoTests::thumbnailDiskCacheHandlesConcurrentAccess() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    ThumbnailDiskCache cache(directory.path());
+    std::atomic_bool succeeded{true};
+    std::vector<std::thread> workers;
+    for (int worker = 0; worker < 8; ++worker) {
+        workers.emplace_back([&, worker] {
+            for (int index = 0; index < 16; ++index) {
+                const QString key = QStringLiteral("%1-%2").arg(worker).arg(index);
+                QImage image(128, 128, QImage::Format_RGBA8888);
+                image.fill(QColor(worker * 20, index * 12, 80, 123));
+                if (!cache.store(key, image, QSize(8000, 6000), 16) ||
+                    cache.load(key).pixelColor(0, 0) != image.pixelColor(0, 0)) {
+                    succeeded.store(false);
+                }
+            }
+        });
+    }
+    for (auto& worker : workers) worker.join();
+    QVERIFY(succeeded.load());
 }
 
 void IoTests::imageLoaderDiskCacheKeepsSourceDimensions() {

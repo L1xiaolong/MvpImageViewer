@@ -23,6 +23,7 @@ class ThumbnailDiskCache final {
 
     QString rootDirectory_;
     mutable std::atomic_uint storeCount_{0};
+    mutable QMutex ioMutex_;
     mutable QMutex trimMutex_;
 };
 

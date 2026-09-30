@@ -116,10 +116,10 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
     QImageReader reader(request.path, readerFormat);
     reader.setAutoTransform(autoOrientationEnabled());
     // The registry has already validated the suffix. Selecting the corresponding Qt
-    // decoder explicitly avoids a second content probe and keeps thumbnail loading cheap.
+    // decoder explicitly avoids a second content probe for correctly named images.
     reader.setDecideFormatFromContent(false);
-    const QString fileFormat = QFileInfo(request.path).suffix().toUpper();
-    const QSize sourceSize = reader.size();
+    QString fileFormat = QFileInfo(request.path).suffix().toUpper();
+    QSize sourceSize = reader.size();
 
     if (!request.maximumSize.isEmpty()) {
         if (sourceSize.isValid() && (sourceSize.width() > request.maximumSize.width() ||
@@ -130,7 +130,20 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
 
     QImage image = reader.read();
     if (image.isNull()) {
-        return {{}, reader.errorString()};
+        // Some camera exports keep an old extension when replacing a damaged file. Let Qt
+        // inspect the signature if the suffix-selected decoder could not read its contents.
+        QImageReader contentReader(request.path);
+        contentReader.setAutoTransform(autoOrientationEnabled());
+        contentReader.setDecideFormatFromContent(true);
+        sourceSize = contentReader.size();
+        if (!request.maximumSize.isEmpty() && sourceSize.isValid() &&
+            (sourceSize.width() > request.maximumSize.width() ||
+             sourceSize.height() > request.maximumSize.height())) {
+            contentReader.setScaledSize(sourceSize.scaled(request.maximumSize, Qt::KeepAspectRatio));
+        }
+        image = contentReader.read();
+        if (image.isNull()) return {{}, contentReader.errorString()};
+        fileFormat = QString::fromLatin1(QImageReader::imageFormat(request.path)).toUpper();
     }
 
     const bool sourceHighBitDepth = image.depth() > 32;

@@ -466,6 +466,7 @@ TestCase {
         compare(mockController.statusText, "Parent folder")
 
         mouseClick(locationField, 8, locationField.height / 2, Qt.LeftButton)
+        compare(locationField.text, mockController.currentDirectory)
         locationField.text = "/Images/Typed path"
         keyClick(Qt.Key_Return)
         compare(mockController.currentDirectory, "/Images/Typed path")

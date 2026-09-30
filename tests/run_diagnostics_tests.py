@@ -6,6 +6,7 @@ import tempfile
 
 cases = ["filteringAndPrivacy", "boundedConcurrentQueueAndRotation", "breadcrumbsWithoutOrdinaryLogs",
          "writeFailureDoesNotCrash", "cleanupProtectsActiveSession", "zipExportAndCancellation",
+         "exportPopulatedStore",
          "killedAndDisabled", "bothDisabledAndLateEnable", "expiredSessionsAndTimeRange",
          "snapshotExcludesAnotherLiveSession", "disabledCrashProducesNoDump", "timeWindowKeepsLongRunningSession",
          "nestedContextIsRedacted", "oversizedContextIsBounded", "controllerRejectsUnsafeExportTargets",

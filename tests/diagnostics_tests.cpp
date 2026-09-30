@@ -1,6 +1,7 @@
 #include "diagnostics/diagnostics.h"
 #include "diagnostics/diagnostics_controller.h"
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -10,6 +11,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QLockFile>
+#include <QUuid>
 #include <thread>
 #include <vector>
 #include <miniz.h>
@@ -110,6 +112,59 @@ private slots:
         const auto cancelled = output.filePath("cancelled.zip");
         controller.exportLogs(QUrl::fromLocalFile(cancelled), 0, false); controller.cancelExport();
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 15000); QVERIFY(!QFileInfo::exists(cancelled));
+    }
+    void exportPopulatedStore() {
+        const QString source = qEnvironmentVariable("ISPVIEW_TEST_EXISTING_DIAGNOSTICS");
+        QTemporaryDir root, output;
+        if (!source.isEmpty()) {
+            QDirIterator it(source, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+            while (it.hasNext()) {
+                const QString path = it.next();
+                const QString relative = QDir(source).relativeFilePath(path);
+                if (relative.endsWith(QStringLiteral("active.lock")) ||
+                    relative == QStringLiteral("maintenance.lock")) continue;
+                const QString destination = root.filePath(relative);
+                QVERIFY(QDir().mkpath(QFileInfo(destination).absolutePath()));
+                QVERIFY(QFile::copy(path, destination));
+            }
+        } else {
+            const QString timestamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd'T'HHmmsszzz"));
+            const QByteArray started = QJsonDocument(QJsonObject{{"started", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}}).toJson();
+            for (int i = 0; i < 40; ++i) {
+                const QString session = timestamp + QLatin1Char('-') + QUuid::createUuid().toString(QUuid::WithoutBraces);
+                const QString directory = root.filePath(session);
+                QVERIFY(QDir().mkpath(directory));
+                QFile metadata(directory + QStringLiteral("/session.json"));
+                QVERIFY(metadata.open(QIODevice::WriteOnly));
+                QCOMPARE(metadata.write(started), started.size());
+                metadata.close();
+                QFile crumbs(directory + QStringLiteral("/breadcrumbs.bin"));
+                QVERIFY(crumbs.open(QIODevice::WriteOnly));
+                QVERIFY(crumbs.resize(2048 * 128));
+                crumbs.close();
+                QFile log(directory + QStringLiteral("/log-0000.jsonl"));
+                QVERIFY(log.open(QIODevice::WriteOnly));
+                QVERIFY(log.write("{\"timestamp\":\"2026-09-29T00:00:00.000Z\",\"event\":\"test\"}\n") > 0);
+            }
+        }
+        Service service({root.path(), true, false});
+        ispview::DiagnosticsController controller(service);
+        const QString archive = output.filePath(QStringLiteral("existing-store.zip"));
+        controller.exportLogs(QUrl::fromLocalFile(archive), 0, false);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 30000);
+        QVERIFY2(controller.error().isEmpty(), qPrintable(controller.error()));
+        QFile zipFile(archive); QVERIFY(zipFile.open(QIODevice::ReadOnly));
+        const QByteArray bytes = zipFile.readAll();
+        mz_zip_archive zip{};
+        QVERIFY(mz_zip_reader_init_mem(&zip, bytes.constData(), static_cast<size_t>(bytes.size()), 0));
+        int summaries = 0;
+        for (mz_uint i = 0; i < mz_zip_reader_get_num_files(&zip); ++i) {
+            mz_zip_archive_file_stat stat{};
+            QVERIFY(mz_zip_reader_file_stat(&zip, i, &stat));
+            if (QByteArray(stat.m_filename).endsWith("/summary.json")) ++summaries;
+        }
+        mz_zip_reader_end(&zip);
+        QVERIFY(summaries >= 40);
     }
     void bothDisabledAndLateEnable() {
         QTemporaryDir root; const QString store = root.filePath("store");

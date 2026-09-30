@@ -281,6 +281,7 @@ class QmlWorkspaceControllerTests final : public QObject {
     void thumbnailMetadataSurvivesDemosaicCacheRoundTrip();
     void galleryUsesPreviewUntilPixelProbeRequestsFullResolution();
     void galleryStateClearsWhenChangingFolders();
+    void galleryReloadsWhenDamagedFileIsReplaced();
     void browseFileDialogsAreRequestedByQmlAndActionsStayInBackend();
     void imagePropertiesAreExposedWithoutWidgetUi();
     void fullScreenPresentationLifecycleIsIdempotent();
@@ -1000,6 +1001,35 @@ void QmlWorkspaceControllerTests::galleryStateClearsWhenChangingFolders() {
     QVERIFY(!controller.galleryImageSize().isValid());
     QVERIFY(controller.galleryInfoText().isEmpty());
     QVERIFY(galleryChanged.count() >= 1);
+}
+
+void QmlWorkspaceControllerTests::galleryReloadsWhenDamagedFileIsReplaced() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("camera.bmp"));
+    QFile damaged(path);
+    QVERIFY(damaged.open(QIODevice::WriteOnly));
+    QCOMPARE(damaged.write("damaged", 7), 7);
+    damaged.close();
+
+    BrowseController controller(std::make_shared<QtImageDecoder>(), directory.path());
+    QTRY_COMPARE_WITH_TIMEOUT(controller.thumbnails()->rowCount(), 1, 5000);
+    const QString oldUrl = controller.thumbnails()->index(0, 0)
+                               .data(ThumbnailModel::ThumbnailUrlRole).toString();
+    QSignalSpy galleryChanged(&controller, &BrowseController::galleryImageChanged);
+    controller.setGalleryPath(path);
+    QTRY_VERIFY_WITH_TIMEOUT(galleryChanged.size() >= 2, 5000);
+    QVERIFY(!controller.galleryImageReady());
+
+    QImage replacement(20, 10, QImage::Format_RGBA8888);
+    replacement.fill(Qt::green);
+    QVERIFY(replacement.save(path, "PNG"));
+
+    QTRY_VERIFY_WITH_TIMEOUT(controller.galleryImageReady(), 5000);
+    QCOMPARE(controller.galleryImageSize(), QSize(20, 10));
+    QTRY_VERIFY_WITH_TIMEOUT(
+        controller.thumbnails()->index(0, 0)
+            .data(ThumbnailModel::ThumbnailUrlRole).toString() != oldUrl, 5000);
 }
 
 void QmlWorkspaceControllerTests::browseFileDialogsAreRequestedByQmlAndActionsStayInBackend() {

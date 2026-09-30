@@ -47,6 +47,13 @@ bool save(const QString& path, const QByteArray& bytes) {
     QSaveFile file(path);
     return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit();
 }
+bool saveSnapshot(const QString& path, const QByteArray& bytes) {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.flush())
+        return false;
+    file.close();
+    return file.error() == QFileDevice::NoError;
+}
 QJsonObject readObject(const QString& path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return {};
@@ -536,9 +543,9 @@ QString Service::snapshot(const QString& destination, int days, bool includeDump
                 }
                 std::sort(records.begin(), records.end(), [](const auto& a, const auto& b) { return a.value("sequence").toDouble() < b.value("sequence").toDouble(); });
                 QByteArray lines; for (const auto& record : records) lines += json(record);
-                if (!save(dest + QStringLiteral("/breadcrumbs.jsonl"), lines)) return QStringLiteral("Cannot save breadcrumbs snapshot");
+                if (!saveSnapshot(dest + QStringLiteral("/breadcrumbs.jsonl"), lines)) return QStringLiteral("Cannot save breadcrumbs snapshot");
             } else if (name.startsWith(QStringLiteral("log-")) && name.endsWith(QStringLiteral(".jsonl"))) {
-                QFile input(path); QSaveFile output(dest + QLatin1Char('/') + name);
+                QFile input(path); QFile output(dest + QLatin1Char('/') + name);
                 // Rotation can remove an older part between listing and reading it.
                 if (!input.open(QIODevice::ReadOnly)) continue;
                 if (!output.open(QIODevice::WriteOnly)) return QStringLiteral("Cannot snapshot diagnostic log");
@@ -549,15 +556,22 @@ QString Service::snapshot(const QString& destination, int days, bool includeDump
                     const auto time = QDateTime::fromString(object.value(QStringLiteral("timestamp")).toString(), Qt::ISODateWithMs);
                     if ((!cutoff.isValid() || time >= cutoff) && output.write(line) != line.size()) return QStringLiteral("Cannot write log snapshot");
                 }
-                if (input.error() != QFileDevice::NoError || !output.commit()) return QStringLiteral("Cannot complete log snapshot");
+                if (input.error() != QFileDevice::NoError || !output.flush()) return QStringLiteral("Cannot complete log snapshot");
+                output.close();
+                if (output.error() != QFileDevice::NoError) return QStringLiteral("Cannot complete log snapshot");
             } else if (name == QStringLiteral("session.json") || name == QStringLiteral("closed.json") || (includeDumps && dump && dumpInRange)) {
                 if (!QFile::copy(path, dest + QLatin1Char('/') + name)) return QStringLiteral("Cannot copy diagnostic snapshot");
             }
         }
-        if (!save(dest + QStringLiteral("/summary.json"), json({{"session", info.fileName()},
+        const bool crashDumpAvailable = hasDump(info.absoluteFilePath());
+        const auto crashSummary = dumpSummary(info.absoluteFilePath());
+        const QByteArray summaryBytes = json({{"session", info.fileName()},
                   {"version", ISPVIEW_PROJECT_VERSION}, {"build", ISPVIEW_BUILD_ID},
-                  {"crashDumpAvailable", hasDump(info.absoluteFilePath())}, {"crash", dumpSummary(info.absoluteFilePath())}, {"dumpIncluded", includeDumps && dumpInRange && !captured.isEmpty()}, {"partialLogRecordsSkipped", partialRecords},
-                  {"cleanExit", QFileInfo::exists(info.absoluteFilePath() + QStringLiteral("/closed.json"))}})))
+                  {"crashDumpAvailable", crashDumpAvailable}, {"crash", crashSummary}, {"dumpIncluded", includeDumps && dumpInRange && !captured.isEmpty()}, {"partialLogRecordsSkipped", partialRecords},
+                  {"cleanExit", QFileInfo::exists(info.absoluteFilePath() + QStringLiteral("/closed.json"))}});
+        // The snapshot is private until export finishes, so these files need no
+        // atomic rename or temporary sibling for every retained session.
+        if (!saveSnapshot(dest + QStringLiteral("/summary.json"), summaryBytes))
             return QStringLiteral("Cannot save diagnostic summary");
     }
     return {};

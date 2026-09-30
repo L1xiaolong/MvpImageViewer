@@ -117,7 +117,27 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                 diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.scan_complete"),
                     {{"directory", diagnostics::fileId(directory)}, {"generation", static_cast<qint64>(generation)}, {"items", files.size()}}, true);
                 if (!incrementalScan_) {
+                    bool galleryFileChanged = false;
+                    if (!galleryPath_.isEmpty()) {
+                        const auto& previous = thumbnailModel_->files();
+                        const auto old = std::find_if(previous.cbegin(), previous.cend(),
+                            [this](const ImageFileRecord& file) { return file.path == galleryPath_; });
+                        const auto updated = std::find_if(files.cbegin(), files.cend(),
+                            [this](const ImageFileRecord& file) { return file.path == galleryPath_; });
+                        galleryFileChanged = old != previous.cend() &&
+                            (updated == files.cend() || old->fileSize != updated->fileSize ||
+                             old->modifiedAt != updated->modifiedAt);
+                    }
                     thumbnailModel_->updateFiles(files);
+                    if (galleryFileChanged) {
+                        const QString path = galleryPath_;
+                        setGalleryPath({});
+                        if (QFileInfo::exists(path)) setGalleryPath(path);
+                    }
+                    if (!galleryPath_.isEmpty() && QFileInfo::exists(galleryPath_) &&
+                        !directoryWatcher_->files().contains(galleryPath_)) {
+                        directoryWatcher_->addPath(galleryPath_);
+                    }
                 }
                 QStringList existing;
                 for (const QString& path : std::as_const(selectedPaths_)) {
@@ -156,6 +176,10 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
     refreshDeadlineTimer_->setSingleShot(true);
     refreshDeadlineTimer_->setInterval(1'000);
     connect(directoryWatcher_, &QFileSystemWatcher::directoryChanged, this, [this] {
+        refreshTimer_->start();
+        if (!refreshDeadlineTimer_->isActive()) refreshDeadlineTimer_->start();
+    });
+    connect(directoryWatcher_, &QFileSystemWatcher::fileChanged, this, [this] {
         refreshTimer_->start();
         if (!refreshDeadlineTimer_->isActive()) refreshDeadlineTimer_->start();
     });
@@ -914,7 +938,13 @@ void BrowseController::setGalleryPath(const QString& path) {
     if (galleryPath_ == normalized && (galleryFrame_ || normalized.isEmpty())) {
         return;
     }
+    if (!galleryPath_.isEmpty() && directoryWatcher_->files().contains(galleryPath_)) {
+        directoryWatcher_->removePath(galleryPath_);
+    }
     galleryPath_ = normalized;
+    if (!normalized.isEmpty() && QFileInfo(normalized).isFile()) {
+        directoryWatcher_->addPath(normalized);
+    }
     galleryPreviewHandle_.cancel();
     galleryFullHandle_.cancel();
     galleryFullRequested_ = false;

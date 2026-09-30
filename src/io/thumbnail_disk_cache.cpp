@@ -5,7 +5,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMutexLocker>
-#include <QSaveFile>
 #include <QStandardPaths>
 
 #include <algorithm>
@@ -22,6 +21,7 @@ ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
 }
 
 QImage ThumbnailDiskCache::load(const QString& key) const {
+    const QMutexLocker lock(&ioMutex_);
     QImage image;
     const QString base = pathForKey(key);
     if (!image.load(base + QStringLiteral(".png"), "PNG")) {
@@ -35,6 +35,7 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     if (image.isNull()) {
         return false;
     }
+    const QMutexLocker lock(&ioMutex_);
     QImage storedImage = image;
     if (sourceSize.isValid()) {
         storedImage.setText(QStringLiteral("ispview.sourceWidth"),
@@ -63,16 +64,19 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
         }
     }
     const QString suffix = hasTransparency ? QStringLiteral(".png") : QStringLiteral(".jpg");
-    QSaveFile file(pathForKey(key) + suffix);
+    const QString path = pathForKey(key) + suffix;
+    QFile file(path);
     const char* format = hasTransparency ? "PNG" : "JPEG";
     const int quality = hasTransparency ? 20 : 85;
-    if (!file.open(QIODevice::WriteOnly) || !storedImage.save(&file, format, quality)) {
-        file.cancelWriting();
+    if (!file.open(QIODevice::WriteOnly)) return false;
+    const bool stored = storedImage.save(&file, format, quality) && file.flush();
+    file.close();
+    if (!stored || file.error() != QFileDevice::NoError) {
+        QFile::remove(path);
         return false;
     }
-    const bool stored = file.commit();
-    if (stored && (++storeCount_ % 64U) == 0U) trimIfNeeded();
-    return stored;
+    if ((++storeCount_ % 64U) == 0U) trimIfNeeded();
+    return true;
 }
 
 QString ThumbnailDiskCache::pathForKey(const QString& key) const {
