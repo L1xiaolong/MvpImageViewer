@@ -6,7 +6,7 @@
 #include <QPointF>
 #include <QString>
 
-namespace ispview {
+namespace mvpview {
 
 struct ComparisonPixelSample {
     bool valid = false;
@@ -42,4 +42,4 @@ class ComparisonPixelProbe final {
                                                       const QPointF& normalizedPoint);
 };
 
-} // namespace ispview
+} // namespace mvpview

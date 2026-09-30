@@ -8,7 +8,7 @@
 
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 
 class BrowseController;
 class IImageDecoder;
@@ -93,4 +93,4 @@ class BrowseWorkspaceController final : public QObject {
     BrowseController* pendingTransferPane_ = nullptr;
 };
 
-} // namespace ispview
+} // namespace mvpview

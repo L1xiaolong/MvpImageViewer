@@ -23,17 +23,17 @@ fi
 gclient sync --revision "$(basename "$root")@$revision" --no-history
 cd "$root"
 # Build the client separately so its complete object closure excludes the handler's main().
-gn gen out/ispview --args='is_debug=false target_cpu="arm64"'
-ninja -C out/ispview client
+gn gen out/mvpview --args='is_debug=false target_cpu="arm64"'
+ninja -C out/mvpview client
 python3 - <<'PY'
 from pathlib import Path
 import subprocess
-objects = sorted(Path('out/ispview/obj').rglob('*.o'))
+objects = sorted(Path('out/mvpview/obj').rglob('*.o'))
 if not objects:
     raise SystemExit('No Crashpad client objects produced')
-subprocess.run(['xcrun', 'libtool', '-static', '-o', 'out/ispview/libispview_crashpad.a',
+subprocess.run(['xcrun', 'libtool', '-static', '-o', 'out/mvpview/libmvpview_crashpad.a',
                 *map(str, objects)], check=True)
 PY
-gn gen out/ispview-handler --args='is_debug=false target_cpu="arm64"'
-ninja -C out/ispview-handler crashpad_handler
-printf '%s\n' "$revision" > out/ispview/ispview-revision
+gn gen out/mvpview-handler --args='is_debug=false target_cpu="arm64"'
+ninja -C out/mvpview-handler crashpad_handler
+printf '%s\n' "$revision" > out/mvpview/mvpview-revision

@@ -1,4 +1,4 @@
-module Isp
+module Mvp
 singleton Theme 1.0 Theme.qml
 AppIconButton 1.0 AppIconButton.qml
 AppConfirmDialog 1.0 AppConfirmDialog.qml

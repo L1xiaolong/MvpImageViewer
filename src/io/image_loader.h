@@ -14,7 +14,7 @@
 #include <memory>
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 
 class ThumbnailDiskCache;
 
@@ -112,4 +112,4 @@ class ImageLoader final : public QObject {
     quint64 nextInFlightGeneration_ = 0;
 };
 
-} // namespace ispview
+} // namespace mvpview

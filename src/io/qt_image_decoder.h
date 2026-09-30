@@ -4,7 +4,7 @@
 
 #include <QStringList>
 
-namespace ispview {
+namespace mvpview {
 
 class QtImageDecoder final : public IImageDecoder {
   public:
@@ -19,4 +19,4 @@ class QtImageDecoder final : public IImageDecoder {
     [[nodiscard]] DecodeResult decode(const DecodeRequest& request) const override;
 };
 
-} // namespace ispview
+} // namespace mvpview

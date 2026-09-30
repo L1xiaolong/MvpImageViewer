@@ -8,7 +8,7 @@
 #include <functional>
 #include <memory>
 
-namespace ispview::diagnostics {
+namespace mvpview::diagnostics {
 Q_DECLARE_LOGGING_CATEGORY(startup)
 Q_DECLARE_LOGGING_CATEGORY(browse)
 Q_DECLARE_LOGGING_CATEGORY(decode)
@@ -85,4 +85,4 @@ Level parseLevel(const QString& name);
 QString levelName(Level level);
 // Sanitizes unstructured Qt/third-party messages before disk persistence.
 QString redact(QString text);
-} // namespace ispview::diagnostics
+} // namespace mvpview::diagnostics

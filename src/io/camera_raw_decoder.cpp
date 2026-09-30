@@ -16,11 +16,11 @@
 #include <memory>
 #include <mutex>
 
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
 #include <libraw.h>
 #endif
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QStringList cameraRawSuffixes() {
@@ -32,7 +32,7 @@ QStringList cameraRawSuffixes() {
             QStringLiteral("rwl")};
 }
 
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
 
 struct ProcessedImageDeleter {
     void operator()(libraw_processed_image_t* image) const {
@@ -531,7 +531,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
 } // namespace
 
 bool CameraRawDecoder::isAvailable() {
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
     return true;
 #else
     return false;
@@ -543,7 +543,7 @@ QStringList CameraRawDecoder::supportedSuffixes() {
 }
 
 QString CameraRawDecoder::cacheIdentity() const {
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
     // v3: 16-bit output, orientation applied during decode, and the retained sensor mosaic.
     // v7: the develop target follows the application display space.
     return QStringLiteral("camera-raw-v7|libraw-%1|display-%2")
@@ -567,7 +567,7 @@ DecodeResult CameraRawDecoder::decode(const DecodeRequest& request) const {
         return {{},
                 QStringLiteral("Camera RAW support is unavailable or the format is unsupported")};
     }
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
     // Even the reentrant LibRaw build can delegate to optional codec dependencies
     // with shared process state. Serializing this adapter also bounds peak memory
     // when thumbnail, preview, and full requests for a large RAW overlap.
@@ -588,4 +588,4 @@ DecodeResult CameraRawDecoder::decode(const DecodeRequest& request) const {
 #endif
 }
 
-} // namespace ispview
+} // namespace mvpview

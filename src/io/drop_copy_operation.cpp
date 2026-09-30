@@ -4,7 +4,7 @@
 #include <QFile>
 #include <QFileInfo>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QString copyName(const QFileInfo& source, int copyNumber) {
@@ -176,4 +176,4 @@ DropCopyResult DropCopyOperation::execute(const QStringList& sourcePaths,
     return FileTransferOperation::execute(sourcePaths, targetDirectory, FileTransferMode::Copy);
 }
 
-} // namespace ispview
+} // namespace mvpview

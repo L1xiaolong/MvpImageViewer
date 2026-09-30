@@ -15,7 +15,7 @@
 #include <functional>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 constexpr auto kNamedPresetsKey = "rawPresets/named";
@@ -213,7 +213,7 @@ bool RawPresetStore::saveSidecar(const QString& path, const RawImageParameters& 
 }
 
 QString RawPresetStore::sidecarPath(const QString& path) {
-    return path + QStringLiteral(".ispview.json");
+    return path + QStringLiteral(".mvpview.json");
 }
 
 RawImageParameters RawPresetStore::inferFromFileName(const QString& path) {
@@ -396,4 +396,4 @@ bool RawPresetStore::saveFilenameRules(const QVector<RawFilenameRule>& rules) {
     return settings.status() == QSettings::NoError;
 }
 
-} // namespace ispview
+} // namespace mvpview

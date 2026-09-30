@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtTest
 import "../../design"
-import "../../src/qml/Isp"
+import "../../src/qml/Mvp"
 import "../../src/qml/Pages"
 
 TestCase {

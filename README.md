@@ -217,7 +217,7 @@ LibRaw 和 Exiv2 是必需依赖；缺少任一库时 CMake 配置会失败。Li
 
 ```sh
 cmake --preset macos-debug \
-  -DISPVIEW_ENABLE_LCMS2=OFF
+  -DMVPVIEW_ENABLE_LCMS2=OFF
 ```
 
 使用 vcpkg 时，LibRaw 和 Exiv2 是默认依赖。可选 manifest feature：
@@ -240,10 +240,10 @@ Release Preset 可构建 RAW 解码、直方图、颜色管理和大目录浏览
 
 ```sh
 cmake --build --preset macos-release
-./build/macos-preset-release/tools/ispview_raw_benchmark --48mp
-./build/macos-preset-release/tools/ispview_histogram_benchmark --48mp
-./build/macos-preset-release/tools/ispview_color_benchmark --48mp
-./build/macos-preset-release/tools/ispview_browser_benchmark --enforce
+./build/macos-preset-release/tools/mvpview_raw_benchmark --48mp
+./build/macos-preset-release/tools/mvpview_histogram_benchmark --48mp
+./build/macos-preset-release/tools/mvpview_color_benchmark --48mp
+./build/macos-preset-release/tools/mvpview_browser_benchmark --enforce
 ```
 
 需要真实图片的测试数据应保存在本地，不应提交包含个人信息、精确位置或来源不明的素材。
@@ -275,4 +275,4 @@ tools          性能测试和诊断工具
 
 [Diagnostic settings, export, symbols and validation](docs/diagnostics.md)
 
-macOS 构建可用 `-DISPVIEW_ENABLE_CRASHPAD=OFF` 跳过 Crashpad；此时崩溃采集在设置页显示为不可用，其余诊断功能不受影响。
+macOS 构建可用 `-DMVPVIEW_ENABLE_CRASHPAD=OFF` 跳过 Crashpad；此时崩溃采集在设置页显示为不可用，其余诊断功能不受影响。

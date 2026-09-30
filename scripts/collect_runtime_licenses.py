@@ -23,7 +23,7 @@ MACHO_MAGIC = {bytes.fromhex(x) for x in
                 "cafebabf", "bfbafeca")}
 # Build-produced artifacts (including pinned static Crashpad); their notices are staged
 # by package_licenses.cmake. Imported runtime files below still require hash provenance.
-APPLICATION_FILES = {"MVPImageViewer.exe", "Contents/MacOS/MVPImageViewer", "ispview_crash_handler.exe",
+APPLICATION_FILES = {"MVPImageViewer.exe", "Contents/MacOS/MVPImageViewer", "mvpview_crash_handler.exe",
                      "Contents/Helpers/crashpad_handler"}
 
 
@@ -254,8 +254,8 @@ def main():
     parser.add_argument("package", type=Path)
     parser.add_argument("--output", type=Path, help="Notice directory; defaults to package root")
     parser.add_argument("--msys-root", type=Path)
-    parser.add_argument("--catalog", type=Path, default=os.environ.get("ISPVIEW_RUNTIME_CATALOG") or None,
-                        help="Reviewed vendor/custom-runtime catalog, also read from ISPVIEW_RUNTIME_CATALOG")
+    parser.add_argument("--catalog", type=Path, default=os.environ.get("MVPVIEW_RUNTIME_CATALOG") or None,
+                        help="Reviewed vendor/custom-runtime catalog, also read from MVPVIEW_RUNTIME_CATALOG")
     args = parser.parse_args()
     try:
         report = collect(args.package, args.output or args.package, args.msys_root, args.catalog)

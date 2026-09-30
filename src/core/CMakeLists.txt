@@ -1,4 +1,4 @@
-qt_add_library(ispview_core STATIC
+qt_add_library(mvpview_core STATIC
     bayer_image_renderer.h
     bayer_image_renderer.cpp
     color_conversion.h
@@ -23,6 +23,6 @@ qt_add_library(ispview_core STATIC
     weighted_lru_cache.h
 )
 
-target_include_directories(ispview_core PUBLIC ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(ispview_core PUBLIC Qt6::Core Qt6::Gui)
-ispview_enable_warnings(ispview_core)
+target_include_directories(mvpview_core PUBLIC ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(mvpview_core PUBLIC Qt6::Core Qt6::Gui)
+mvpview_enable_warnings(mvpview_core)

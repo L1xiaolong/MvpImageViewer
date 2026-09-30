@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace ispview {
+namespace mvpview {
 
 // Central product-facing suffix list used by scanners and tools. Availability-sensitive formats
 // such as camera RAW are included only when their adapter is usable in the current build.
@@ -11,4 +11,4 @@ namespace ispview {
 [[nodiscard]] QStringList supportedImageNameFilters();
 [[nodiscard]] bool hasSupportedImageSuffix(const QString& path);
 
-} // namespace ispview
+} // namespace mvpview

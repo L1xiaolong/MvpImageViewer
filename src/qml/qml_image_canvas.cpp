@@ -23,7 +23,7 @@
 #include <limits>
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 bool isIndependentViewAdjustment(Qt::KeyboardModifiers modifiers) {
@@ -1237,4 +1237,4 @@ void QmlImageCanvas::hoverLeaveEvent(QHoverEvent* event) {
 
 QQuickRhiItemRenderer* QmlImageCanvas::createRenderer() { return new Renderer; }
 
-} // namespace ispview
+} // namespace mvpview

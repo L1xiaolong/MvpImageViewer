@@ -20,7 +20,7 @@
 #include <memory>
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 constexpr QSize kPreviewSize{1920, 1200};
@@ -86,7 +86,7 @@ QStringList imageCandidates(const QString& directory) {
 }
 
 } // namespace
-} // namespace ispview
+} // namespace mvpview
 
 int main(int argc, char* argv[]) {
     QCoreApplication application(argc, argv);
@@ -94,14 +94,14 @@ int main(int argc, char* argv[]) {
     QTextStream errors(stderr);
     const QStringList arguments = application.arguments();
     QString directory;
-    std::optional<ispview::RawImageParameters> raw16Candidate;
+    std::optional<mvpview::RawImageParameters> raw16Candidate;
     const qsizetype candidateIndex = arguments.indexOf(QStringLiteral("--candidate-raw16"));
     if (candidateIndex >= 0) {
         if (candidateIndex + 1 >= arguments.size()) {
             errors << "--candidate-raw16 requires WIDTHxHEIGHT:VALID_BITS:CFA\n";
             return 1;
         }
-        raw16Candidate = ispview::tools::parseRaw16Candidate(
+        raw16Candidate = mvpview::tools::parseRaw16Candidate(
             arguments.at(candidateIndex + 1), arguments.contains(QStringLiteral("--msb-aligned")),
             arguments.contains(QStringLiteral("--big-endian")));
         if (!raw16Candidate) {
@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
         }
     }
     QString optionError;
-    if (!ispview::tools::applyCandidateOrientationOption(arguments, raw16Candidate, optionError)) {
+    if (!mvpview::tools::applyCandidateOrientationOption(arguments, raw16Candidate, optionError)) {
         errors << optionError << '\n';
         return 1;
     }
@@ -125,19 +125,19 @@ int main(int argc, char* argv[]) {
         }
     }
     if (directory.isEmpty() || !QFileInfo(directory).isDir()) {
-        errors << "Usage: ispview_sample_check [--allow-incomplete] "
+        errors << "Usage: mvpview_sample_check [--allow-incomplete] "
                   "[--candidate-raw16 WIDTHxHEIGHT:VALID_BITS:CFA] [--msb-aligned] "
                   "[--big-endian] [--orientation 0|90|180|270] <image-directory>\n";
         return 1;
     }
 
     const bool allowIncomplete = arguments.contains(QStringLiteral("--allow-incomplete"));
-    const QStringList paths = ispview::imageCandidates(directory);
-    const auto decoder = ispview::createDefaultImageDecoder();
+    const QStringList paths = mvpview::imageCandidates(directory);
+    const auto decoder = mvpview::createDefaultImageDecoder();
     QSet<QString> browserPaths;
-    const QVector<ispview::ImageFileRecord> browserFiles =
-        ispview::DirectoryScanner::scan(directory);
-    for (const ispview::ImageFileRecord& record : browserFiles) {
+    const QVector<mvpview::ImageFileRecord> browserFiles =
+        mvpview::DirectoryScanner::scan(directory);
+    for (const mvpview::ImageFileRecord& record : browserFiles) {
         browserPaths.insert(QFileInfo(record.path).absoluteFilePath());
     }
     int passed = 0;
@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        const auto parameters = ispview::rawParametersFor(path, raw16Candidate);
+        const auto parameters = mvpview::rawParametersFor(path, raw16Candidate);
         const QString suffix = info.suffix().toLower();
         if ((suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv")) && !parameters) {
             output << "NEEDS_PARAMETERS\t" << info.fileName() << '\t' << info.suffix().toUpper()
@@ -169,10 +169,10 @@ int main(int argc, char* argv[]) {
             ++needsParameters;
             continue;
         }
-        const ispview::TimedDecode preview = ispview::decodeTimed(
-            *decoder, {path, ispview::DecodePurpose::Preview, ispview::kPreviewSize, parameters});
-        const ispview::TimedDecode full =
-            ispview::decodeTimed(*decoder, {path, ispview::DecodePurpose::Full, {}, parameters});
+        const mvpview::TimedDecode preview = mvpview::decodeTimed(
+            *decoder, {path, mvpview::DecodePurpose::Preview, mvpview::kPreviewSize, parameters});
+        const mvpview::TimedDecode full =
+            mvpview::decodeTimed(*decoder, {path, mvpview::DecodePurpose::Full, {}, parameters});
         if (!preview.result.succeeded() || !full.result.succeeded() ||
             !preview.result.frame->qImage() || !full.result.frame->qImage()) {
             const QString message =
@@ -182,8 +182,8 @@ int main(int argc, char* argv[]) {
             ++failed;
             continue;
         }
-        const ispview::ImageFrame& previewFrame = *preview.result.frame;
-        const ispview::ImageFrame& fullFrame = *full.result.frame;
+        const mvpview::ImageFrame& previewFrame = *preview.result.frame;
+        const mvpview::ImageFrame& fullFrame = *full.result.frame;
         output << "PASS\t" << info.fileName() << '\t' << fullFrame.metadata.format << '\t'
                << fullFrame.descriptor.size.width() << 'x' << fullFrame.descriptor.size.height()
                << '\t' << previewFrame.descriptor.size.width() << 'x'
@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
                << QString::number(preview.nanoseconds / 1'000'000.0, 'f', 2) << '\t'
                << QString::number(full.nanoseconds / 1'000'000.0, 'f', 2) << '\t'
                << QString::number(fullFrame.byteSize() / (1024.0 * 1024.0), 'f', 2) << '\t'
-               << ispview::fingerprint(fullFrame) << '\n';
+               << mvpview::fingerprint(fullFrame) << '\n';
         ++passed;
     }
     output << "Summary\tPASS=" << passed << "\tFAILED=" << failed << "\tUNSUPPORTED=" << unsupported

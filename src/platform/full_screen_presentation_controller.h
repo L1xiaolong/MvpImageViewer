@@ -7,7 +7,7 @@
 
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 
 // Turns an existing native window into a borderless full-display window without entering the
 // platform's animated full-screen state, then restores its exact placement and decoration.
@@ -47,4 +47,4 @@ class FullScreenPresentationController final : public QObject {
 #endif
 };
 
-} // namespace ispview
+} // namespace mvpview

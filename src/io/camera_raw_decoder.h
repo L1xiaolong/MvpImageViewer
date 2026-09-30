@@ -4,7 +4,7 @@
 
 #include <QStringList>
 
-namespace ispview {
+namespace mvpview {
 
 class CameraRawDecoder final : public IImageDecoder {
   public:
@@ -17,4 +17,4 @@ class CameraRawDecoder final : public IImageDecoder {
     [[nodiscard]] DecodeResult decode(const DecodeRequest& request) const override;
 };
 
-} // namespace ispview
+} // namespace mvpview

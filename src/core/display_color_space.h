@@ -6,7 +6,7 @@
 #include <QList>
 #include <QString>
 
-namespace ispview {
+namespace mvpview {
 
 // Primaries of a display-referred RGB encoding. Every space the viewer targets is D65 white,
 // so primaries alone define the gamut mapping.
@@ -54,4 +54,4 @@ void setCurrentDisplayColorSpace(DisplayColorSpace space);
 // display space because that is what the compositor will assume, but are not colorimetric.
 void applyDisplayColor(ColorDescriptor& color, bool visualization = false);
 
-} // namespace ispview
+} // namespace mvpview

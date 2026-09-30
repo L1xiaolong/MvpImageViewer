@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
-using namespace ispview;
+using namespace mvpview;
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     if (app.arguments().size() != 2) return 2;

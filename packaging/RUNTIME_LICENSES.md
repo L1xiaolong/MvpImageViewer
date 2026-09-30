@@ -90,12 +90,12 @@ Use the actual license identifier and terms for the SDK obtained; a URL alone
 is not a license text. MSYS2 matching fills files not supplied by the catalog.
 
 ```powershell
-$env:ISPVIEW_RUNTIME_CATALOG = 'packaging/runtime/windows.json'
+$env:MVPVIEW_RUNTIME_CATALOG = 'packaging/runtime/windows.json'
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
 
 ```sh
-ISPVIEW_RUNTIME_CATALOG=packaging/runtime/macos.json ./build_macos.sh package
+MVPVIEW_RUNTIME_CATALOG=packaging/runtime/macos.json ./build_macos.sh package
 ```
 
 For macOS use the post-relocation, pre-signing hashes from the first packaging
@@ -105,8 +105,8 @@ component versions and notices from the actual SDK/build records, not merely
 the reported filenames. SDK updates require reviewing and refreshing the
 catalog. No macOS SDK catalog is fabricated or supplied by this repository.
 
-For GitHub releases, repository variables `ISPVIEW_RUNTIME_CATALOG_MACOS` and
-`ISPVIEW_RUNTIME_CATALOG_WINDOWS` can point to reviewed catalogs checked out
+For GitHub releases, repository variables `MVPVIEW_RUNTIME_CATALOG_MACOS` and
+`MVPVIEW_RUNTIME_CATALOG_WINDOWS` can point to reviewed catalogs checked out
 with the release commit. Without a catalog, packaging continues and records
 the unresolved findings as warnings. Diagnostics are retained as separate
 workflow artifacts and are also included in the staged package.

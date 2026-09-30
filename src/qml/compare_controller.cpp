@@ -21,7 +21,7 @@
 
 #include <algorithm>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 template <typename Bins>
@@ -509,4 +509,4 @@ void CompareController::clearHistograms(int slot) {
     emit histogramRevisionChanged();
 }
 
-} // namespace ispview
+} // namespace mvpview

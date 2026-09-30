@@ -1,6 +1,6 @@
 #include "render/bayer_render_parameters.h"
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 float shaderFormat(RawPixelFormat format) {
@@ -50,4 +50,4 @@ std::array<float, 28> makeBayerRenderUniformData(const RawImageParameters& param
     return values;
 }
 
-} // namespace ispview
+} // namespace mvpview

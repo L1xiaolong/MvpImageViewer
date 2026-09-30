@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 
 class RawImageDecoder final : public IImageDecoder {
   public:
@@ -17,4 +17,4 @@ class RawImageDecoder final : public IImageDecoder {
     [[nodiscard]] static QString pixelDescription(const ImageFrame& frame, int x, int y);
 };
 
-} // namespace ispview
+} // namespace mvpview

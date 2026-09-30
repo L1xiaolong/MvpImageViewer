@@ -8,7 +8,7 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include <miniz.h>
-namespace ispview {
+namespace mvpview {
 namespace {
 struct ZipOutput { QSaveFile* file; std::atomic<bool>* cancelled; };
 size_t writeZip(void* opaque, mz_uint64 offset, const void* data, size_t count) {

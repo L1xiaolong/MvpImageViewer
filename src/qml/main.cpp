@@ -27,7 +27,7 @@
 #include <QTimer>
 #include <QUrl>
 
-static int runApplication(int argc, char* argv[], ispview::diagnostics::Service& diagnosticService) {
+static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service& diagnosticService) {
     QGuiApplication app(argc, argv);
 #ifdef Q_OS_WIN
     // Qt defaults to D3D11 on Windows. Some Intel drivers crash while Qt Quick creates
@@ -37,8 +37,8 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
 #endif
     QGuiApplication::setQuitOnLastWindowClosed(false);
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
-    QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
-    QCoreApplication::setApplicationVersion(QStringLiteral(ISPVIEW_PROJECT_VERSION));
+    QCoreApplication::setOrganizationName(QStringLiteral("MvpView"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(MVPVIEW_PROJECT_VERSION));
 #ifndef Q_OS_MACOS
     // macOS should keep the icon declared by CFBundleIconFile for the whole
     // application lifetime. Setting the generic runtime PNG here replaces the
@@ -47,10 +47,10 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
 #endif
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QSettings settings;
-    ispview::AppSettings appSettings(&app);
-    ispview::DiagnosticsController diagnosticsController(diagnosticService);
-    QObject::connect(&appSettings, &ispview::AppSettings::diagnosticsChanged, &app, [&] {
-        diagnosticService.configure(appSettings.loggingEnabled(), ispview::diagnostics::parseLevel(appSettings.logLevel()));
+    mvpview::AppSettings appSettings(&app);
+    mvpview::DiagnosticsController diagnosticsController(diagnosticService);
+    QObject::connect(&appSettings, &mvpview::AppSettings::diagnosticsChanged, &app, [&] {
+        diagnosticService.configure(appSettings.loggingEnabled(), mvpview::diagnostics::parseLevel(appSettings.logLevel()));
     });
     bool lastMainWindowStateWasMaximized =
         settings.value(QStringLiteral("window/maximized"), false).toBool();
@@ -120,20 +120,20 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
         QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
     }
 
-    const auto decoder = ispview::createDefaultImageDecoder();
+    const auto decoder = mvpview::createDefaultImageDecoder();
     // Keep filesystem restoration out of the pre-window startup path. On a cold first launch,
     // QML and shader caches are also being populated; touching a slow or unavailable previous
     // directory here can otherwise prevent the first frame from appearing at all.
-    ispview::BrowseWorkspaceController browseController(decoder, initialDirectory, true);
+    mvpview::BrowseWorkspaceController browseController(decoder, initialDirectory, true);
     while (browseController.paneCount() < initialFileManagerCount)
         browseController.addFileManagerPane();
-    ispview::CompareController compareController(browseController.loader());
-    ispview::ImagePropertiesController imagePropertiesController(browseController.loader());
-    ispview::FullScreenController fullScreenController(browseController.loader());
-    ispview::FullScreenPresentationController fullScreenPresentationController;
-    ispview::RawParametersController rawParametersController(browseController.loader());
-    QObject::connect(&appSettings, &ispview::AppSettings::colorDisplayChanged, &app, [&] {
-        ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::settings(), QStringLiteral("settings.color_display"),
+    mvpview::CompareController compareController(browseController.loader());
+    mvpview::ImagePropertiesController imagePropertiesController(browseController.loader());
+    mvpview::FullScreenController fullScreenController(browseController.loader());
+    mvpview::FullScreenPresentationController fullScreenPresentationController;
+    mvpview::RawParametersController rawParametersController(browseController.loader());
+    QObject::connect(&appSettings, &mvpview::AppSettings::colorDisplayChanged, &app, [&] {
+        mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::settings(), QStringLiteral("settings.color_display"),
             {{"colorProfiles", appSettings.applyEmbeddedColorProfiles()}, {"highBitDepth", appSettings.preserveHighBitDepth()},
              {"displayColorSpace", appSettings.displayColorSpace()},
              {"exifOrientation", appSettings.honorExifOrientation()}}, true);
@@ -144,7 +144,7 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
     });
 
     QQmlApplicationEngine engine;
-    QObject::connect(&appSettings, &ispview::AppSettings::languageChanged,
+    QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
                      &engine, &QQmlApplicationEngine::retranslate);
     engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), &appSettings);
     engine.rootContext()->setContextProperty(QStringLiteral("diagnosticsController"), &diagnosticsController);
@@ -168,14 +168,14 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
     engine.rootContext()->setContextProperty(QStringLiteral("settingsStartupSection"),
                                              settingsStartupSection);
     engine.addImageProvider(QStringLiteral("thumbnail"),
-                            new ispview::ThumbnailImageProvider(decoder,
+                            new mvpview::ThumbnailImageProvider(decoder,
                                                                 browseController.loader()));
 #ifdef Q_OS_WIN
     engine.addImageProvider(QStringLiteral("system-folder"),
-                            new ispview::SystemFolderIconProvider());
+                            new mvpview::SystemFolderIconProvider());
 #endif
-    ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::startup(), QStringLiteral("qml.loading"), {}, true);
-    engine.load(QUrl(QStringLiteral("qrc:/ISPViewQml/Main.qml")));
+    mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::startup(), QStringLiteral("qml.loading"), {}, true);
+    engine.load(QUrl(QStringLiteral("qrc:/MvpViewQml/Main.qml")));
     if (engine.rootObjects().isEmpty()) {
         return 1;
     }
@@ -184,7 +184,7 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
         return 1;
     }
     QObject::connect(mainWindow, &QQuickWindow::sceneGraphInitialized, mainWindow, [mainWindow] {
-        ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::render(), QStringLiteral("scenegraph.initialized"),
+        mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::render(), QStringLiteral("scenegraph.initialized"),
             {{"graphicsApi", static_cast<int>(mainWindow->rendererInterface()->graphicsApi())}}, true);
     }, Qt::DirectConnection);
     // The canvas buffer is interpreted in the colour space the platform reports for the window
@@ -199,11 +199,11 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
     mainWindow->create();
     applySurfaceColorSpace();
     QObject::connect(mainWindow, &QWindow::screenChanged, mainWindow, [applySurfaceColorSpace] {
-        ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::render(), QStringLiteral("window.screen_changed"), {}, true);
+        mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::render(), QStringLiteral("window.screen_changed"), {}, true);
         applySurfaceColorSpace();
     });
     QObject::connect(mainWindow, &QWindow::visibilityChanged, mainWindow, [](QWindow::Visibility visibility) {
-        ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::render(), QStringLiteral("window.visibility"), {{"visibility", static_cast<int>(visibility)}}, true);
+        mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::render(), QStringLiteral("window.visibility"), {{"visibility", static_cast<int>(visibility)}}, true);
     });
     // QML emits this signal only for a real application close; closing a compare/full-screen
     // session is deliberately kept inside QML.
@@ -287,18 +287,18 @@ static int runApplication(int argc, char* argv[], ispview::diagnostics::Service&
 
 int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
-    QCoreApplication::setOrganizationName(QStringLiteral("ISPView"));
-    QCoreApplication::setApplicationVersion(QStringLiteral(ISPVIEW_PROJECT_VERSION));
+    QCoreApplication::setOrganizationName(QStringLiteral("MvpView"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(MVPVIEW_PROJECT_VERSION));
     const QSettings diagnosticSettings;
-    ispview::diagnostics::Options diagnosticOptions;
+    mvpview::diagnostics::Options diagnosticOptions;
     diagnosticOptions.root = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
                              + QStringLiteral("/diagnostics");
     diagnosticOptions.loggingEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/loggingEnabled"), true).toBool();
     diagnosticOptions.crashEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/crashReportingEnabled"), true).toBool();
-    diagnosticOptions.level = ispview::diagnostics::parseLevel(diagnosticSettings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString());
-    ispview::diagnostics::Service diagnosticService(diagnosticOptions);
+    diagnosticOptions.level = mvpview::diagnostics::parseLevel(diagnosticSettings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString());
+    mvpview::diagnostics::Service diagnosticService(diagnosticOptions);
     diagnosticService.startCrashCapture({});
-    ispview::diagnostics::event(ispview::diagnostics::Level::Info, ispview::diagnostics::startup(), QStringLiteral("application.start"), {}, true);
+    mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::startup(), QStringLiteral("application.start"), {}, true);
     const int result = runApplication(argc, argv, diagnosticService);
     diagnosticService.markCleanExit();
     return result;

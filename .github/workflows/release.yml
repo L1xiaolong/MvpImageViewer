@@ -40,7 +40,7 @@ jobs:
           fi
           release_version="${BASH_REMATCH[1]}"
           project_version="$(sed -nE \
-            's/^project\(ISPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
+            's/^project\(MVPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
             CMakeLists.txt)"
           if [[ "$project_version" != "$release_version" ]]; then
             echo "Release tag $RELEASE_TAG does not match project version $project_version" >&2
@@ -145,12 +145,12 @@ jobs:
         if: runner.os == 'macOS'
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
-          ISPVIEW_GITHUB_REPOSITORY: ${{ github.repository }}
-          ISPVIEW_RUNTIME_CATALOG: ${{ vars.ISPVIEW_RUNTIME_CATALOG_MACOS }}
+          MVPVIEW_GITHUB_REPOSITORY: ${{ github.repository }}
+          MVPVIEW_RUNTIME_CATALOG: ${{ vars.MVPVIEW_RUNTIME_CATALOG_MACOS }}
         run: |
           ./build_macos.sh package --no-zip
           project_version="$(sed -nE \
-            's/^project\(ISPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
+            's/^project\(MVPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
             CMakeLists.txt)"
           source_image="dist/MVPImageViewer-${project_version}-macos-arm64.dmg"
           installer="dist/MVPImageViewer-${RELEASE_TAG}-${ASSET_SUFFIX}.dmg"
@@ -165,9 +165,9 @@ jobs:
           MSYS2_UCRT64: C:/msys64/ucrt64
         run: |
           cmake --preset windows-msys2-release \
-            -DISPVIEW_BUILD_BENCHMARKS=OFF \
-            -DISPVIEW_ENABLE_LCMS2=OFF \
-            -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
+            -DMVPVIEW_BUILD_BENCHMARKS=OFF \
+            -DMVPVIEW_ENABLE_LCMS2=OFF \
+            -DMVPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
           cmake --build --preset windows-msys2-release --parallel
 
       - name: Package (Windows)
@@ -175,7 +175,7 @@ jobs:
         shell: msys2 {0}
         env:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
-          ISPVIEW_RUNTIME_CATALOG: ${{ vars.ISPVIEW_RUNTIME_CATALOG_WINDOWS }}
+          MVPVIEW_RUNTIME_CATALOG: ${{ vars.MVPVIEW_RUNTIME_CATALOG_WINDOWS }}
         run: |
           set -euxo pipefail
 
@@ -196,7 +196,7 @@ jobs:
           package_directory='dist/MVPImageViewer'
           mkdir -p "$package_directory"
           cp "$executable" "$package_directory/MVPImageViewer.exe"
-          cp "$(dirname "$executable")/ispview_crash_handler.exe" "$package_directory/"
+          cp "$(dirname "$executable")/mvpview_crash_handler.exe" "$package_directory/"
           python scripts/archive_diagnostic_symbols.py --binary "$executable" --staged-binary "$package_directory/MVPImageViewer.exe" --output dist/symbols
           # MSYS2's windeployqt cannot launch its QML import scanner reliably.
           # Our QML module is compiled into the executable; deploy the required
@@ -263,12 +263,12 @@ jobs:
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
         run: |
           $match = Select-String -LiteralPath "CMakeLists.txt" `
-            -Pattern "project\(ISPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+)" | Select-Object -First 1
+            -Pattern "project\(MVPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+)" | Select-Object -First 1
           if ($null -eq $match) { throw "Could not read the project version" }
           $version = $match.Matches[0].Groups[1].Value
           $installer = Join-Path $PWD "dist\MVPImageViewer-$($env:RELEASE_TAG)-$($env:ASSET_SUFFIX)-setup.exe"
           $stageDir = Join-Path $PWD "dist\MVPImageViewer"
-          $icon = Join-Path $PWD "assets\icons\windows\ISPImageViewer.ico"
+          $icon = Join-Path $PWD "assets\icons\windows\MVPImageViewer.ico"
           & makensis.exe /V3 "/DSTAGE_DIR=$stageDir" "/DOUTPUT_FILE=$installer" `
             "/DAPP_VERSION=$version" "/DAPP_ICON=$icon" "packaging\windows\installer.nsi"
           if ($LASTEXITCODE -ne 0) { throw "NSIS failed with exit code $LASTEXITCODE" }

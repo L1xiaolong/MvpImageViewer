@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
-import "../Isp"
+import "../Mvp"
 
 Item {
     id: root
@@ -99,8 +99,8 @@ Item {
         anchors.fill: parent
         active: root.visible || root.designMode
         source: root.designMode
-                ? Qt.resolvedUrl("../Isp/DesignFullScreenCanvas.qml")
-                : Qt.resolvedUrl("../Isp/ProductionFullScreenCanvas.qml")
+                ? Qt.resolvedUrl("../Mvp/DesignFullScreenCanvas.qml")
+                : Qt.resolvedUrl("../Mvp/ProductionFullScreenCanvas.qml")
         onLoaded: if (item) {
             item.controller = root.controller
             item.settingsController = root.settingsController

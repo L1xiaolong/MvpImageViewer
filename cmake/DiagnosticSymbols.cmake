@@ -1,4 +1,4 @@
-function(ispview_diagnostic_symbols target)
+function(mvpview_diagnostic_symbols target)
     if(MSVC)
         target_compile_options(${target} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/Zi>)
         target_link_options(${target} PRIVATE /DEBUG)

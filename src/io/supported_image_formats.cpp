@@ -7,7 +7,7 @@
 
 #include <algorithm>
 
-namespace ispview {
+namespace mvpview {
 
 QStringList supportedImageSuffixes() {
     QStringList suffixes = QtImageDecoder::supportedSuffixes();
@@ -35,4 +35,4 @@ bool hasSupportedImageSuffix(const QString& path) {
     });
 }
 
-} // namespace ispview
+} // namespace mvpview

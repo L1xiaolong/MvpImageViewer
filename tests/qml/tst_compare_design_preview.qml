@@ -2,7 +2,7 @@ import QtQuick
 import QtCore
 import QtTest
 import "../../design"
-import "../../src/qml/Isp"
+import "../../src/qml/Mvp"
 
 TestCase {
     id: testCase
@@ -139,7 +139,7 @@ TestCase {
         }
         page.screenshotFinished.connect(recordResult)
         const destination = StandardPaths.writableLocation(StandardPaths.TempLocation)
-                + "/ispview_compare_screenshot_test.png"
+                + "/mvpview_compare_screenshot_test.png"
         page.captureScreenshot(destination)
         tryVerify(function() { return finished }, 3000)
         verify(succeeded)

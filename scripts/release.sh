@@ -82,7 +82,7 @@ fi
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
     tag_commit="$(git rev-list -n 1 "$tag")"
     project_version="$(sed -nE \
-        's/^project\(ISPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
+        's/^project\(MVPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
         CMakeLists.txt)"
     if [[ "$tag_commit" == "$(git rev-parse HEAD)" && \
           "$project_version" == "$version" && \
@@ -97,7 +97,7 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
 fi
 
 current_version="$(sed -nE \
-    's/^project\(ISPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
+    's/^project\(MVPImageViewer VERSION ([0-9]+\.[0-9]+\.[0-9]+) LANGUAGES CXX\)$/\1/p' \
     CMakeLists.txt)"
 if [[ -z "$current_version" ]]; then
     echo "Could not read the project version from CMakeLists.txt." >&2
@@ -108,11 +108,11 @@ if [[ "$current_version" == "$version" ]]; then
     exit 2
 fi
 
-ISPVIEW_RELEASE_VERSION="$version" perl -0pi -e \
-    's/(project\(ISPImageViewer VERSION )[^ ]+( LANGUAGES CXX\))/$1$ENV{ISPVIEW_RELEASE_VERSION}$2/' \
+MVPVIEW_RELEASE_VERSION="$version" perl -0pi -e \
+    's/(project\(MVPImageViewer VERSION )[^ ]+( LANGUAGES CXX\))/$1$ENV{MVPVIEW_RELEASE_VERSION}$2/' \
     CMakeLists.txt
 
-if ! grep -Fq "project(ISPImageViewer VERSION $version LANGUAGES CXX)" CMakeLists.txt; then
+if ! grep -Fq "project(MVPImageViewer VERSION $version LANGUAGES CXX)" CMakeLists.txt; then
     echo "Could not update the project version in CMakeLists.txt." >&2
     exit 1
 fi

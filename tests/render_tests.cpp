@@ -4,7 +4,7 @@
 
 #include <QTest>
 
-namespace ispview {
+namespace mvpview {
 
 class RenderTests final : public QObject {
     Q_OBJECT
@@ -130,7 +130,7 @@ void RenderTests::bayerUniformsDescribePackingAndDisplayTransform() {
     QCOMPARE(values[26], 9.0F);
 }
 
-} // namespace ispview
+} // namespace mvpview
 
-QTEST_GUILESS_MAIN(ispview::RenderTests)
+QTEST_GUILESS_MAIN(mvpview::RenderTests)
 #include "render_tests.moc"

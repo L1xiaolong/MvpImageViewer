@@ -12,7 +12,7 @@
 
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 int priorityFor(const RequestOptions& options) {
@@ -144,7 +144,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                                                       ? request.rawParameters->validBits()
                                                       : cachedImage
                                                             .text(QStringLiteral(
-                                                                "ispview.validBits"))
+                                                                "mvpview.validBits"))
                                                             .toInt();
                     if (frame->descriptor.validBits <= 0) {
                         frame->descriptor.validBits = 8;
@@ -153,8 +153,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                         frame->metadata.sourceSize = request.rawParameters->size;
                     } else {
                         const QSize cachedSourceSize(
-                            cachedImage.text(QStringLiteral("ispview.sourceWidth")).toInt(),
-                            cachedImage.text(QStringLiteral("ispview.sourceHeight")).toInt());
+                            cachedImage.text(QStringLiteral("mvpview.sourceWidth")).toInt(),
+                            cachedImage.text(QStringLiteral("mvpview.sourceHeight")).toInt());
                         if (cachedSourceSize.isValid()) {
                             frame->metadata.sourceSize = cachedSourceSize;
                         }
@@ -427,4 +427,4 @@ QString ImageLoader::cacheKey(const DecodeRequest& request, const QString& decod
         .arg(decoderIdentity);
 }
 
-} // namespace ispview
+} // namespace mvpview

@@ -8,7 +8,7 @@
 
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 
 enum class BayerSampleChannel { Red, GreenRedRow, GreenBlueRow, Blue };
 
@@ -69,4 +69,4 @@ class RawPlaneAccessor final {
     bool valid_ = false;
 };
 
-} // namespace ispview
+} // namespace mvpview

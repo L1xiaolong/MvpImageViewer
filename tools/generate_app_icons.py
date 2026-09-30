@@ -116,7 +116,7 @@ def generate_macos_icns(source: Path, output_root: Path) -> None:
         )
         canvas.alpha_composite(logo, logo_position)
         canvas.save(
-            macos_dir / "ISPImageViewer.icns",
+            macos_dir / "MVPImageViewer.icns",
             format="ICNS",
             sizes=[(size, size) for size in MACOS_ICNS_SIZES],
         )
@@ -143,7 +143,7 @@ def generate_windows_ico(source: Path, output_root: Path) -> None:
     image = Image.open(source).convert("RGBA")
     images = [image.resize((size, size), Image.Resampling.LANCZOS) for size in WINDOWS_ICO_SIZES]
     images[-1].save(
-        windows_dir / "ISPImageViewer.ico",
+        windows_dir / "MVPImageViewer.ico",
         format="ICO",
         sizes=[(size, size) for size in WINDOWS_ICO_SIZES],
         append_images=images[:-1],

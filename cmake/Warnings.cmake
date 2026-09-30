@@ -1,4 +1,4 @@
-function(ispview_enable_warnings target)
+function(mvpview_enable_warnings target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive- /Zc:__cplusplus)
     else()

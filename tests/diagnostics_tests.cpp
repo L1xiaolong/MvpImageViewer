@@ -15,7 +15,7 @@
 #include <thread>
 #include <vector>
 #include <miniz.h>
-using namespace ispview::diagnostics;
+using namespace mvpview::diagnostics;
 namespace {
 QByteArray logs(const QString& root) {
     QByteArray result; QDirIterator it(root, {"*.jsonl"}, QDir::Files, QDirIterator::Subdirectories);
@@ -28,9 +28,9 @@ QStringList dumps(const QString& root) {
 }
 QString fixture() {
 #ifdef Q_OS_WIN
-    return QCoreApplication::applicationDirPath() + "/ispview_diagnostics_crash_fixture.exe";
+    return QCoreApplication::applicationDirPath() + "/mvpview_diagnostics_crash_fixture.exe";
 #else
-    return QCoreApplication::applicationDirPath() + "/ispview_diagnostics_crash_fixture";
+    return QCoreApplication::applicationDirPath() + "/mvpview_diagnostics_crash_fixture";
 #endif
 }
 }
@@ -86,7 +86,7 @@ private slots:
     void zipExportAndCancellation() {
         QTemporaryDir root, output; Service service({root.path(), true, false});
         service.record(Level::Info, "test", "exported", {{"path", "/Users/private/image.png"}});
-        ispview::DiagnosticsController controller(service);
+        mvpview::DiagnosticsController controller(service);
         const auto path = output.filePath(QStringLiteral("诊断.zip"));
         controller.exportLogs(QUrl::fromLocalFile(path), 7, false);
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 15000);
@@ -114,7 +114,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 15000); QVERIFY(!QFileInfo::exists(cancelled));
     }
     void exportPopulatedStore() {
-        const QString source = qEnvironmentVariable("ISPVIEW_TEST_EXISTING_DIAGNOSTICS");
+        const QString source = qEnvironmentVariable("MVPVIEW_TEST_EXISTING_DIAGNOSTICS");
         QTemporaryDir root, output;
         if (!source.isEmpty()) {
             QDirIterator it(source, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
@@ -148,7 +148,7 @@ private slots:
             }
         }
         Service service({root.path(), true, false});
-        ispview::DiagnosticsController controller(service);
+        mvpview::DiagnosticsController controller(service);
         const QString archive = output.filePath(QStringLiteral("existing-store.zip"));
         controller.exportLogs(QUrl::fromLocalFile(archive), 0, false);
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 30000);
@@ -242,7 +242,7 @@ private slots:
     }
     void controllerRejectsUnsafeExportTargets() {
         QTemporaryDir root, outside; Service service({root.path(), true, false});
-        ispview::DiagnosticsController controller(service);
+        mvpview::DiagnosticsController controller(service);
         // A destination inside the store would make the export part of the next export.
         const QString inside = service.sessionDirectory() + QStringLiteral("/nested.zip");
         controller.exportLogs(QUrl::fromLocalFile(inside), 7, false);
@@ -260,7 +260,7 @@ private slots:
     void controllerScansOffTheCallingThread() {
         QTemporaryDir root; Service service({root.path(), true, false});
         service.record(Level::Info, "test", "scan"); QVERIFY(service.flush());
-        ispview::DiagnosticsController controller(service);
+        mvpview::DiagnosticsController controller(service);
         // The constructor must not walk the store: the summary arrives from the scan worker.
         QCOMPARE(controller.diskUsage(), qint64(0));
         QTRY_VERIFY_WITH_TIMEOUT(controller.diskUsage() > 0, 5000);
@@ -285,7 +285,7 @@ private slots:
         }
     }
     void crashCapture() {
-#if defined(Q_OS_WIN) || (defined(Q_OS_MACOS) && ISPVIEW_HAS_CRASHPAD)
+#if defined(Q_OS_WIN) || (defined(Q_OS_MACOS) && MVPVIEW_HAS_CRASHPAD)
         QFETCH(QString, mode); QFETCH(bool, worker); QTemporaryDir root;
         QProcess child; QStringList args{root.path(), mode, "on"}; if (worker) args << "worker";
         child.start(fixture(), args); QVERIFY(child.waitForStarted()); QVERIFY(child.waitForFinished(20000));

@@ -30,7 +30,7 @@ Options:
   -h,--help    Show this help.
 
 Environment:
-  ISPVIEW_GITHUB_REPOSITORY  GitHub owner/repository embedded in update links.
+  MVPVIEW_GITHUB_REPOSITORY  GitHub owner/repository embedded in update links.
 
 Outputs:
   dev/debug  build/macos-preset-debug/src/qml/MVPImageViewer.app
@@ -47,8 +47,8 @@ run_rhi=0
 clean=0
 create_zip=1
 enable_crashpad="OFF"
-sign_identity="${ISPVIEW_CODESIGN_IDENTITY:--}"
-qt_prefix="${ISPVIEW_QT_PREFIX:-}"
+sign_identity="${MVPVIEW_CODESIGN_IDENTITY:--}"
+qt_prefix="${MVPVIEW_QT_PREFIX:-}"
 jobs="$(sysctl -n hw.ncpu 2>/dev/null || echo 6)"
 
 if [[ $# -gt 0 ]]; then
@@ -175,9 +175,9 @@ if [[ -n "$qt_prefix" ]]; then
         -DCMAKE_BUILD_TYPE="$build_type" \
         -DCMAKE_OSX_ARCHITECTURES=arm64 \
         -DBUILD_TESTING="$build_testing" \
-        -DISPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
-        -DISPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
-        -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}" \
+        -DMVPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
+        -DMVPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
+        -DMVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY:-}" \
         -DCMAKE_PREFIX_PATH="$qt_prefix;$brew_prefix" \
         -DQt6_DIR="$qt_prefix/lib/cmake/Qt6"
     echo "Building custom Qt configuration (-j $jobs)"
@@ -185,10 +185,10 @@ if [[ -n "$qt_prefix" ]]; then
 else
     echo "Configuring preset: $preset"
     cmake --preset "$preset" \
-        -DISPVIEW_BUILD_BENCHMARKS=OFF \
+        -DMVPVIEW_BUILD_BENCHMARKS=OFF \
         -DCMAKE_PREFIX_PATH="$brew_prefix" \
-        -DISPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
-        -DISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY:-}"
+        -DMVPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
+        -DMVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY:-}"
     echo "Building preset: $preset (-j $jobs)"
     cmake --build --preset "$preset" -j "$jobs"
 fi
@@ -231,7 +231,7 @@ for tool_name in macdeployqt qtpaths otool install_name_tool codesign ditto file
     }
 done
 
-stage_dir="$(mktemp -d /tmp/ispview-package.XXXXXX)"
+stage_dir="$(mktemp -d /tmp/mvpview-package.XXXXXX)"
 trap 'rm -rf "$stage_dir"' EXIT
 staged_app="$stage_dir/MVPImageViewer.app"
 ditto "$built_app" "$staged_app"
@@ -242,16 +242,16 @@ if [[ -d "$staged_app/Contents/MacOS/MVPImageViewer.dSYM" ]]; then
     rm -rf "$staged_app/Contents/MacOS/MVPImageViewer.dSYM"
 fi
 
-crashpad_enabled="$(sed -n 's/^ISPVIEW_ENABLE_CRASHPAD:BOOL=//p' "$build_dir/CMakeCache.txt")"
+crashpad_enabled="$(sed -n 's/^MVPVIEW_ENABLE_CRASHPAD:BOOL=//p' "$build_dir/CMakeCache.txt")"
 if [[ "$crashpad_enabled" == "ON" && ! -x "$staged_app/Contents/Helpers/crashpad_handler" ]]; then
     echo "Crashpad is enabled, but its packaged helper is missing or not executable." >&2
     exit 1
 fi
 
-crashpad_root="$(sed -n 's/^ISPVIEW_CRASHPAD_ROOT:PATH=//p' "$build_dir/CMakeCache.txt")"
+crashpad_root="$(sed -n 's/^MVPVIEW_CRASHPAD_ROOT:PATH=//p' "$build_dir/CMakeCache.txt")"
 cmake "-DNOTICE_DESTINATION=$staged_app/Contents/Resources" \
-    "-DISPVIEW_CRASHPAD_ROOT=$crashpad_root" \
-    "-DISPVIEW_INCLUDE_CRASHPAD_LICENSES=$crashpad_enabled" \
+    "-DMVPVIEW_CRASHPAD_ROOT=$crashpad_root" \
+    "-DMVPVIEW_INCLUDE_CRASHPAD_LICENSES=$crashpad_enabled" \
     -P "$script_dir/scripts/package_licenses.cmake"
 
 echo "Deploying Qt and QML dependencies"
@@ -472,7 +472,7 @@ if ! python3 "$script_dir/scripts/collect_runtime_licenses.py" "$staged_app" \
         fi
     done
     echo "Warning: runtime license audit is incomplete; packaging will continue." >&2
-    echo "Inspect $audit_dir and set ISPVIEW_RUNTIME_CATALOG to resolve the findings." >&2
+    echo "Inspect $audit_dir and set MVPVIEW_RUNTIME_CATALOG to resolve the findings." >&2
 fi
 
 chmod -R u+w "$staged_app"

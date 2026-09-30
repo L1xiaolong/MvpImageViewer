@@ -5,7 +5,7 @@
 #include <QMimeData>
 #include <QUrl>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 void appendLocalUrl(const QUrl& url, QStringList* paths) {
@@ -67,4 +67,4 @@ QStringList localFileDropPaths(const QMimeData* mimeData) {
     return paths;
 }
 
-} // namespace ispview
+} // namespace mvpview

@@ -10,7 +10,7 @@ QT_BEGIN_NAMESPACE
 class QTimer;
 QT_END_NAMESPACE
 
-namespace ispview {
+namespace mvpview {
 
 class ImageLoader;
 
@@ -69,4 +69,4 @@ class RawParametersController final : public QObject {
     QString selectedPreset_;
 };
 
-} // namespace ispview
+} // namespace mvpview

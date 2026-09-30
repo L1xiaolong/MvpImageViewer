@@ -1,7 +1,7 @@
-set_source_files_properties(Isp/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(Mvp/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_policy(SET QTP0004 NEW)
 
-qt_add_executable(ISPImageViewerQml
+qt_add_executable(MVPImageViewerQml
     main.cpp
     app_settings.h
     app_settings.cpp
@@ -23,50 +23,50 @@ qt_add_executable(ISPImageViewerQml
     raw_parameters_controller.cpp
 )
 
-qt_add_qml_module(ISPImageViewerQml
-    URI ISPViewQml
+qt_add_qml_module(MVPImageViewerQml
+    URI MvpViewQml
     VERSION 1.0
     QML_FILES
         Main.qml
-        Isp/Theme.qml
-        Isp/SettingsCard.qml
-        Isp/DiagnosticsPage.qml
-        Isp/AppIconButton.qml
-        Isp/AppTextInputDialog.qml
-        Isp/AppConfirmDialog.qml
-        Isp/AppMenu.qml
-        Isp/AppMenuItem.qml
-        Isp/AppMenuSeparator.qml
-        Isp/BrowserPane.qml
-        Isp/CompareLumaHistogram.qml
-        Isp/DesignCompareCanvas.qml
-        Isp/DesignFullScreenCanvas.qml
-        Isp/FolderNavigator.qml
-        Isp/ImagePropertiesDialog.qml
-        Isp/ImageResizeDialog.qml
-        Isp/PropertiesHistogram.qml
-        Isp/PropertyFieldList.qml
-        Isp/RawNumberField.qml
-        Isp/RawParameterComboBox.qml
-        Isp/RawParametersDialog.qml
-        Isp/ProductionCompareCanvas.qml
-        Isp/ProductionFullScreenCanvas.qml
-        Isp/TopToolbar.ui.qml
-        Isp/ThumbnailTile.qml
+        Mvp/Theme.qml
+        Mvp/SettingsCard.qml
+        Mvp/DiagnosticsPage.qml
+        Mvp/AppIconButton.qml
+        Mvp/AppTextInputDialog.qml
+        Mvp/AppConfirmDialog.qml
+        Mvp/AppMenu.qml
+        Mvp/AppMenuItem.qml
+        Mvp/AppMenuSeparator.qml
+        Mvp/BrowserPane.qml
+        Mvp/CompareLumaHistogram.qml
+        Mvp/DesignCompareCanvas.qml
+        Mvp/DesignFullScreenCanvas.qml
+        Mvp/FolderNavigator.qml
+        Mvp/ImagePropertiesDialog.qml
+        Mvp/ImageResizeDialog.qml
+        Mvp/PropertiesHistogram.qml
+        Mvp/PropertyFieldList.qml
+        Mvp/RawNumberField.qml
+        Mvp/RawParameterComboBox.qml
+        Mvp/RawParametersDialog.qml
+        Mvp/ProductionCompareCanvas.qml
+        Mvp/ProductionFullScreenCanvas.qml
+        Mvp/TopToolbar.ui.qml
+        Mvp/ThumbnailTile.qml
         Pages/BrowsePage.qml
         Pages/ComparePage.qml
         Pages/FullScreenPage.qml
 )
 
-qt_add_translations(ISPImageViewerQml
+qt_add_translations(MVPImageViewerQml
     IMMEDIATE_CALL
-    SOURCE_TARGETS ISPImageViewerQml ispview_diagnostics
+    SOURCE_TARGETS MVPImageViewerQml mvpview_diagnostics
     TS_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/i18n/ispimageviewer_zh_CN.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/i18n/mvpimageviewer_zh_CN.ts"
     RESOURCE_PREFIX "/i18n"
 )
 
-set(_ispview_qml_icons
+set(_mvpview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/back.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/forward.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/up.svg
@@ -104,42 +104,42 @@ set(_ispview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/image-resize.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/settings.svg
 )
-qt_add_resources(ISPImageViewerQml "ispview_qml_icons"
+qt_add_resources(MVPImageViewerQml "mvpview_qml_icons"
     PREFIX "/icons/ui"
     BASE "${PROJECT_SOURCE_DIR}/assets/icons/ui"
-    FILES ${_ispview_qml_icons}
+    FILES ${_mvpview_qml_icons}
 )
 
-set(_ispview_qml_dark_icons)
-foreach(_icon IN LISTS _ispview_qml_icons)
+set(_mvpview_qml_dark_icons)
+foreach(_icon IN LISTS _mvpview_qml_icons)
     get_filename_component(_icon_name "${_icon}" NAME)
-    list(APPEND _ispview_qml_dark_icons
+    list(APPEND _mvpview_qml_dark_icons
         "${PROJECT_SOURCE_DIR}/assets/icons/ui-dark/${_icon_name}")
 endforeach()
-qt_add_resources(ISPImageViewerQml "ispview_qml_dark_icons"
+qt_add_resources(MVPImageViewerQml "mvpview_qml_dark_icons"
     PREFIX "/icons/ui-dark"
     BASE "${PROJECT_SOURCE_DIR}/assets/icons/ui-dark"
-    FILES ${_ispview_qml_dark_icons}
+    FILES ${_mvpview_qml_dark_icons}
 )
 
-set(_ispview_brand_assets
+set(_mvpview_brand_assets
     ${PROJECT_SOURCE_DIR}/assets/brand/app_icon.png
 )
-qt_add_resources(ISPImageViewerQml "ispview_brand_assets"
+qt_add_resources(MVPImageViewerQml "mvpview_brand_assets"
     PREFIX "/brand"
     BASE "${PROJECT_SOURCE_DIR}/assets/brand"
-    FILES ${_ispview_brand_assets}
+    FILES ${_mvpview_brand_assets}
 )
 
-target_include_directories(ISPImageViewerQml PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_compile_definitions(ISPImageViewerQml PRIVATE
-    ISPVIEW_PROJECT_VERSION="${PROJECT_VERSION}"
-    ISPVIEW_GITHUB_REPOSITORY="${ISPVIEW_GITHUB_REPOSITORY}"
+target_include_directories(MVPImageViewerQml PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_compile_definitions(MVPImageViewerQml PRIVATE
+    MVPVIEW_PROJECT_VERSION="${PROJECT_VERSION}"
+    MVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY}"
 )
-target_link_libraries(ISPImageViewerQml PRIVATE
-    ispview_browser_backend
-    ispview_render_backend
-    ispview_io
+target_link_libraries(MVPImageViewerQml PRIVATE
+    mvpview_browser_backend
+    mvpview_render_backend
+    mvpview_io
     # QmlImageCanvas implements the QQuickRhiItem renderer directly and uses
     # QRhi resource types.  Do not rely on another Qt target to leak the
     # versioned private QtGui include directory: framework builds on macOS may
@@ -152,35 +152,35 @@ target_link_libraries(ISPImageViewerQml PRIVATE
     Qt6::QuickTemplates2
     Qt6::Svg
 )
-ispview_enable_warnings(ISPImageViewerQml)
+mvpview_enable_warnings(MVPImageViewerQml)
 
 # The QML executable is the sole production application artifact.
-set_target_properties(ISPImageViewerQml PROPERTIES
+set_target_properties(MVPImageViewerQml PROPERTIES
     WIN32_EXECUTABLE ON
     MACOSX_BUNDLE ON
     OUTPUT_NAME "MVPImageViewer"
     MACOSX_BUNDLE_BUNDLE_NAME "MVP Image Viewer"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.ispview.viewer"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.mvpview.viewer"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
 )
 
-set(_ispview_qml_macos_icon "${PROJECT_SOURCE_DIR}/assets/icons/macos/ISPImageViewer.icns")
-if(APPLE AND EXISTS "${_ispview_qml_macos_icon}")
-    set_source_files_properties("${_ispview_qml_macos_icon}" PROPERTIES
+set(_mvpview_qml_macos_icon "${PROJECT_SOURCE_DIR}/assets/icons/macos/MVPImageViewer.icns")
+if(APPLE AND EXISTS "${_mvpview_qml_macos_icon}")
+    set_source_files_properties("${_mvpview_qml_macos_icon}" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources")
-    target_sources(ISPImageViewerQml PRIVATE "${_ispview_qml_macos_icon}")
-    set_target_properties(ISPImageViewerQml PROPERTIES
-        MACOSX_BUNDLE_ICON_FILE "ISPImageViewer.icns")
+    target_sources(MVPImageViewerQml PRIVATE "${_mvpview_qml_macos_icon}")
+    set_target_properties(MVPImageViewerQml PROPERTIES
+        MACOSX_BUNDLE_ICON_FILE "MVPImageViewer.icns")
 endif()
 
 # The QML application is the Windows production executable as well, so embed the
 # same application icon used by the macOS bundle.
-set(_ispview_qml_windows_icon "${PROJECT_SOURCE_DIR}/assets/icons/windows/ISPImageViewer.ico")
-if(WIN32 AND EXISTS "${_ispview_qml_windows_icon}")
-    set(_ispview_qml_windows_icon_rc "${CMAKE_CURRENT_BINARY_DIR}/ISPImageViewerQmlIcon.rc")
-    string(CONCAT _ispview_qml_windows_icon_rc_content
-        "IDI_ICON1 ICON \"${_ispview_qml_windows_icon}\"\n"
+set(_mvpview_qml_windows_icon "${PROJECT_SOURCE_DIR}/assets/icons/windows/MVPImageViewer.ico")
+if(WIN32 AND EXISTS "${_mvpview_qml_windows_icon}")
+    set(_mvpview_qml_windows_icon_rc "${CMAKE_CURRENT_BINARY_DIR}/MVPImageViewerQmlIcon.rc")
+    string(CONCAT _mvpview_qml_windows_icon_rc_content
+        "IDI_ICON1 ICON \"${_mvpview_qml_windows_icon}\"\n"
         "1 VERSIONINFO\n"
         "FILEVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0\n"
         "PRODUCTVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0\n"
@@ -205,32 +205,32 @@ if(WIN32 AND EXISTS "${_ispview_qml_windows_icon}")
         "    VALUE \"Translation\", 0x0409, 1200\n"
         "  END\n"
         "END\n")
-    file(GENERATE OUTPUT "${_ispview_qml_windows_icon_rc}"
-        CONTENT "${_ispview_qml_windows_icon_rc_content}")
-    add_library(ISPImageViewerQml_windows_icon OBJECT "${_ispview_qml_windows_icon_rc}")
-    target_sources(ISPImageViewerQml PRIVATE
-        $<TARGET_OBJECTS:ISPImageViewerQml_windows_icon>
+    file(GENERATE OUTPUT "${_mvpview_qml_windows_icon_rc}"
+        CONTENT "${_mvpview_qml_windows_icon_rc_content}")
+    add_library(MVPImageViewerQml_windows_icon OBJECT "${_mvpview_qml_windows_icon_rc}")
+    target_sources(MVPImageViewerQml PRIVATE
+        $<TARGET_OBJECTS:MVPImageViewerQml_windows_icon>
     )
 endif()
 
-unset(_ispview_qml_icons)
-unset(_ispview_brand_assets)
-unset(_ispview_qml_macos_icon)
-unset(_ispview_qml_windows_icon)
-unset(_ispview_qml_windows_icon_rc)
-unset(_ispview_qml_windows_icon_rc_content)
+unset(_mvpview_qml_icons)
+unset(_mvpview_brand_assets)
+unset(_mvpview_qml_macos_icon)
+unset(_mvpview_qml_windows_icon)
+unset(_mvpview_qml_windows_icon_rc)
+unset(_mvpview_qml_windows_icon_rc_content)
 
 if(WIN32)
-    add_dependencies(ISPImageViewerQml ispview_crash_handler)
-    add_custom_command(TARGET ISPImageViewerQml POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ispview_crash_handler>
-            $<TARGET_FILE_DIR:ISPImageViewerQml>)
+    add_dependencies(MVPImageViewerQml mvpview_crash_handler)
+    add_custom_command(TARGET MVPImageViewerQml POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:mvpview_crash_handler>
+            $<TARGET_FILE_DIR:MVPImageViewerQml>)
 endif()
-if(APPLE AND ISPVIEW_HAS_CRASHPAD)
-    add_custom_command(TARGET ISPImageViewerQml POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:ISPImageViewerQml>/../Helpers"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ISPVIEW_CRASHPAD_HANDLER}"
-            "$<TARGET_FILE_DIR:ISPImageViewerQml>/../Helpers/crashpad_handler")
+if(APPLE AND MVPVIEW_HAS_CRASHPAD)
+    add_custom_command(TARGET MVPImageViewerQml POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:MVPImageViewerQml>/../Helpers"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MVPVIEW_CRASHPAD_HANDLER}"
+            "$<TARGET_FILE_DIR:MVPImageViewerQml>/../Helpers/crashpad_handler")
 endif()
 include(${PROJECT_SOURCE_DIR}/cmake/DiagnosticSymbols.cmake)
-ispview_diagnostic_symbols(ISPImageViewerQml)
+mvpview_diagnostic_symbols(MVPImageViewerQml)

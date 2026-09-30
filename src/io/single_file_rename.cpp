@@ -8,7 +8,7 @@
 #include <QFileInfo>
 #include <QRegularExpression>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QString portableFileNameError(const QString& fileName) {
@@ -111,4 +111,4 @@ bool SingleFileRename::execute(const QString& sourcePath, const QString& destina
     return true;
 }
 
-} // namespace ispview
+} // namespace mvpview

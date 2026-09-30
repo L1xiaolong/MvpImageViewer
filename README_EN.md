@@ -219,7 +219,7 @@ LibRaw and Exiv2 are required; CMake configuration fails if either is missing. L
 
 ```sh
 cmake --preset macos-debug \
-  -DISPVIEW_ENABLE_LCMS2=OFF
+  -DMVPVIEW_ENABLE_LCMS2=OFF
 ```
 
 The vcpkg manifest installs LibRaw and Exiv2 by default. Its optional feature is:
@@ -242,10 +242,10 @@ Release presets can build RAW decoding, histogram, color-management, and large-d
 
 ```sh
 cmake --build --preset macos-release
-./build/macos-preset-release/tools/ispview_raw_benchmark --48mp
-./build/macos-preset-release/tools/ispview_histogram_benchmark --48mp
-./build/macos-preset-release/tools/ispview_color_benchmark --48mp
-./build/macos-preset-release/tools/ispview_browser_benchmark --enforce
+./build/macos-preset-release/tools/mvpview_raw_benchmark --48mp
+./build/macos-preset-release/tools/mvpview_histogram_benchmark --48mp
+./build/macos-preset-release/tools/mvpview_color_benchmark --48mp
+./build/macos-preset-release/tools/mvpview_browser_benchmark --enforce
 ```
 
 Real-world image fixtures should remain local. Do not commit media containing personal information, precise locations, or unclear ownership.
@@ -277,4 +277,4 @@ Packaging also requires Python 3.9+ and inventories deployed runtime files, coll
 
 [Diagnostic settings, export, symbols and validation](docs/diagnostics.md)
 
-macOS builds can pass `-DISPVIEW_ENABLE_CRASHPAD=OFF` to skip Crashpad; the settings page then reports crash capture as unavailable while logging, cleanup and export keep working.
+macOS builds can pass `-DMVPVIEW_ENABLE_CRASHPAD=OFF` to skip Crashpad; the settings page then reports crash capture as unavailable while logging, cleanup and export keep working.

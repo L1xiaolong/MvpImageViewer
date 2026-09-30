@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QVariantMap field(const QString& label, const QString& value) {
@@ -461,4 +461,4 @@ void ImagePropertiesController::resetHistograms() {
     emit histogramRevisionChanged();
 }
 
-} // namespace ispview
+} // namespace mvpview

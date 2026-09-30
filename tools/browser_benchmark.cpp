@@ -23,7 +23,7 @@
 #include <sys/resource.h>
 #endif
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 bool writeBytes(const QString& path, const QByteArray& bytes) {
@@ -42,7 +42,7 @@ QByteArray jpegFixture() {
 }
 
 } // namespace
-} // namespace ispview
+} // namespace mvpview
 
 int main(int argc, char* argv[]) {
     QCoreApplication application(argc, argv);
@@ -55,9 +55,9 @@ int main(int argc, char* argv[]) {
 
     QTemporaryDir directory;
     if (!directory.isValid()) return 2;
-    const QByteArray jpeg = ispview::jpegFixture();
+    const QByteArray jpeg = mvpview::jpegFixture();
     for (int index = 0; index < imageCount; ++index) {
-        if (!ispview::writeBytes(
+        if (!mvpview::writeBytes(
                 directory.filePath(QStringLiteral("image-%1.jpg").arg(index, 5, 10, QLatin1Char('0'))),
                 jpeg)) return 3;
     }
@@ -68,13 +68,13 @@ int main(int argc, char* argv[]) {
         }
     }
     for (int index = 0; index < hiddenImages; ++index) {
-        if (!ispview::writeBytes(directory.filePath(QStringLiteral(".hidden-%1.jpg").arg(index)),
+        if (!mvpview::writeBytes(directory.filePath(QStringLiteral(".hidden-%1.jpg").arg(index)),
                                  jpeg)) return 5;
     }
     for (int index = 0; index < hiddenDirectories; ++index) {
         const QString hidden = directory.filePath(QStringLiteral(".hidden-album-%1").arg(index));
         if (!QDir().mkpath(hidden) ||
-            !ispview::writeBytes(QDir(hidden).filePath(QStringLiteral("inside.jpg")), jpeg)) {
+            !mvpview::writeBytes(QDir(hidden).filePath(QStringLiteral("inside.jpg")), jpeg)) {
             return 6;
         }
     }
@@ -82,17 +82,17 @@ int main(int argc, char* argv[]) {
     QElapsedTimer scanTimer;
     scanTimer.start();
     double firstBatchMilliseconds = -1.0;
-    QVector<ispview::ImageFileRecord> records;
-    ispview::DirectoryScanner scanner;
+    QVector<mvpview::ImageFileRecord> records;
+    mvpview::DirectoryScanner scanner;
     QEventLoop scanLoop;
-    QObject::connect(&scanner, &ispview::DirectoryScanner::scanBatchReady, &scanLoop,
-                     [&](const QString&, const QVector<ispview::ImageFileRecord>&, quint64) {
+    QObject::connect(&scanner, &mvpview::DirectoryScanner::scanBatchReady, &scanLoop,
+                     [&](const QString&, const QVector<mvpview::ImageFileRecord>&, quint64) {
                          if (firstBatchMilliseconds < 0.0) {
                              firstBatchMilliseconds = scanTimer.nsecsElapsed() / 1'000'000.0;
                          }
                      });
-    QObject::connect(&scanner, &ispview::DirectoryScanner::scanFinished, &scanLoop,
-                     [&](const QString&, const QVector<ispview::ImageFileRecord>& files, quint64) {
+    QObject::connect(&scanner, &mvpview::DirectoryScanner::scanFinished, &scanLoop,
+                     [&](const QString&, const QVector<mvpview::ImageFileRecord>& files, quint64) {
                          records = files;
                          scanLoop.quit();
                      });
@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
         if (record.fileName.startsWith(QLatin1Char('.'))) return 8;
     }
 
-    ispview::ImageLoader loader(ispview::createDefaultImageDecoder());
+    mvpview::ImageLoader loader(mvpview::createDefaultImageDecoder());
     QElapsedTimer thumbnailsTimer;
     thumbnailsTimer.start();
     double firstThumbnailMilliseconds = -1.0;
@@ -117,8 +117,8 @@ int main(int argc, char* argv[]) {
         if (record.isDirectory) continue;
         loader.request(
             static_cast<quint64>(submitted + 1),
-            {record.path, ispview::DecodePurpose::Thumbnail, QSize(256, 256)},
-            [&](quint64, const ispview::DecodeResult& result) {
+            {record.path, mvpview::DecodePurpose::Thumbnail, QSize(256, 256)},
+            [&](quint64, const mvpview::DecodeResult& result) {
                 if (!result.succeeded()) {
                     loop.exit(9);
                     return;
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
                 }
                 if (++completed == requestedThumbnails) loop.quit();
             },
-            ispview::RequestOptions{ispview::LoadCategory::VisibleThumbnail, 0,
+            mvpview::RequestOptions{mvpview::LoadCategory::VisibleThumbnail, 0,
                                     QStringLiteral("browser-benchmark")});
         if (++submitted >= requestedThumbnails) break;
     }

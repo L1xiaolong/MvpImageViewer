@@ -9,7 +9,7 @@
 
 #include <algorithm>
 
-namespace ispview {
+namespace mvpview {
 
 ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
     : rootDirectory_(std::move(rootDirectory)) {
@@ -38,13 +38,13 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     const QMutexLocker lock(&ioMutex_);
     QImage storedImage = image;
     if (sourceSize.isValid()) {
-        storedImage.setText(QStringLiteral("ispview.sourceWidth"),
+        storedImage.setText(QStringLiteral("mvpview.sourceWidth"),
                             QString::number(sourceSize.width()));
-        storedImage.setText(QStringLiteral("ispview.sourceHeight"),
+        storedImage.setText(QStringLiteral("mvpview.sourceHeight"),
                             QString::number(sourceSize.height()));
     }
     if (validBits > 0) {
-        storedImage.setText(QStringLiteral("ispview.validBits"), QString::number(validBits));
+        storedImage.setText(QStringLiteral("mvpview.validBits"), QString::number(validBits));
     }
     bool hasTransparency = false;
     if (storedImage.hasAlphaChannel()) {
@@ -103,4 +103,4 @@ void ThumbnailDiskCache::trimIfNeeded() const {
     }
 }
 
-} // namespace ispview
+} // namespace mvpview

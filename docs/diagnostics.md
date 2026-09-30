@@ -8,7 +8,7 @@
 
 普通日志保留 7 天、最多 100 MiB，单文件最多 10 MiB；崩溃会话连同其关联资料保留 30 天、最多 10 份、200 MiB。容量限制是自动清理目标：新转储正在生成、多个实例正在运行时可能暂时超限。每分钟及启动时清理最旧的已结束会话，当前会话的普通日志也会轮转并限制容量。
 
-默认目录为 `QStandardPaths::AppLocalDataLocation/diagnostics`。Windows 通常位于 `%LOCALAPPDATA%/ISPView/MVP Image Viewer/diagnostics`，macOS 位于用户应用支持目录；以设置页显示的实际目录为准。
+默认目录为 `QStandardPaths::AppLocalDataLocation/diagnostics`。Windows 通常位于 `%LOCALAPPDATA%/MvpView/MVP Image Viewer/diagnostics`，macOS 位于用户应用支持目录；以设置页显示的实际目录为准。
 
 ## 文件与接口
 
@@ -31,7 +31,7 @@
 
 ### Windows x64
 
-正常构建会同时生成 `ispview_crash_handler.exe`，必须与主程序一起部署。它只继承所需 IPC 句柄，使用独立进程调用 `MiniDumpWriteDump`。主进程的异常回调仅保存预分配上下文并有限等待，处理未捕获异常、终止、abort 和 Qt fatal 路径。
+正常构建会同时生成 `mvpview_crash_handler.exe`，必须与主程序一起部署。它只继承所需 IPC 句柄，使用独立进程调用 `MiniDumpWriteDump`。主进程的异常回调仅保存预分配上下文并有限等待，处理未捕获异常、终止、abort 和 Qt fatal 路径。
 
 打包脚本自动在 `dist/symbols/` 保存未剥离二进制、DWARF 或 PDB 及 `symbols.json`，随后剥离暂存安装文件的 DWARF。清单保留原文件哈希、剥离后 PE 标识、架构、版本和提交信息。符号目录不加入用户诊断 ZIP。
 
@@ -44,7 +44,7 @@ python scripts/analyze_minidump.py crash.dmp --binary build/symbols/<matching-bu
 
 ### macOS arm64
 
-首次配置时调用 `scripts/build_crashpad_macos.sh`，需要网络、Xcode、Python、Git；脚本准备 depot_tools，并固定 Crashpad 与其 DEPS。客户端和 handler 使用分开的 GN 输出目录，避免把 handler 入口点混入客户端静态库。可通过 `ISPVIEW_CRASHPAD_ROOT` 指定已经准备好的、目录名为 `crashpad` 的源码目录。配置 `-DISPVIEW_ENABLE_CRASHPAD=OFF` 可跳过 Crashpad 构建：应用仍可正常运行，崩溃采集显示为不可用，日志、清理与导出功能不受影响。
+首次配置时调用 `scripts/build_crashpad_macos.sh`，需要网络、Xcode、Python、Git；脚本准备 depot_tools，并固定 Crashpad 与其 DEPS。客户端和 handler 使用分开的 GN 输出目录，避免把 handler 入口点混入客户端静态库。可通过 `MVPVIEW_CRASHPAD_ROOT` 指定已经准备好的、目录名为 `crashpad` 的源码目录。配置 `-DMVPVIEW_ENABLE_CRASHPAD=OFF` 可跳过 Crashpad 构建：应用仍可正常运行，崩溃采集显示为不可用，日志、清理与导出功能不受影响。
 
 应用包包含 `Contents/Helpers/crashpad_handler`。数据库明确关闭上传；打包时部署许可证，先签名辅助程序再签名外层应用。发布符号归档包含二进制 UUID 和 dSYM。使用配套 Crashpad/Breakpad 工具将匹配 dSYM 转换为符号文件，再用 `minidump_stackwalk` 展开堆栈；不要直接把 minidump 当作 macOS `.ips` 文件交给 `atos`。
 
@@ -55,8 +55,8 @@ CI 把 `dist/symbols/` 作为独立 artifact 保留 90 天。发布维护者应�
 ```powershell
 cmake --build build/windows-msys2-debug --parallel 6
 ctest --test-dir build/windows-msys2-debug --output-on-failure
-# Release 构建开启 ISPVIEW_BUILD_BENCHMARKS 后：
-build/windows-msys2-release/ispview_diagnostics_benchmark.exe build/diagnostics-benchmark.json
+# Release 构建开启 MVPVIEW_BUILD_BENCHMARKS 后：
+build/windows-msys2-release/mvpview_diagnostics_benchmark.exe build/diagnostics-benchmark.json
 ```
 
 诊断测试使用独立临时目录和子进程，验证等级、中文/路径过滤、并发过载、轮转、故障写入、独立开关、清理、多实例快照、ZIP 完整性与取消，以及主线程/工作线程的访问异常、未处理 C++ 异常、abort、qFatal。测试驱动逐项检查 QtTest 完整结束，不能只凭子进程退出码判断成功。QML 测试检查两个开关独立，以及默认不导出转储。

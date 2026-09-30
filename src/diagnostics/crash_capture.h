@@ -1,7 +1,7 @@
 #pragma once
 #include <QString>
 #include <memory>
-namespace ispview::diagnostics {
+namespace mvpview::diagnostics {
 void captureFatalMessage();
 class CrashCapture {
 public:

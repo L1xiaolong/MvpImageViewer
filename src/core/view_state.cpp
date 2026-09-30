@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 
 double ViewTransform::fitScale(const QSize& imageSize, const QSize& viewportSize) {
     if (imageSize.isEmpty() || viewportSize.isEmpty()) {
@@ -114,4 +114,4 @@ std::optional<QRectF> ViewTransform::clampedNormalizedRoi(QRectF roi) {
     return roi;
 }
 
-} // namespace ispview
+} // namespace mvpview

@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <atomic>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 std::atomic_bool autoOrientation{true};
 std::atomic_bool keepHighBitDepth{true};
@@ -201,4 +201,4 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
     return {std::move(frame), {}};
 }
 
-} // namespace ispview
+} // namespace mvpview

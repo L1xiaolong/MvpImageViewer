@@ -4,20 +4,20 @@
 #include <exception>
 #include <map>
 #include <csignal>
-#ifndef ISPVIEW_HAS_CRASHPAD
-#define ISPVIEW_HAS_CRASHPAD 0
+#ifndef MVPVIEW_HAS_CRASHPAD
+#define MVPVIEW_HAS_CRASHPAD 0
 #endif
 
 #ifdef Q_OS_WIN
 #include "diagnostics/crash_shared_win.h"
-#elif defined(Q_OS_MACOS) && ISPVIEW_HAS_CRASHPAD
+#elif defined(Q_OS_MACOS) && MVPVIEW_HAS_CRASHPAD
 #include <client/crashpad_client.h>
 #include <client/crash_report_database.h>
 #include <client/settings.h>
 #include <base/files/file_path.h>
 #include <mach-o/dyld.h>
 #endif
-namespace ispview::diagnostics {
+namespace mvpview::diagnostics {
 #ifdef Q_OS_WIN
 namespace {
 CrashShared* shared = nullptr;
@@ -61,7 +61,7 @@ struct CrashCapture::Impl {
         for (HANDLE h : {mapping, request, done, ready}) if (h) CloseHandle(h);
     }
 };
-#elif defined(Q_OS_MACOS) && ISPVIEW_HAS_CRASHPAD
+#elif defined(Q_OS_MACOS) && MVPVIEW_HAS_CRASHPAD
 struct CrashCapture::Impl { crashpad::CrashpadClient client; };
 #else
 struct CrashCapture::Impl {};
@@ -83,7 +83,7 @@ QString CrashCapture::start(const QString& directory, const QString& executableD
         wchar_t path[32768]{}; const DWORD count = GetModuleFileNameW(nullptr, path, 32768);
         bin = QFileInfo(QString::fromWCharArray(path, static_cast<int>(count))).absolutePath();
     }
-    const auto executable = QDir::toNativeSeparators(bin + QStringLiteral("/ispview_crash_handler.exe"));
+    const auto executable = QDir::toNativeSeparators(bin + QStringLiteral("/mvpview_crash_handler.exe"));
     SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
     d.mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, &sa, PAGE_READWRITE, 0, sizeof(CrashShared), nullptr);
     d.request = CreateEventW(&sa, FALSE, FALSE, nullptr);
@@ -123,7 +123,7 @@ QString CrashCapture::start(const QString& directory, const QString& executableD
     d.abortHandler = std::signal(SIGABRT, fatalSignal);
     d.installed = true;
     return {};
-#elif defined(Q_OS_MACOS) && ISPVIEW_HAS_CRASHPAD
+#elif defined(Q_OS_MACOS) && MVPVIEW_HAS_CRASHPAD
     QString bin = executableDirectory;
     if (bin.isEmpty()) {
         uint32_t size = 0; _NSGetExecutablePath(nullptr, &size);
@@ -136,7 +136,7 @@ QString CrashCapture::start(const QString& directory, const QString& executableD
     if (!db || !db->GetSettings()->SetUploadsEnabled(false)) return QStringLiteral("Cannot initialize local crash database");
     const base::FilePath handler((bin + QStringLiteral("/../Helpers/crashpad_handler")).toStdString());
     std::map<std::string, std::string> annotations{{"session", session.toStdString()},
-        {"version", ISPVIEW_PROJECT_VERSION}, {"build", ISPVIEW_BUILD_ID}};
+        {"version", MVPVIEW_PROJECT_VERSION}, {"build", MVPVIEW_BUILD_ID}};
     if (!impl_->client.StartHandler(handler, database, database, "", annotations,
                                    {"--no-rate-limit"}, true, false))
         return QStringLiteral("Crashpad helper failed to initialize");
@@ -150,7 +150,7 @@ bool CrashCapture::alive() const {
 #if defined(Q_OS_WIN)
     auto& d = *impl_;
     return d.process != nullptr && WaitForSingleObject(d.process, 0) == WAIT_TIMEOUT;
-#elif defined(Q_OS_MACOS) && ISPVIEW_HAS_CRASHPAD
+#elif defined(Q_OS_MACOS) && MVPVIEW_HAS_CRASHPAD
     // Crashpad starts and supervises its own handler; the client reports the configured state.
     return true;
 #else

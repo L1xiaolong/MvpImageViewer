@@ -4,7 +4,7 @@
 #include <QSize>
 #include <QString>
 
-namespace ispview {
+namespace mvpview {
 
 // Exiv2 adapter for carrying metadata across destructive pixel transforms.
 // Third-party metadata types deliberately stop at this boundary.
@@ -15,4 +15,4 @@ class MetadataWriter final {
                                                        const QSize& pixelSize);
 };
 
-} // namespace ispview
+} // namespace mvpview

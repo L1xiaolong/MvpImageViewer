@@ -5,7 +5,7 @@
 
 #include <array>
 
-namespace ispview {
+namespace mvpview {
 
 struct YuvCoefficients {
     double redV;
@@ -36,4 +36,4 @@ yuvRgbToDisplay(const std::array<double, 3>& sourceRgb, const RawImageParameters
 yuvRgbToDisplaySrgb(const std::array<double, 3>& sourceRgb,
                     const RawImageParameters& parameters);
 
-} // namespace ispview
+} // namespace mvpview

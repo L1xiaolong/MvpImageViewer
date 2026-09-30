@@ -21,7 +21,7 @@ echo "[2/6] Build production QML app and tests"
 cmake --build --preset macos-debug --parallel
 
 echo "[3/6] Run QML static analysis"
-cmake --build --preset macos-debug --target ISPImageViewerQml_qmllint --parallel
+cmake --build --preset macos-debug --target MVPImageViewerQml_qmllint --parallel
 
 echo "[4/6] Run all automated tests"
 ctest --test-dir build/macos-preset-debug --output-on-failure

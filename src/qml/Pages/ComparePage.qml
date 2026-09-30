@@ -5,7 +5,7 @@ import QtQuick.Controls
 import QtCore
 import QtQuick.Dialogs as PlatformDialogs
 import QtQuick.Layouts
-import "../Isp"
+import "../Mvp"
 
 Item {
     id: root
@@ -402,8 +402,8 @@ Item {
             anchors.fill: parent
             active: root.visible || root.designMode
             source: root.designMode
-                    ? Qt.resolvedUrl("../Isp/DesignCompareCanvas.qml")
-                    : Qt.resolvedUrl("../Isp/ProductionCompareCanvas.qml")
+                    ? Qt.resolvedUrl("../Mvp/DesignCompareCanvas.qml")
+                    : Qt.resolvedUrl("../Mvp/ProductionCompareCanvas.qml")
             onLoaded: {
                 if (item) {
                     item.controller = root.controller

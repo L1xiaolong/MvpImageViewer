@@ -79,7 +79,7 @@ const translations = new Map(Object.entries({
   "Help and guide": "帮助与指南",
   "Height": "高度",
   "Hold B to inspect the candidate": "按住 B 检查候选图",
-  "ISP": "ISP",
+  "MVP": "MVP",
   "MVP Image Viewer": "MVP Image Viewer",
   "Image presentation": "图片呈现",
   "Inspect": "检查",
@@ -233,7 +233,7 @@ const translations = new Map(Object.entries({
   "⌘F": "⌘F"
 }));
 
-const path = new URL("../src/qml/i18n/ispimageviewer_zh_CN.ts", import.meta.url);
+const path = new URL("../src/qml/i18n/mvpimageviewer_zh_CN.ts", import.meta.url);
 const decodeXml = value => value
   .replaceAll("&quot;", "\"").replaceAll("&apos;", "'")
   .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");

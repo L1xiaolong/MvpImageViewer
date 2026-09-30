@@ -7,7 +7,7 @@
 #include <QJsonObject>
 #include <QStringList>
 
-namespace ispview {
+namespace mvpview {
 
 QString ImageDecoderRegistry::cacheIdentity() const {
     QStringList identities;
@@ -78,4 +78,4 @@ DecodeResult ImageDecoderRegistry::decode(const DecodeRequest& request) const {
     return {{}, QStringLiteral("Unsupported image format")};
 }
 
-} // namespace ispview
+} // namespace mvpview

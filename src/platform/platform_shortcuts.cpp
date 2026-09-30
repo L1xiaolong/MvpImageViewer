@@ -3,7 +3,7 @@
 #include <QKeyEvent>
 #include <QKeySequence>
 
-namespace ispview {
+namespace mvpview {
 
 bool isPlatformTrashShortcut(const QKeyEvent* event) {
     if (!event) {
@@ -24,4 +24,4 @@ bool isItemViewTrashShortcut(const QKeyEvent* event) {
     return event && (event->matches(QKeySequence::Delete) || isPlatformTrashShortcut(event));
 }
 
-} // namespace ispview
+} // namespace mvpview

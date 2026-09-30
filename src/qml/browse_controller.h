@@ -18,7 +18,7 @@ class QFileSystemWatcher;
 class QTimer;
 QT_END_NAMESPACE
 
-namespace ispview {
+namespace mvpview {
 
 class DirectoryScanner;
 class FullScreenWindow;
@@ -232,4 +232,4 @@ class BrowseController final : public QObject {
     bool galleryFullResolution_ = false;
 };
 
-} // namespace ispview
+} // namespace mvpview

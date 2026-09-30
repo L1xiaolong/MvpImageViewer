@@ -7,7 +7,7 @@
 #include <QMimeData>
 #include <QPixmap>
 
-namespace ispview {
+namespace mvpview {
 
 class ImageLoader;
 
@@ -64,4 +64,4 @@ class ThumbnailModel final : public QAbstractListModel {
     QPixmap folderPlaceholder_;
 };
 
-} // namespace ispview
+} // namespace mvpview

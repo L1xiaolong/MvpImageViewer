@@ -6,7 +6,7 @@
 
 #include <atomic>
 
-namespace ispview {
+namespace mvpview {
 
 class ThumbnailDiskCache final {
   public:
@@ -27,4 +27,4 @@ class ThumbnailDiskCache final {
     mutable QMutex trimMutex_;
 };
 
-} // namespace ispview
+} // namespace mvpview

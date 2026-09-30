@@ -18,7 +18,7 @@
 
 #include <algorithm>
 
-namespace ispview {
+namespace mvpview {
 
 FullScreenController::FullScreenController(ImageLoader* loader, QObject* parent)
     : QObject(parent), loader_(loader) {
@@ -292,4 +292,4 @@ void FullScreenController::refreshCanvas(bool resetView) {
     canvas_->setSynchronized(false);
 }
 
-} // namespace ispview
+} // namespace mvpview

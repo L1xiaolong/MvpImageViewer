@@ -4,7 +4,7 @@
 
 #include <QString>
 
-namespace ispview {
+namespace mvpview {
 
 // Exiv2 adapter. Third-party metadata types deliberately stop at this boundary.
 // Failures are reported on ImageMetadata and never turn a successful pixel decode into an error.
@@ -15,4 +15,4 @@ class MetadataReader final {
     static void enrich(const QString& path, ImageMetadata& metadata);
 };
 
-} // namespace ispview
+} // namespace mvpview

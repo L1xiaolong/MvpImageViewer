@@ -14,7 +14,7 @@
 #include <optional>
 #include <variant>
 
-namespace ispview {
+namespace mvpview {
 
 enum class PixelLayout { Interleaved, Planar, SemiPlanar, Bayer, Packed };
 enum class SampleType { UInt, SInt, Float };
@@ -158,4 +158,4 @@ struct ImageFrame {
 
 using ImageFramePtr = std::shared_ptr<const ImageFrame>;
 
-} // namespace ispview
+} // namespace mvpview

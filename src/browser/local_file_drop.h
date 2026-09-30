@@ -7,7 +7,7 @@ QT_BEGIN_NAMESPACE
 class QMimeData;
 QT_END_NAMESPACE
 
-namespace ispview {
+namespace mvpview {
 
 // Presentation-neutral conversion of the standard local-file representations used by Qt,
 // Finder and Explorer into paths.
@@ -15,4 +15,4 @@ namespace ispview {
 // pasteboard data has been promoted to QMimeData::urls().
 [[nodiscard]] QStringList localFileDropPaths(const QMimeData* mimeData);
 
-} // namespace ispview
+} // namespace mvpview

@@ -250,7 +250,7 @@ Popup {
             spacing: 4
 
             Text {
-                text: qsTr("ISP")
+                text: qsTr("MVP")
                 color: Theme.exposureAmber
                 font.family: Theme.monoFont
                 font.pixelSize: 11

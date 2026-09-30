@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace ispview::tools {
+namespace mvpview::tools {
 
 inline std::optional<RawImageParameters> parseRaw16Candidate(const QString& text, bool msbAligned,
                                                              bool bigEndian) {
@@ -78,4 +78,4 @@ inline bool applyCandidateOrientationOption(const QStringList& arguments,
     return true;
 }
 
-} // namespace ispview::tools
+} // namespace mvpview::tools

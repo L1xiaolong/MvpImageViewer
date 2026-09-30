@@ -7,7 +7,7 @@
 #include <array>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QPoint pixelAtNormalizedPoint(const QPointF& normalizedPoint, const QSize& size) {
@@ -405,4 +405,4 @@ ComparisonPixelSample ComparisonPixelProbe::sampleAtDisplayPixel(const ImageFram
     return result;
 }
 
-} // namespace ispview
+} // namespace mvpview

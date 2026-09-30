@@ -8,7 +8,7 @@
 #include <array>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 struct ChannelAccumulator {
@@ -375,4 +375,4 @@ DisplayHistogram DisplayHistogramAnalyzer::analyzeRegion(const ImageFrame& frame
     return analyzeRegionImpl(frame, normalizedRegion, maximumSamples);
 }
 
-} // namespace ispview
+} // namespace mvpview

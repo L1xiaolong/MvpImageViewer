@@ -1,3 +1,3 @@
 #include <QtQuickTest/quicktest.h>
 
-QUICK_TEST_MAIN(ispview_qml_interactions)
+QUICK_TEST_MAIN(mvpview_qml_interactions)

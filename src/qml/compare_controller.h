@@ -9,7 +9,7 @@
 #include <QTimer>
 #include <QVariantMap>
 
-namespace ispview {
+namespace mvpview {
 
 class QmlImageCanvas;
 
@@ -128,4 +128,4 @@ class CompareController final : public QObject {
     QTimer automaticFullLoadTimer_;
 };
 
-} // namespace ispview
+} // namespace mvpview

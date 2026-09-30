@@ -9,7 +9,7 @@
 #include <QVariantMap>
 #include <QtQml/qqml.h>
 
-namespace ispview {
+namespace mvpview {
 
 // A single scene-graph item renders the complete 2-4 image comparison. Qt 6.9
 // does not reliably composite several sibling QQuickRhiItems on Metal, while a
@@ -81,7 +81,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     void navigationRevisionChanged();
     void backgroundColorChanged();
     void smoothDisplayChanged();
-    void viewStateChanged(int slot, const ispview::ViewState& state);
+    void viewStateChanged(int slot, const mvpview::ViewState& state);
     void pixelHovered(int sourceSlot, const QPoint& pixel, const QString& valueText, bool valid);
     // Emitted when a probe needs source samples that only a full decode provides.
     void pixelProbeFullResolutionRequested(int sourceSlot);
@@ -143,4 +143,4 @@ class QmlImageCanvas : public QQuickRhiItem {
     void pollCursorForPixelProbe();
 };
 
-} // namespace ispview
+} // namespace mvpview

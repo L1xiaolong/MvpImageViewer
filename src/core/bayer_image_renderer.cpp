@@ -11,7 +11,7 @@
 #include <cstddef>
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 int toByte(double value) {
@@ -172,4 +172,4 @@ QImage renderBayerImage(const QByteArray& bytes, const RawImageParameters& param
     return image;
 }
 
-} // namespace ispview
+} // namespace mvpview

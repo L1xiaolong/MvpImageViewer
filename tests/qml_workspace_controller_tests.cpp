@@ -45,9 +45,9 @@
 #include <cmath>
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 namespace {
-QString sessionLogText(const ispview::diagnostics::Service& service) {
+QString sessionLogText(const mvpview::diagnostics::Service& service) {
     QString text;
     QDirIterator it(service.sessionDirectory(), {QStringLiteral("*.jsonl")}, QDir::Files);
     while (it.hasNext()) {
@@ -321,20 +321,20 @@ void QmlWorkspaceControllerTests::diagnosticSettingsPersistAndNormalize() {
 }
 
 void QmlWorkspaceControllerTests::repositoryLinksFallBackWhenBuildConfigurationIsEmpty() {
-    QCOMPARE(AppSettings::repositorySlug(), QStringLiteral("L1xiaolong/IspImageViewer"));
+    QCOMPARE(AppSettings::repositorySlug(), QStringLiteral("L1xiaolong/MvpImageViewer"));
     QCOMPARE(AppSettings::repositoryUrl(),
-             QUrl(QStringLiteral("https://github.com/L1xiaolong/IspImageViewer")));
+             QUrl(QStringLiteral("https://github.com/L1xiaolong/MvpImageViewer")));
     QCOMPARE(AppSettings::repositoryUrl(QStringLiteral("/releases")),
-             QUrl(QStringLiteral("https://github.com/L1xiaolong/IspImageViewer/releases")));
+             QUrl(QStringLiteral("https://github.com/L1xiaolong/MvpImageViewer/releases")));
     QCOMPARE(AppSettings::latestReleaseApiUrl(),
              QUrl(QStringLiteral(
-                 "https://api.github.com/repos/L1xiaolong/IspImageViewer/releases/latest")));
+                 "https://api.github.com/repos/L1xiaolong/MvpImageViewer/releases/latest")));
 }
 
 void QmlWorkspaceControllerTests::initTestCase() {
     settingsDirectory_ = std::make_unique<QTemporaryDir>();
     QVERIFY(settingsDirectory_->isValid());
-    QCoreApplication::setOrganizationName(QStringLiteral("ISPViewTests"));
+    QCoreApplication::setOrganizationName(QStringLiteral("MvpViewTests"));
     QCoreApplication::setApplicationName(QStringLiteral("QmlWorkspaceControllerTests"));
     QCoreApplication::setApplicationVersion(QStringLiteral("1.0.0"));
     QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -1722,8 +1722,8 @@ void QmlWorkspaceControllerTests::otaDownloadsAndVerifiesPlatformInstaller() {
                    updateReleaseJson(server, installerName, installerData.size(), digest));
     server.respond("/installer", installerData);
 
-    qputenv("ISPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
-    const auto resetEnvironment = qScopeGuard([] { qunsetenv("ISPVIEW_UPDATE_API_URL"); });
+    qputenv("MVPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
+    const auto resetEnvironment = qScopeGuard([] { qunsetenv("MVPVIEW_UPDATE_API_URL"); });
     auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
     QVERIFY(application);
     AppSettings settings(application);
@@ -1754,8 +1754,8 @@ void QmlWorkspaceControllerTests::otaRejectsInstallerWithWrongChecksum() {
                                                   QByteArray(64, '0')));
     server.respond("/installer", installerData);
 
-    qputenv("ISPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
-    const auto resetEnvironment = qScopeGuard([] { qunsetenv("ISPVIEW_UPDATE_API_URL"); });
+    qputenv("MVPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
+    const auto resetEnvironment = qScopeGuard([] { qunsetenv("MVPVIEW_UPDATE_API_URL"); });
     auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
     QVERIFY(application);
     AppSettings settings(application);
@@ -1780,8 +1780,8 @@ void QmlWorkspaceControllerTests::otaDownloadCanBeCancelled() {
     server.respond("/release",
                    updateReleaseJson(server, installerName, installerData.size(), digest));
 
-    qputenv("ISPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
-    const auto resetEnvironment = qScopeGuard([] { qunsetenv("ISPVIEW_UPDATE_API_URL"); });
+    qputenv("MVPVIEW_UPDATE_API_URL", server.url("/release").toString().toUtf8());
+    const auto resetEnvironment = qScopeGuard([] { qunsetenv("MVPVIEW_UPDATE_API_URL"); });
     auto* application = qobject_cast<QGuiApplication*>(QCoreApplication::instance());
     QVERIFY(application);
     AppSettings settings(application);
@@ -1806,7 +1806,7 @@ void QmlWorkspaceControllerTests::diagnosticsReceivesPresentationSessionEvents()
     QVERIFY(log.contains(QStringLiteral("compare.presentation_mode")));
 }
 
-} // namespace ispview
+} // namespace mvpview
 
-QTEST_MAIN(ispview::QmlWorkspaceControllerTests)
+QTEST_MAIN(mvpview::QmlWorkspaceControllerTests)
 #include "qml_workspace_controller_tests.moc"

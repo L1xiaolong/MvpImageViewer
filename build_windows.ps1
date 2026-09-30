@@ -135,7 +135,7 @@ function New-WindowsInstaller {
     $makeNsis = Find-MakeNsis
     $installerPath = Join-Path $ScriptDir "dist\MVPImageViewer-$Version-windows-x64-setup.exe"
     $nsisScript = Join-Path $ScriptDir "packaging\windows\installer.nsi"
-    $iconPath = Join-Path $ScriptDir "assets\icons\windows\ISPImageViewer.ico"
+    $iconPath = Join-Path $ScriptDir "assets\icons\windows\MVPImageViewer.ico"
     if (Test-Path -LiteralPath $installerPath) {
         Remove-Item -LiteralPath $installerPath -Force
     }
@@ -172,7 +172,7 @@ function Publish-WindowsPackage {
     # executable. Preserve those dependencies when staging an MSVC package.
     Get-ChildItem -LiteralPath (Split-Path -Parent $Executable) -Filter "*.dll" -File |
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $stageDir }
-    $crashHelper = Join-Path (Split-Path -Parent $Executable) "ispview_crash_handler.exe"
+    $crashHelper = Join-Path (Split-Path -Parent $Executable) "mvpview_crash_handler.exe"
     if (-not (Test-Path -LiteralPath $crashHelper)) { throw "Crash helper is missing: $crashHelper" }
     Copy-Item -LiteralPath $crashHelper -Destination (Split-Path -Parent $targetExe)
     python "$ScriptDir/scripts/archive_diagnostic_symbols.py" --binary $Executable --staged-binary $targetExe --output "$ScriptDir/dist/symbols"
@@ -222,7 +222,7 @@ Translations=translations
     }
     & python @licenseArgs
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Runtime license audit is incomplete; packaging will continue. Inspect $stageDir\RUNTIME_DEPENDENCIES.md and set ISPVIEW_RUNTIME_CATALOG to resolve the findings."
+        Write-Warning "Runtime license audit is incomplete; packaging will continue. Inspect $stageDir\RUNTIME_DEPENDENCIES.md and set MVPVIEW_RUNTIME_CATALOG to resolve the findings."
     }
 
     if (Test-Path -LiteralPath $distDir) {
@@ -231,7 +231,7 @@ Translations=translations
     Copy-Item -LiteralPath $stageDir -Destination $distDir -Recurse
 
     $versionMatch = Select-String -LiteralPath (Join-Path $ScriptDir "CMakeLists.txt") `
-        -Pattern "project\(ISPImageViewer VERSION ([0-9.]+)" | Select-Object -First 1
+        -Pattern "project\(MVPImageViewer VERSION ([0-9.]+)" | Select-Object -First 1
     $version = if ($null -ne $versionMatch) { $versionMatch.Matches[0].Groups[1].Value } else { "unknown" }
     if ($version -eq "unknown") { throw "Could not read the project version from CMakeLists.txt" }
     New-WindowsInstaller -StageDir $stageDir -Version $version
@@ -306,7 +306,7 @@ if ($Toolchain -eq "msys2") {
     if ($BuildMode -eq "debug") {
         $configureArgs += "-DBUILD_TESTING=ON"
     } else {
-        $configureArgs += @("-DBUILD_TESTING=OFF", "-DISPVIEW_BUILD_BENCHMARKS=ON")
+        $configureArgs += @("-DBUILD_TESTING=OFF", "-DMVPVIEW_BUILD_BENCHMARKS=ON")
     }
 
     Write-Host "Configuring MSYS2/UCRT64 build: $BuildDir"

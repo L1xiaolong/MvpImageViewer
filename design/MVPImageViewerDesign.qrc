@@ -24,21 +24,21 @@
         <file>../assets/icons/ui/sort.svg</file>
         <file>App.qml</file>
         <file>DesignPreview.ui.qml</file>
-        <file>ISPImageViewerDesign.qmlproject</file>
+        <file>MVPImageViewerDesign.qmlproject</file>
         <file>MockBrowseController.qml</file>
         <file>MockBrowseWorkspace.qml</file>
         <file>qtquickcontrols2.conf</file>
         <file>RuntimePreview.qml</file>
-        <file>../src/qml/Isp/AppIconButton.qml</file>
-        <file>../src/qml/Isp/AppMenu.qml</file>
-        <file>../src/qml/Isp/AppMenuItem.qml</file>
-        <file>../src/qml/Isp/AppMenuSeparator.qml</file>
-        <file>../src/qml/Isp/BrowserPane.qml</file>
-        <file>../src/qml/Isp/FolderNavigator.qml</file>
-        <file>../src/qml/Isp/qmldir</file>
-        <file>../src/qml/Isp/Theme.qml</file>
-        <file>../src/qml/Isp/ThumbnailTile.qml</file>
-        <file>../src/qml/Isp/TopToolbar.ui.qml</file>
+        <file>../src/qml/Mvp/AppIconButton.qml</file>
+        <file>../src/qml/Mvp/AppMenu.qml</file>
+        <file>../src/qml/Mvp/AppMenuItem.qml</file>
+        <file>../src/qml/Mvp/AppMenuSeparator.qml</file>
+        <file>../src/qml/Mvp/BrowserPane.qml</file>
+        <file>../src/qml/Mvp/FolderNavigator.qml</file>
+        <file>../src/qml/Mvp/qmldir</file>
+        <file>../src/qml/Mvp/Theme.qml</file>
+        <file>../src/qml/Mvp/ThumbnailTile.qml</file>
+        <file>../src/qml/Mvp/TopToolbar.ui.qml</file>
         <file>../src/qml/Main.qml</file>
         <file>../src/qml/Pages/BrowsePage.qml</file>
         <file>../src/qml/Pages/qmldir</file>

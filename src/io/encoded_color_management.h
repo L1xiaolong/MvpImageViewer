@@ -6,7 +6,7 @@
 #include <QImage>
 #include <QString>
 
-namespace ispview {
+namespace mvpview {
 
 // Converts an encoded RGB image's embedded ICC profile into the application display space.
 // RAW/YUV source planes never pass through this adapter.
@@ -23,4 +23,4 @@ class EncodedColorManagement final {
                                    DisplayColorSpace target);
 };
 
-} // namespace ispview
+} // namespace mvpview

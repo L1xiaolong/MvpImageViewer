@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 bool checkedPlaneEnd(const PlaneBuffer& plane, qsizetype storageSize, qsizetype& end) {
@@ -305,4 +305,4 @@ RawPlaneAccessor::readBayerValue(const QPoint& sourcePixel) const {
     return value;
 }
 
-} // namespace ispview
+} // namespace mvpview

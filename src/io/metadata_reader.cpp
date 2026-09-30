@@ -13,14 +13,14 @@
 #include <mutex>
 #include <stdexcept>
 
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
 #include <exiv2/exiv2.hpp>
 #endif
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
 
 constexpr qsizetype kMaximumTextLength = 4096;
 constexpr qsizetype kMaximumWarningLength = 512;
@@ -313,7 +313,7 @@ void mapDescription(const Exiv2::ExifData& exif, const Exiv2::IptcData& iptc,
 } // namespace
 
 bool MetadataReader::isAvailable() {
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
     return true;
 #else
     return false;
@@ -321,7 +321,7 @@ bool MetadataReader::isAvailable() {
 }
 
 QString MetadataReader::version() {
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
     return QString::fromStdString(Exiv2::versionString());
 #else
     return {};
@@ -329,7 +329,7 @@ QString MetadataReader::version() {
 }
 
 void MetadataReader::enrich(const QString& path, ImageMetadata& metadata) {
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
     // XMP has process-global initialization state. Serializing this optional adapter keeps
     // decoding deterministic until profiling justifies a narrower lock.
     static QCache<QString, CachedMetadata> cache(kMaximumCachedMetadataEntries);
@@ -395,4 +395,4 @@ void MetadataReader::enrich(const QString& path, ImageMetadata& metadata) {
 #endif
 }
 
-} // namespace ispview
+} // namespace mvpview

@@ -9,7 +9,7 @@
 #include <array>
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 constexpr int kMeasuredRuns = 5;
@@ -129,31 +129,31 @@ bool printRawMeasurement(QTextStream& output, const QString& label, const QStrin
 }
 
 } // namespace
-} // namespace ispview
+} // namespace mvpview
 
 int main(int argc, char* argv[]) {
     QCoreApplication application(argc, argv);
     QTextStream output(stdout);
     output << "Source\tScope\tSize\tSamples\tMedianMs\n";
-    if (!ispview::printMeasurement(output, QStringLiteral("4K"), QStringLiteral("Full"),
+    if (!mvpview::printMeasurement(output, QStringLiteral("4K"), QStringLiteral("Full"),
                                    {3840, 2160}) ||
-        !ispview::printMeasurement(output, QStringLiteral("4K"), QStringLiteral("Center25%"),
+        !mvpview::printMeasurement(output, QStringLiteral("4K"), QStringLiteral("Center25%"),
                                    {3840, 2160}, QRectF(0.25, 0.25, 0.5, 0.5)) ||
-        !ispview::printRawMeasurement(output, QStringLiteral("4K NV12 Source"),
+        !mvpview::printRawMeasurement(output, QStringLiteral("4K NV12 Source"),
                                       QStringLiteral("Full"), {3840, 2160}, true) ||
-        !ispview::printRawMeasurement(output, QStringLiteral("4K RAW14 Source"),
+        !mvpview::printRawMeasurement(output, QStringLiteral("4K RAW14 Source"),
                                       QStringLiteral("Full"), {3840, 2160}, false)) {
         return 1;
     }
     if (application.arguments().contains(QStringLiteral("--48mp"))) {
-        if (!ispview::printMeasurement(output, QStringLiteral("48MP"), QStringLiteral("Full"),
+        if (!mvpview::printMeasurement(output, QStringLiteral("48MP"), QStringLiteral("Full"),
                                        {8000, 6000}) ||
-            !ispview::printMeasurement(output, QStringLiteral("48MP"),
+            !mvpview::printMeasurement(output, QStringLiteral("48MP"),
                                        QStringLiteral("Center25%"), {8000, 6000},
                                        QRectF(0.25, 0.25, 0.5, 0.5)) ||
-            !ispview::printRawMeasurement(output, QStringLiteral("48MP NV12 Source"),
+            !mvpview::printRawMeasurement(output, QStringLiteral("48MP NV12 Source"),
                                           QStringLiteral("Full"), {8000, 6000}, true) ||
-            !ispview::printRawMeasurement(output, QStringLiteral("48MP RAW14 Source"),
+            !mvpview::printRawMeasurement(output, QStringLiteral("48MP RAW14 Source"),
                                           QStringLiteral("Full"), {8000, 6000}, false)) {
             return 1;
         }

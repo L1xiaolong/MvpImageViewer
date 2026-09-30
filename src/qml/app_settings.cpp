@@ -29,13 +29,13 @@
 #include <QTimer>
 #include <QVersionNumber>
 
-#ifndef ISPVIEW_GITHUB_REPOSITORY
-#define ISPVIEW_GITHUB_REPOSITORY ""
+#ifndef MVPVIEW_GITHUB_REPOSITORY
+#define MVPVIEW_GITHUB_REPOSITORY ""
 #endif
 
-namespace ispview {
+namespace mvpview {
 namespace {
-constexpr auto kDefaultRepositorySlug = "L1xiaolong/IspImageViewer";
+constexpr auto kDefaultRepositorySlug = "L1xiaolong/MvpImageViewer";
 constexpr auto kLanguageKey = "general/language";
 constexpr auto kThemeKey = "appearance/theme";
 constexpr auto kRestoreLastDirectoryKey = "general/restoreLastDirectory";
@@ -80,7 +80,7 @@ const ShortcutDefinition* shortcutDefinition(const QString& action) {
 } // namespace
 
 QString AppSettings::repositorySlug() {
-    const QString configured = QString::fromUtf8(ISPVIEW_GITHUB_REPOSITORY).trimmed();
+    const QString configured = QString::fromUtf8(MVPVIEW_GITHUB_REPOSITORY).trimmed();
     return configured.isEmpty() ? QString::fromLatin1(kDefaultRepositorySlug) : configured;
 }
 
@@ -103,11 +103,11 @@ AppSettings::AppSettings(QGuiApplication* application, QObject* parent)
         settings.value(QLatin1String(kLanguageKey), QStringLiteral("system")).toString());
     theme_ = normalizedTheme(
         settings.value(QLatin1String(kThemeKey), QStringLiteral("system")).toString());
-    if (qEnvironmentVariableIsSet("ISPVIEW_LANGUAGE_OVERRIDE")) {
-        language_ = normalizedLanguage(qEnvironmentVariable("ISPVIEW_LANGUAGE_OVERRIDE"));
+    if (qEnvironmentVariableIsSet("MVPVIEW_LANGUAGE_OVERRIDE")) {
+        language_ = normalizedLanguage(qEnvironmentVariable("MVPVIEW_LANGUAGE_OVERRIDE"));
     }
-    if (qEnvironmentVariableIsSet("ISPVIEW_THEME_OVERRIDE")) {
-        theme_ = normalizedTheme(qEnvironmentVariable("ISPVIEW_THEME_OVERRIDE"));
+    if (qEnvironmentVariableIsSet("MVPVIEW_THEME_OVERRIDE")) {
+        theme_ = normalizedTheme(qEnvironmentVariable("MVPVIEW_THEME_OVERRIDE"));
     }
     restoreLastDirectory_ = settings.value(QLatin1String(kRestoreLastDirectoryKey), true).toBool();
     confirmTrash_ = settings.value(QLatin1String(kConfirmTrashKey), true).toBool();
@@ -398,7 +398,7 @@ void AppSettings::startAutomaticUpdateCheck() {
     if (!automaticUpdateChecks_)
         return;
 #ifndef NDEBUG
-    if (qEnvironmentVariableIsSet("ISPVIEW_UPDATE_API_URL")) {
+    if (qEnvironmentVariableIsSet("MVPVIEW_UPDATE_API_URL")) {
         QTimer::singleShot(100, this, &AppSettings::checkForUpdates);
         return;
     }
@@ -431,8 +431,8 @@ void AppSettings::checkForUpdates() {
     setUpdateState(QStringLiteral("checking"));
     QUrl endpoint = latestReleaseApiUrl();
 #ifndef NDEBUG
-    if (qEnvironmentVariableIsSet("ISPVIEW_UPDATE_API_URL"))
-        endpoint = QUrl(qEnvironmentVariable("ISPVIEW_UPDATE_API_URL"));
+    if (qEnvironmentVariableIsSet("MVPVIEW_UPDATE_API_URL"))
+        endpoint = QUrl(qEnvironmentVariable("MVPVIEW_UPDATE_API_URL"));
 #endif
     if (!endpoint.isValid()) {
         setUpdateState(QStringLiteral("error"));
@@ -650,7 +650,7 @@ bool AppSettings::isAllowedUpdateUrl(const QUrl& url) const {
     if (url.scheme() == QStringLiteral("https"))
         return true;
 #ifndef NDEBUG
-    return qEnvironmentVariableIsSet("ISPVIEW_UPDATE_API_URL") &&
+    return qEnvironmentVariableIsSet("MVPVIEW_UPDATE_API_URL") &&
            url.scheme() == QStringLiteral("http");
 #else
     return false;
@@ -717,7 +717,7 @@ void AppSettings::applyLanguage() {
         return;
     application_->removeTranslator(&translator_);
     if (effectiveLanguage() == QStringLiteral("zh_CN") &&
-        translator_.load(QStringLiteral(":/i18n/ispimageviewer_zh_CN.qm"))) {
+        translator_.load(QStringLiteral(":/i18n/mvpimageviewer_zh_CN.qm"))) {
         application_->installTranslator(&translator_);
     }
 }
@@ -775,4 +775,4 @@ QString AppSettings::normalizedDisplayColorSpace(const QString& space) {
     return QStringLiteral("auto");
 }
 
-} // namespace ispview
+} // namespace mvpview

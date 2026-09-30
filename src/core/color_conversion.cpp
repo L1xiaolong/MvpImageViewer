@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 double decodeTransfer(double encoded, YuvTransfer transfer) {
@@ -155,4 +155,4 @@ std::array<double, 3> yuvRgbToDisplaySrgb(const std::array<double, 3>& sourceRgb
     return yuvRgbToDisplay(sourceRgb, parameters, DisplayColorSpace::Srgb);
 }
 
-} // namespace ispview
+} // namespace mvpview

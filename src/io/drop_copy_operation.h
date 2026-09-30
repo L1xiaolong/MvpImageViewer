@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace ispview {
+namespace mvpview {
 
 struct FileTransferResult {
     QStringList destinationPaths;
@@ -32,4 +32,4 @@ class DropCopyOperation final {
                                                 const QString& targetDirectory);
 };
 
-} // namespace ispview
+} // namespace mvpview

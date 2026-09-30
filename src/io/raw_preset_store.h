@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 
 struct RawFilenameRule {
     QString name;
@@ -34,4 +34,4 @@ class RawPresetStore final {
     [[nodiscard]] static bool saveFilenameRules(const QVector<RawFilenameRule>& rules);
 };
 
-} // namespace ispview
+} // namespace mvpview

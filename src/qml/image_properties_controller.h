@@ -8,7 +8,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-namespace ispview {
+namespace mvpview {
 
 
 // Presentation data for the QML properties inspector. Decoding and histogram analysis stay in
@@ -77,4 +77,4 @@ class ImagePropertiesController final : public QObject {
     LoadHandle loadHandle_;
 };
 
-} // namespace ispview
+} // namespace mvpview

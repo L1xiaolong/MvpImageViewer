@@ -11,7 +11,7 @@
 #include <mutex>
 #include <stdexcept>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 struct OpenedImage {
@@ -110,4 +110,4 @@ QString MetadataWriter::copyForImageTransform(const QString& sourcePath,
     }
 }
 
-} // namespace ispview
+} // namespace mvpview

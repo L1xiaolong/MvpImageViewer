@@ -55,9 +55,9 @@ jobs:
         if: runner.os == 'macOS'
         run: >-
           cmake --preset macos-debug
-          -DISPVIEW_BUILD_BENCHMARKS=OFF
+          -DMVPVIEW_BUILD_BENCHMARKS=OFF
           -DCMAKE_PREFIX_PATH="$(brew --prefix)"
-          -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
+          -DMVPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: cmake --build --preset macos-debug
@@ -70,7 +70,7 @@ jobs:
           fi
       - name: QML static analysis (macOS)
         if: runner.os == 'macOS'
-        run: cmake --build --preset macos-debug --target ISPImageViewerQml_qmllint
+        run: cmake --build --preset macos-debug --target MVPImageViewerQml_qmllint
       - name: Configure (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
@@ -78,8 +78,8 @@ jobs:
           MSYS2_UCRT64: C:/msys64/ucrt64
         run: >-
           cmake --preset windows-msys2-debug
-          -DISPVIEW_BUILD_BENCHMARKS=OFF
-          -DISPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
+          -DMVPVIEW_BUILD_BENCHMARKS=OFF
+          -DMVPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
       - name: Build (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
@@ -90,12 +90,12 @@ jobs:
         run: |
           if ! ctest --preset windows-msys2-debug; then
             cat build/windows-msys2-debug/Testing/Temporary/LastTest.log
-            if [[ -f build/windows-msys2-debug/tests/ispview_io_tests.log ]]; then
-              cat build/windows-msys2-debug/tests/ispview_io_tests.log
+            if [[ -f build/windows-msys2-debug/tests/mvpview_io_tests.log ]]; then
+              cat build/windows-msys2-debug/tests/mvpview_io_tests.log
             fi
             exit 1
           fi
       - name: QML static analysis (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: cmake --build --preset windows-msys2-debug --target ISPImageViewerQml_qmllint
+        run: cmake --build --preset windows-msys2-debug --target MVPImageViewerQml_qmllint

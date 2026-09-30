@@ -20,7 +20,7 @@
 #include <limits>
 #include <vector>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 double cubicWeight(double value) {
@@ -476,7 +476,7 @@ QString loadEncoded(const QString& path, QImage& image) {
 } // namespace
 
 QString ImageTransformer::backupPath(const QString& path) {
-    return path + QStringLiteral(".ispview-original");
+    return path + QStringLiteral(".mvpview-original");
 }
 
 bool ImageTransformer::canRestore(const QString& path) {
@@ -484,7 +484,7 @@ bool ImageTransformer::canRestore(const QString& path) {
 }
 
 QString ImageTransformer::backupManifestPath(const QString& path) {
-    return path + QStringLiteral(".ispview-original.json");
+    return path + QStringLiteral(".mvpview-original.json");
 }
 
 QString ImageTransformer::ensureBackup(const QString& path) {
@@ -616,4 +616,4 @@ QString ImageTransformer::restore(const QString& path) {
     return {};
 }
 
-} // namespace ispview
+} // namespace mvpview

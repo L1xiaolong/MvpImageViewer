@@ -9,7 +9,7 @@
 
 #include <algorithm>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QVariantList listFor(const auto& values) {
@@ -239,4 +239,4 @@ void RawParametersController::applyEditedParameters() {
     emit parametersApplied(path_);
 }
 
-} // namespace ispview
+} // namespace mvpview

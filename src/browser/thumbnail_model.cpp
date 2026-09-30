@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QString formattedFileSize(qint64 bytes) {
@@ -376,4 +376,4 @@ void ThumbnailModel::rebuildPathIndex() {
     }
 }
 
-} // namespace ispview
+} // namespace mvpview

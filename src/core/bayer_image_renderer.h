@@ -6,7 +6,7 @@
 #include <QImage>
 #include <QSize>
 
-namespace ispview {
+namespace mvpview {
 
 // Develops a Bayer buffer with the same black/white levels, demosaic, white balance,
 // colour matrix, and display transfer used by the GPU renderer. This is also the bounded
@@ -15,4 +15,4 @@ namespace ispview {
                                       const RawImageParameters& parameters,
                                       const QSize& outputSize = {});
 
-} // namespace ispview
+} // namespace mvpview

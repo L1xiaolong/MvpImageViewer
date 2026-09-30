@@ -1,33 +1,33 @@
-qt_add_executable(ispview_core_tests
+qt_add_executable(mvpview_core_tests
     core_tests.cpp
 )
-target_link_libraries(ispview_core_tests PRIVATE ispview_core Qt6::Test)
-ispview_enable_warnings(ispview_core_tests)
-add_test(NAME ispview_core_tests COMMAND ispview_core_tests)
+target_link_libraries(mvpview_core_tests PRIVATE mvpview_core Qt6::Test)
+mvpview_enable_warnings(mvpview_core_tests)
+add_test(NAME mvpview_core_tests COMMAND mvpview_core_tests)
 
-qt_add_executable(ispview_io_tests
+qt_add_executable(mvpview_io_tests
     io_tests.cpp
 )
-target_link_libraries(ispview_io_tests PRIVATE ispview_io Qt6::Test)
-target_compile_definitions(ispview_io_tests PRIVATE
-    ISPVIEW_HAS_LIBRAW=$<BOOL:${ISPVIEW_HAS_LIBRAW}>
-    ISPVIEW_HAS_EXIV2=$<BOOL:${ISPVIEW_HAS_EXIV2}>
-    ISPVIEW_HAS_LCMS2=$<BOOL:${ISPVIEW_HAS_LCMS2}>
+target_link_libraries(mvpview_io_tests PRIVATE mvpview_io Qt6::Test)
+target_compile_definitions(mvpview_io_tests PRIVATE
+    MVPVIEW_HAS_LIBRAW=$<BOOL:${MVPVIEW_HAS_LIBRAW}>
+    MVPVIEW_HAS_EXIV2=$<BOOL:${MVPVIEW_HAS_EXIV2}>
+    MVPVIEW_HAS_LCMS2=$<BOOL:${MVPVIEW_HAS_LCMS2}>
 )
-if(ISPVIEW_HAS_EXIV2)
-    target_link_libraries(ispview_io_tests PRIVATE Exiv2::exiv2lib)
+if(MVPVIEW_HAS_EXIV2)
+    target_link_libraries(mvpview_io_tests PRIVATE Exiv2::exiv2lib)
 endif()
-ispview_enable_warnings(ispview_io_tests)
+mvpview_enable_warnings(mvpview_io_tests)
 if(WIN32)
     # QtTest's text logger is not forwarded through CTest's captured stdout on MSYS2.
     # Keep a dedicated report so the release gate can expose the actual failing assertion.
-    add_test(NAME ispview_io_tests COMMAND ispview_io_tests
-        -o "${CMAKE_CURRENT_BINARY_DIR}/ispview_io_tests.log,txt")
+    add_test(NAME mvpview_io_tests COMMAND mvpview_io_tests
+        -o "${CMAKE_CURRENT_BINARY_DIR}/mvpview_io_tests.log,txt")
 else()
-    add_test(NAME ispview_io_tests COMMAND ispview_io_tests)
+    add_test(NAME mvpview_io_tests COMMAND mvpview_io_tests)
 endif()
 
-qt_add_executable(ispview_qml_workspace_tests
+qt_add_executable(mvpview_qml_workspace_tests
     qml_workspace_controller_tests.cpp
     ../src/qml/app_settings.h
     ../src/qml/app_settings.cpp
@@ -48,57 +48,57 @@ qt_add_executable(ispview_qml_workspace_tests
     ../src/qml/thumbnail_image_provider.h
     ../src/qml/thumbnail_image_provider.cpp
 )
-target_link_libraries(ispview_qml_workspace_tests PRIVATE
-    ispview_browser_backend ispview_render_backend ispview_io
+target_link_libraries(mvpview_qml_workspace_tests PRIVATE
+    mvpview_browser_backend mvpview_render_backend mvpview_io
     Qt6::Quick Qt6::GuiPrivate Qt6::Network Qt6::Test
 )
-target_compile_definitions(ispview_qml_workspace_tests PRIVATE
-    ISPVIEW_HAS_LIBRAW=$<BOOL:${ISPVIEW_HAS_LIBRAW}>
-    ISPVIEW_GITHUB_REPOSITORY=""
+target_compile_definitions(mvpview_qml_workspace_tests PRIVATE
+    MVPVIEW_HAS_LIBRAW=$<BOOL:${MVPVIEW_HAS_LIBRAW}>
+    MVPVIEW_GITHUB_REPOSITORY=""
 )
-ispview_enable_warnings(ispview_qml_workspace_tests)
-add_test(NAME ispview_qml_workspace_tests COMMAND ispview_qml_workspace_tests)
-set_tests_properties(ispview_qml_workspace_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+mvpview_enable_warnings(mvpview_qml_workspace_tests)
+add_test(NAME mvpview_qml_workspace_tests COMMAND mvpview_qml_workspace_tests)
+set_tests_properties(mvpview_qml_workspace_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-qt_add_executable(ispview_qml_interaction_tests
+qt_add_executable(mvpview_qml_interaction_tests
     qml_test_main.cpp
 )
-target_link_libraries(ispview_qml_interaction_tests PRIVATE Qt6::QuickTest)
-target_compile_definitions(ispview_qml_interaction_tests PRIVATE
+target_link_libraries(mvpview_qml_interaction_tests PRIVATE Qt6::QuickTest)
+target_compile_definitions(mvpview_qml_interaction_tests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
 )
-ispview_enable_warnings(ispview_qml_interaction_tests)
-add_test(NAME ispview_qml_interaction_tests COMMAND ispview_qml_interaction_tests)
-set_tests_properties(ispview_qml_interaction_tests PROPERTIES
+mvpview_enable_warnings(mvpview_qml_interaction_tests)
+add_test(NAME mvpview_qml_interaction_tests COMMAND mvpview_qml_interaction_tests)
+set_tests_properties(mvpview_qml_interaction_tests PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_CONTROLS_STYLE=Basic;QML_DISABLE_DISK_CACHE=1"
 )
 
-qt_add_executable(ispview_render_tests
+qt_add_executable(mvpview_render_tests
     render_tests.cpp
 )
-target_link_libraries(ispview_render_tests PRIVATE ispview_io ispview_render_backend Qt6::Test)
-ispview_enable_warnings(ispview_render_tests)
-add_test(NAME ispview_render_tests COMMAND ispview_render_tests)
+target_link_libraries(mvpview_render_tests PRIVATE mvpview_io mvpview_render_backend Qt6::Test)
+mvpview_enable_warnings(mvpview_render_tests)
+add_test(NAME mvpview_render_tests COMMAND mvpview_render_tests)
 
-qt_add_executable(ispview_diagnostics_crash_fixture diagnostics_crash_fixture.cpp)
-target_link_libraries(ispview_diagnostics_crash_fixture PRIVATE ispview_diagnostics)
-qt_add_executable(ispview_diagnostics_tests diagnostics_tests.cpp)
-target_link_libraries(ispview_diagnostics_tests PRIVATE ispview_diagnostics ispview_miniz Qt6::Test)
-target_compile_definitions(ispview_diagnostics_tests PRIVATE
-    ISPVIEW_HAS_CRASHPAD=$<BOOL:${ISPVIEW_HAS_CRASHPAD}>)
+qt_add_executable(mvpview_diagnostics_crash_fixture diagnostics_crash_fixture.cpp)
+target_link_libraries(mvpview_diagnostics_crash_fixture PRIVATE mvpview_diagnostics)
+qt_add_executable(mvpview_diagnostics_tests diagnostics_tests.cpp)
+target_link_libraries(mvpview_diagnostics_tests PRIVATE mvpview_diagnostics mvpview_miniz Qt6::Test)
+target_compile_definitions(mvpview_diagnostics_tests PRIVATE
+    MVPVIEW_HAS_CRASHPAD=$<BOOL:${MVPVIEW_HAS_CRASHPAD}>)
 if(WIN32)
-    add_dependencies(ispview_diagnostics_crash_fixture ispview_crash_handler)
-    add_custom_command(TARGET ispview_diagnostics_crash_fixture POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ispview_crash_handler>
-            $<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>)
+    add_dependencies(mvpview_diagnostics_crash_fixture mvpview_crash_handler)
+    add_custom_command(TARGET mvpview_diagnostics_crash_fixture POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:mvpview_crash_handler>
+            $<TARGET_FILE_DIR:mvpview_diagnostics_crash_fixture>)
 endif()
-if(APPLE AND ISPVIEW_HAS_CRASHPAD)
-    add_custom_command(TARGET ispview_diagnostics_crash_fixture POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>/../Helpers"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ISPVIEW_CRASHPAD_HANDLER}"
-            "$<TARGET_FILE_DIR:ispview_diagnostics_crash_fixture>/../Helpers/crashpad_handler")
+if(APPLE AND MVPVIEW_HAS_CRASHPAD)
+    add_custom_command(TARGET mvpview_diagnostics_crash_fixture POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:mvpview_diagnostics_crash_fixture>/../Helpers"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MVPVIEW_CRASHPAD_HANDLER}"
+            "$<TARGET_FILE_DIR:mvpview_diagnostics_crash_fixture>/../Helpers/crashpad_handler")
 endif()
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
-add_test(NAME ispview_diagnostics_tests COMMAND ${Python3_EXECUTABLE}
-    "${PROJECT_SOURCE_DIR}/tests/run_diagnostics_tests.py" $<TARGET_FILE:ispview_diagnostics_tests>)
-set_tests_properties(ispview_diagnostics_tests PROPERTIES TIMEOUT 180)
+add_test(NAME mvpview_diagnostics_tests COMMAND ${Python3_EXECUTABLE}
+    "${PROJECT_SOURCE_DIR}/tests/run_diagnostics_tests.py" $<TARGET_FILE:mvpview_diagnostics_tests>)
+set_tests_properties(mvpview_diagnostics_tests PROPERTIES TIMEOUT 180)

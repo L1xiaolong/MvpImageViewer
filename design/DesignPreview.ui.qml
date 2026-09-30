@@ -3,7 +3,7 @@ import "../src/qml/Pages"
 
 // Design Studio composition root.
 // This file contains no duplicated visual implementation: every visible item
-// comes from the production BrowsePage and its shared Isp components.
+// comes from the production BrowsePage and its shared Mvp components.
 Item {
     id: root
     width: 1440

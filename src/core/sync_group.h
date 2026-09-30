@@ -2,7 +2,7 @@
 
 #include "core/view_state.h"
 
-namespace ispview {
+namespace mvpview {
 
 class SyncGroup final {
   public:
@@ -26,4 +26,4 @@ class SyncGroup final {
     bool syncRoi_ = true;
 };
 
-} // namespace ispview
+} // namespace mvpview

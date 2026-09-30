@@ -1,6 +1,6 @@
 # Qt Design Studio visual workspace
 
-Open `ISPImageViewerDesign.qmlproject`. `DesignPreview.ui.qml` is now only a composition root: it
+Open `MVPImageViewerDesign.qmlproject`. `DesignPreview.ui.qml` is now only a composition root: it
 loads the real production `BrowsePage.qml` with mock data and contains no separately drawn UI.
 All editable UI sources live under `../src/qml`. There is no design-to-runtime synchronization
 step and no preview-only layout that can drift away from the application.
@@ -9,9 +9,9 @@ step and no preview-only layout that can drift away from the application.
 
 Select an item in the Navigator or directly on the canvas, then edit it in **Properties**:
 
-- `../src/qml/Isp/TopToolbar.ui.qml`: visually editable workbench toolbar
-- `../src/qml/Isp/FolderNavigator.qml`: production folder navigator
-- `../src/qml/Isp/ThumbnailTile.qml`: production grid/list tile
+- `../src/qml/Mvp/TopToolbar.ui.qml`: visually editable workbench toolbar
+- `../src/qml/Mvp/FolderNavigator.qml`: production folder navigator
+- `../src/qml/Mvp/ThumbnailTile.qml`: production grid/list tile
 - `../src/qml/Pages/BrowsePage.qml`: production page composition, inspector and status rail
 - `gridModeButton`, `listModeButton`, `compactModeButton`: display modes
 - `thumbnailSlider`: thumbnail size control
@@ -35,12 +35,12 @@ that file contains runtime controller calls, menus, shortcuts, and interaction h
 visual components are therefore edited directly as `.ui.qml` files, while `BrowsePage.qml` wires
 their signals to the runtime controller:
 
-- `../src/qml/Isp/TopToolbar.ui.qml`: toolbar layout and visual states, shared by design and runtime
+- `../src/qml/Mvp/TopToolbar.ui.qml`: toolbar layout and visual states, shared by design and runtime
 - `../src/qml/Pages/BrowsePage.qml`: page layout and toolbar-controller wiring
-- `../src/qml/Isp/Theme.qml`: colors, typography, radii, and sizes
-- `../src/qml/Isp/ThumbnailTile.qml`: image tile behavior
-- `../src/qml/Isp/FolderNavigator.qml`: folder navigation behavior
-- `../src/qml/Isp/AppIconButton.qml`: reusable icon buttons
+- `../src/qml/Mvp/Theme.qml`: colors, typography, radii, and sizes
+- `../src/qml/Mvp/ThumbnailTile.qml`: image tile behavior
+- `../src/qml/Mvp/FolderNavigator.qml`: folder navigation behavior
+- `../src/qml/Mvp/AppIconButton.qml`: reusable icon buttons
 
 ## Editing contract
 

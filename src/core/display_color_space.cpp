@@ -7,7 +7,7 @@
 #include <atomic>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 std::atomic<int> currentSpace{static_cast<int>(DisplayColorSpace::Srgb)};
@@ -178,4 +178,4 @@ void applyDisplayColor(ColorDescriptor& color, bool visualization) {
     color.transferFunction = displayTransferName(displayTransfer(space));
 }
 
-} // namespace ispview
+} // namespace mvpview

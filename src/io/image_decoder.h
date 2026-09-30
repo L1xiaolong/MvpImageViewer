@@ -8,7 +8,7 @@
 #include <optional>
 #include <utility>
 
-namespace ispview {
+namespace mvpview {
 
 enum class DecodePurpose { Thumbnail, Preview, Full };
 enum class DecodeExecutionMode { Parallel, Serialized };
@@ -46,4 +46,4 @@ class IImageDecoder {
     [[nodiscard]] virtual DecodeResult decode(const DecodeRequest& request) const = 0;
 };
 
-} // namespace ispview
+} // namespace mvpview

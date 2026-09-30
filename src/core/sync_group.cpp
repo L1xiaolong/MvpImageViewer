@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 
 ViewState SyncGroup::synchronizedState(const ViewState& source, const ViewState& target) const {
     ViewState result = target;
@@ -46,4 +46,4 @@ ViewState SyncGroup::relativelySynchronizedState(const ViewState& previousSource
     return result;
 }
 
-} // namespace ispview
+} // namespace mvpview

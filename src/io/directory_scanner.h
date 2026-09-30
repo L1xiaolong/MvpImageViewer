@@ -11,7 +11,7 @@
 #include <functional>
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 
 struct ImageFileRecord {
     QString path;
@@ -41,9 +41,9 @@ class DirectoryScanner final : public QObject {
   signals:
     void scanStarted(const QString& directory, quint64 generation);
     void scanBatchReady(const QString& directory,
-                        const QVector<ispview::ImageFileRecord>& files,
+                        const QVector<mvpview::ImageFileRecord>& files,
                         quint64 generation);
-    void scanFinished(const QString& directory, const QVector<ispview::ImageFileRecord>& files,
+    void scanFinished(const QString& directory, const QVector<mvpview::ImageFileRecord>& files,
                       quint64 generation);
 
   private:
@@ -57,4 +57,4 @@ class DirectoryScanner final : public QObject {
     QThreadPool pool_;
 };
 
-} // namespace ispview
+} // namespace mvpview

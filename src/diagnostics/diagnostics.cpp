@@ -27,7 +27,7 @@
 #include <shared_mutex>
 #include <thread>
 
-namespace ispview::diagnostics {
+namespace mvpview::diagnostics {
 Q_LOGGING_CATEGORY(startup, "isp.startup")
 Q_LOGGING_CATEGORY(browse, "isp.browse")
 Q_LOGGING_CATEGORY(decode, "isp.decode")
@@ -288,7 +288,7 @@ Service::Service(Options options) : impl_(std::make_unique<Impl>(std::move(optio
         d.sessionLock->setStaleLockTime(0);
         if (!d.sessionLock->tryLock()) d.fail(QStringLiteral("Cannot lock diagnostics session"));
         if (!save(d.dir + QStringLiteral("/session.json"), json({{"session", d.id}, {"started", now()},
-                  {"version", ISPVIEW_PROJECT_VERSION}, {"build", ISPVIEW_BUILD_ID},
+                  {"version", MVPVIEW_PROJECT_VERSION}, {"build", MVPVIEW_BUILD_ID},
                   {"os", QSysInfo::prettyProductName()}, {"architecture", QSysInfo::currentCpuArchitecture()},
                   {"qt", QT_VERSION_STR}}))) d.fail(QStringLiteral("Cannot save diagnostic session"));
     }
@@ -321,7 +321,7 @@ void Service::configure(bool enabled, Level level) {
         d.sessionLock->setStaleLockTime(0);
         if (!d.sessionLock->tryLock()) d.fail(QStringLiteral("Cannot lock diagnostics session"));
         save(d.dir + QStringLiteral("/session.json"), json({{"session", d.id}, {"started", now()},
-             {"version", ISPVIEW_PROJECT_VERSION}, {"build", ISPVIEW_BUILD_ID}}));
+             {"version", MVPVIEW_PROJECT_VERSION}, {"build", MVPVIEW_BUILD_ID}}));
     }
     d.level.store(level); d.enabled.store(enabled);
 }
@@ -566,7 +566,7 @@ QString Service::snapshot(const QString& destination, int days, bool includeDump
         const bool crashDumpAvailable = hasDump(info.absoluteFilePath());
         const auto crashSummary = dumpSummary(info.absoluteFilePath());
         const QByteArray summaryBytes = json({{"session", info.fileName()},
-                  {"version", ISPVIEW_PROJECT_VERSION}, {"build", ISPVIEW_BUILD_ID},
+                  {"version", MVPVIEW_PROJECT_VERSION}, {"build", MVPVIEW_BUILD_ID},
                   {"crashDumpAvailable", crashDumpAvailable}, {"crash", crashSummary}, {"dumpIncluded", includeDumps && dumpInRange && !captured.isEmpty()}, {"partialLogRecordsSkipped", partialRecords},
                   {"cleanExit", QFileInfo::exists(info.absoluteFilePath() + QStringLiteral("/closed.json"))}});
         // The snapshot is private until export finishes, so these files need no
@@ -587,4 +587,4 @@ void event(Level level, const QLoggingCategory& category, const QString& name, c
 QString fileId(const QString& path) {
     std::shared_lock lock(globalMutex); return current ? current->fileId(path) : QStringLiteral("untracked");
 }
-} // namespace ispview::diagnostics
+} // namespace mvpview::diagnostics

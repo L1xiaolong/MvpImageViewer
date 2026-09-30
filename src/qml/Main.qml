@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import "Isp"
+import "Mvp"
 import "Pages"
 
 ApplicationWindow {

@@ -7,7 +7,7 @@
 #include <QMimeData>
 #include <QUrl>
 
-namespace ispview {
+namespace mvpview {
 
 void FileClipboard::setPaths(const QStringList& paths, bool cut) {
     QList<QUrl> urls;
@@ -33,4 +33,4 @@ bool FileClipboard::hasFiles() { return !contents().paths.isEmpty(); }
 
 void FileClipboard::clear() { QGuiApplication::clipboard()->clear(); }
 
-} // namespace ispview
+} // namespace mvpview

@@ -15,7 +15,7 @@
 #include <windows.h>
 #endif
 
-namespace ispview {
+namespace mvpview {
 
 #ifdef Q_OS_MACOS
 namespace {
@@ -241,4 +241,4 @@ void FullScreenPresentationController::end() {
     emit activeChanged();
 }
 
-} // namespace ispview
+} // namespace mvpview

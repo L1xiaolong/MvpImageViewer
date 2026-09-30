@@ -2,7 +2,7 @@
 
 #include <QStringList>
 
-namespace ispview {
+namespace mvpview {
 
 struct FileClipboardContents {
     QStringList paths;
@@ -20,7 +20,7 @@ class FileClipboard final {
     static void clear();
 
   private:
-    static constexpr auto CutMimeType = "application/x-isp-image-viewer-cut";
+    static constexpr auto CutMimeType = "application/x-mvp-image-viewer-cut";
 };
 
-} // namespace ispview
+} // namespace mvpview

@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 
 enum class QuarterTurn { Clockwise, CounterClockwise };
 
@@ -28,4 +28,4 @@ class ImageTransformer final {
     static QString ensureBackup(const QString& path);
 };
 
-} // namespace ispview
+} // namespace mvpview

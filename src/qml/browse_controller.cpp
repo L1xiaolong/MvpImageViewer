@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace ispview {
+namespace mvpview {
 BrowseController::BrowseController(std::shared_ptr<const IImageDecoder> decoder,
                                    const QString& initialDirectory, QObject* parent)
     : QObject(parent), loader_(new ImageLoader(std::move(decoder), this)),
@@ -1243,4 +1243,4 @@ QStringList BrowseController::allImagePaths() const {
     return result;
 }
 
-} // namespace ispview
+} // namespace mvpview

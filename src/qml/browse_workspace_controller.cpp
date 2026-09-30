@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace ispview {
+namespace mvpview {
 
 BrowseWorkspaceController::BrowseWorkspaceController(
     std::shared_ptr<const IImageDecoder> decoder, const QString& initialDirectory,
@@ -253,4 +253,4 @@ void BrowseWorkspaceController::recomputeSelection() {
     emit statusTextChanged();
 }
 
-} // namespace ispview
+} // namespace mvpview

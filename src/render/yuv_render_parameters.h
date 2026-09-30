@@ -4,7 +4,7 @@
 
 #include <array>
 
-namespace ispview {
+namespace mvpview {
 
 // Matches the std140 YuvParameters block in yuv.frag. Keeping the conversion in
 // a testable function prevents the CPU reference path and the GPU path from
@@ -12,4 +12,4 @@ namespace ispview {
 [[nodiscard]] std::array<float, 28>
 makeYuvRenderUniformData(const RawImageParameters& parameters);
 
-} // namespace ispview
+} // namespace mvpview

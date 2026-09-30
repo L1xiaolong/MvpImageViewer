@@ -18,7 +18,7 @@ class QNetworkAccessManager;
 class QNetworkReply;
 class QSaveFile;
 
-namespace ispview {
+namespace mvpview {
 
 class AppSettings final : public QObject {
     Q_OBJECT
@@ -193,4 +193,4 @@ class AppSettings final : public QObject {
     std::unique_ptr<QCryptographicHash> updateHash_;
 };
 
-} // namespace ispview
+} // namespace mvpview

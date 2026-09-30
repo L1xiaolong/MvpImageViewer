@@ -11,7 +11,7 @@
 #include <windows.h>
 #endif
 
-namespace ispview {
+namespace mvpview {
 
 bool PlatformServices::revealInFileManager(const QString& path) {
 #if defined(Q_OS_MACOS)
@@ -39,4 +39,4 @@ void PlatformServices::releaseUnusedMemory() {
 #endif
 }
 
-} // namespace ispview
+} // namespace mvpview

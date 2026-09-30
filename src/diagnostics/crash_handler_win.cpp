@@ -3,7 +3,7 @@
 #include <shellapi.h>
 #include <cstdlib>
 #include <cstdint>
-using ispview::diagnostics::CrashShared;
+using mvpview::diagnostics::CrashShared;
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int argc = 0; auto argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!argv || argc != 6) return 1;

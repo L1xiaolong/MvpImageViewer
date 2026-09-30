@@ -8,7 +8,7 @@
 #include <QVector>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 
 enum class RawHistogramDomain { Yuv, Bayer };
 enum class RawHistogramChannelId { Y, U, V, Red, GreenRedRow, GreenBlueRow, Blue };
@@ -61,4 +61,4 @@ class RawPlaneHistogramAnalyzer final {
 
 [[nodiscard]] QString rawHistogramChannelName(RawHistogramChannelId id);
 
-} // namespace ispview
+} // namespace mvpview

@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace ispview {
+namespace mvpview {
 
 // OS integration boundary. Callers receive portable success/failure results and do not include
 // platform process APIs or conditional compilation.
@@ -14,4 +14,4 @@ class PlatformServices final {
     static void releaseUnusedMemory();
 };
 
-} // namespace ispview
+} // namespace mvpview

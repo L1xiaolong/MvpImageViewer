@@ -3,7 +3,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-namespace ispview::diagnostics {
+namespace mvpview::diagnostics {
 struct CrashShared {
     DWORD processId;
     DWORD threadId;

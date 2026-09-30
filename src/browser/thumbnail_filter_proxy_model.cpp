@@ -2,7 +2,7 @@
 
 #include "browser/thumbnail_model.h"
 
-namespace ispview {
+namespace mvpview {
 
 ThumbnailFilterProxyModel::ThumbnailFilterProxyModel(QObject* parent)
     : QSortFilterProxyModel(parent) {
@@ -67,4 +67,4 @@ bool ThumbnailFilterProxyModel::lessThan(const QModelIndex& left, const QModelIn
     return naturalNameLessThan(left, right);
 }
 
-} // namespace ispview
+} // namespace mvpview

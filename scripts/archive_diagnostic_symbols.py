@@ -37,7 +37,7 @@ def main():
     manifest = {'binary': binary.name, 'sha256': digest, 'pe': pe_identity(binary)}
     import re
     project = Path(__file__).resolve().parents[1] / 'CMakeLists.txt'
-    match = re.search(r'project\(ISPImageViewer VERSION ([0-9.]+)', project.read_text(encoding='utf8'))
+    match = re.search(r'project\(MVPImageViewer VERSION ([0-9.]+)', project.read_text(encoding='utf8'))
     manifest['version'] = match[1] if match else 'unknown'
     try:
         manifest['commit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()

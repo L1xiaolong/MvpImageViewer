@@ -30,7 +30,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_TESTING": "OFF",
-        "ISPVIEW_BUILD_BENCHMARKS": "ON"
+        "MVPVIEW_BUILD_BENCHMARKS": "ON"
       }
     },
     {
@@ -55,7 +55,7 @@
       "binaryDir": "${sourceDir}/build/windows-release",
       "cacheVariables": {
         "BUILD_TESTING": "OFF",
-        "ISPVIEW_BUILD_BENCHMARKS": "ON"
+        "MVPVIEW_BUILD_BENCHMARKS": "ON"
       }
     },
     {
@@ -83,7 +83,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_PREFIX_PATH": "$env{MSYS2_UCRT64}",
         "BUILD_TESTING": "OFF",
-        "ISPVIEW_BUILD_BENCHMARKS": "ON"
+        "MVPVIEW_BUILD_BENCHMARKS": "ON"
       },
       "condition": {
         "type": "equals",

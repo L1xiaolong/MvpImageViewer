@@ -4,7 +4,7 @@
 
 #include <array>
 
-namespace ispview {
+namespace mvpview {
 
 // Matches the std140 BayerParameters block in bayer.frag. RAW bytes remain in their
 // source packing; the shader uses these values to unpack and reproduce the CPU reference
@@ -14,4 +14,4 @@ namespace ispview {
 [[nodiscard]] std::array<float, 28>
 makeBayerRenderUniformData(const RawImageParameters& parameters);
 
-} // namespace ispview
+} // namespace mvpview

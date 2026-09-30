@@ -6,7 +6,7 @@
 #include <list>
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 
 template <typename T> class WeightedLruCache final {
   public:
@@ -83,4 +83,4 @@ template <typename T> class WeightedLruCache final {
     QHash<QString, Entry> entries_;
 };
 
-} // namespace ispview
+} // namespace mvpview

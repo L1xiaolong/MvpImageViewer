@@ -7,7 +7,7 @@
 
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 
 enum class FitMode { Fit, Manual };
 
@@ -45,4 +45,4 @@ class ViewTransform final {
     [[nodiscard]] static std::optional<QRectF> clampedNormalizedRoi(QRectF roi);
 };
 
-} // namespace ispview
+} // namespace mvpview

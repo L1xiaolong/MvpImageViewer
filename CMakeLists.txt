@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(ISPImageViewer VERSION 0.2.11 LANGUAGES CXX)
+project(MVPImageViewer VERSION 0.2.11 LANGUAGES CXX)
 enable_language(C)
 
-option(ISPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
-option(ISPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
-option(ISPVIEW_ENABLE_CRASHPAD "Enable macOS Crashpad crash capture when the pinned build succeeds" ON)
-set(ISPVIEW_GITHUB_REPOSITORY "L1xiaolong/IspImageViewer" CACHE STRING
+option(MVPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
+option(MVPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
+option(MVPVIEW_ENABLE_CRASHPAD "Enable macOS Crashpad crash capture when the pinned build succeeds" ON)
+set(MVPVIEW_GITHUB_REPOSITORY "L1xiaolong/MvpImageViewer" CACHE STRING
     "GitHub owner/repository used for update checks and project links")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -23,8 +23,8 @@ endif()
 if(NOT TARGET Exiv2::exiv2lib)
     message(FATAL_ERROR "Exiv2 was found but Exiv2::exiv2lib is unavailable")
 endif()
-set(ISPVIEW_HAS_LIBRAW ON)
-set(ISPVIEW_HAS_EXIV2 ON)
+set(MVPVIEW_HAS_LIBRAW ON)
+set(MVPVIEW_HAS_EXIV2 ON)
 if(APPLE)
     # LibRaw installations using @rpath must also run in the build tree.
     list(APPEND CMAKE_BUILD_RPATH "${LibRaw_LIBRARY_DIR}")
@@ -34,11 +34,11 @@ if(APPLE)
         set(CMAKE_REQUIRED_LIBRARIES "${LibRaw_LIBRARY}")
         check_cxx_source_runs(
             "#include <libraw.h>\nint main() { return libraw_version() ? 0 : 1; }"
-            ISPVIEW_LIBRAW_RUNTIME_WORKS
+            MVPVIEW_LIBRAW_RUNTIME_WORKS
         )
         unset(CMAKE_REQUIRED_INCLUDES)
         unset(CMAKE_REQUIRED_LIBRARIES)
-        if(NOT ISPVIEW_LIBRAW_RUNTIME_WORKS)
+        if(NOT MVPVIEW_LIBRAW_RUNTIME_WORKS)
             message(FATAL_ERROR "LibRaw was found but its runtime dependencies are unusable")
         endif()
     endif()
@@ -46,11 +46,11 @@ endif()
 message(STATUS "Camera RAW support: LibRaw ${LibRaw_VERSION}")
 message(STATUS "Image metadata support: Exiv2 ${exiv2_VERSION}")
 
-set(ISPVIEW_HAS_LCMS2 OFF)
-if(ISPVIEW_ENABLE_LCMS2)
+set(MVPVIEW_HAS_LCMS2 OFF)
+if(MVPVIEW_ENABLE_LCMS2)
     find_package(LCMS2 QUIET)
     if(LCMS2_FOUND)
-        set(ISPVIEW_HAS_LCMS2 ON)
+        set(MVPVIEW_HAS_LCMS2 ON)
         message(STATUS "Embedded ICC color management: LittleCMS ${LCMS2_VERSION}")
     else()
         message(STATUS "Embedded ICC color management disabled: LittleCMS was not found")
@@ -60,9 +60,9 @@ endif()
 # macOS Crashpad is built by its own GN pipeline (cmake/Crashpad.cmake) when the diagnostics
 # target is configured. Switching it off keeps the rest of the feature intact: the service
 # reports crash capture as unavailable instead of failing the configuration.
-set(ISPVIEW_HAS_CRASHPAD OFF)
-if(APPLE AND ISPVIEW_ENABLE_CRASHPAD)
-    set(ISPVIEW_HAS_CRASHPAD ON)
+set(MVPVIEW_HAS_CRASHPAD OFF)
+if(APPLE AND MVPVIEW_ENABLE_CRASHPAD)
+    set(MVPVIEW_HAS_CRASHPAD ON)
     message(STATUS "Crash capture: Crashpad (macOS)")
 elseif(APPLE)
     message(STATUS "Crash capture disabled: macOS Crashpad is switched off")
@@ -85,7 +85,7 @@ if(NOT TARGET Qt6::GuiPrivate)
         "private QtGui development headers for the selected Qt SDK.")
 endif()
 
-if(BUILD_TESTING OR ISPVIEW_BUILD_BENCHMARKS)
+if(BUILD_TESTING OR MVPVIEW_BUILD_BENCHMARKS)
     find_package(Qt6 6.9 REQUIRED COMPONENTS Test)
 endif()
 if(BUILD_TESTING)
@@ -106,9 +106,9 @@ include(CTest)
 include(cmake/Warnings.cmake)
 
 execute_process(COMMAND git rev-parse --short=12 HEAD WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    OUTPUT_VARIABLE ISPVIEW_BUILD_ID OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-if(NOT ISPVIEW_BUILD_ID)
-    set(ISPVIEW_BUILD_ID "source-archive")
+    OUTPUT_VARIABLE MVPVIEW_BUILD_ID OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT MVPVIEW_BUILD_ID)
+    set(MVPVIEW_BUILD_ID "source-archive")
 endif()
 # Keep release optimization while retaining line tables for matching diagnostic symbols.
 if(MSVC)
@@ -119,7 +119,7 @@ endif()
 add_subdirectory(third_party/miniz)
 add_subdirectory(src)
 
-if(ISPVIEW_BUILD_BENCHMARKS)
+if(MVPVIEW_BUILD_BENCHMARKS)
     add_subdirectory(tools)
 endif()
 

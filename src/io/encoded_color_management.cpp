@@ -14,11 +14,11 @@
 #include <limits>
 #include <memory>
 
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
 #include <lcms2.h>
 #endif
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 constexpr qsizetype kMaximumIccProfileBytes = 64LL * 1024 * 1024;
@@ -41,7 +41,7 @@ QString profileFingerprint(const QByteArray& profile) {
         QCryptographicHash::hash(profile, QCryptographicHash::Sha256).toHex().left(16));
 }
 
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
 
 constexpr qsizetype kMaximumColorWarningLength = 512;
 constexpr int kTransformRowsPerChunk = 64;
@@ -243,7 +243,7 @@ std::shared_ptr<LcmsTransform> cachedTransform(const QByteArray& profile,
 } // namespace
 
 bool EncodedColorManagement::isAvailable() {
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
     return true;
 #else
     return false;
@@ -259,7 +259,7 @@ void EncodedColorManagement::setEnabled(bool enabled) {
 }
 
 QString EncodedColorManagement::version() {
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
     return QStringLiteral("%1.%2")
         .arg(LCMS_VERSION / 1000)
         .arg((LCMS_VERSION % 1000) / 10);
@@ -307,7 +307,7 @@ void EncodedColorManagement::normalizeToDisplay(QImage& image, ImageMetadata& me
         return;
     }
 
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
     TransformSampleFormat sampleFormat = TransformSampleFormat::Rgba8;
     QImage::Format targetFormat = QImage::Format_RGBA8888;
     qsizetype bytesPerPixel = 4;
@@ -382,4 +382,4 @@ void EncodedColorManagement::normalizeToDisplay(QImage& image, ImageMetadata& me
     metadata.colorProfile = std::move(colorProfile);
 }
 
-} // namespace ispview
+} // namespace mvpview

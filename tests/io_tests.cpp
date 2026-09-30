@@ -37,7 +37,7 @@
 #include <QtEndian>
 #include <QtGui/qrgbafloat.h>
 
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
 #include <exiv2/exiv2.hpp>
 #endif
 
@@ -48,7 +48,7 @@
 #include <thread>
 #include <vector>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 class PrefetchRecordingDecoder final : public IImageDecoder {
@@ -142,7 +142,7 @@ constexpr quint32 prefetchCallBit(int frame, DecodePurpose purpose) {
     return 1U << (frame * 3 + static_cast<int>(purpose));
 }
 
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
 bool writeSyntheticMetadata(const QString& path) {
     try {
         auto image = Exiv2::ImageFactory::open(path.toStdString());
@@ -151,7 +151,7 @@ bool writeSyntheticMetadata(const QString& path) {
         }
         image->readMetadata();
         Exiv2::ExifData& exif = image->exifData();
-        exif["Exif.Image.Make"] = "ISPView";
+        exif["Exif.Image.Make"] = "MvpView";
         exif["Exif.Image.Model"] = "Synthetic Camera";
         exif["Exif.Image.Software"] = "Synthetic ISP 1.0";
         exif["Exif.Image.Orientation"] = static_cast<uint16_t>(6);
@@ -481,8 +481,8 @@ void IoTests::dropCopyCopiesFilesAndFoldersWithoutOverwriting() {
 }
 
 void IoTests::metadataCapabilityMatchesBuildFeature() {
-    QCOMPARE(MetadataReader::isAvailable(), static_cast<bool>(ISPVIEW_HAS_EXIV2));
-#if ISPVIEW_HAS_EXIV2
+    QCOMPARE(MetadataReader::isAvailable(), static_cast<bool>(MVPVIEW_HAS_EXIV2));
+#if MVPVIEW_HAS_EXIV2
     QVERIFY(!MetadataReader::version().isEmpty());
 #else
     QVERIFY(MetadataReader::version().isEmpty());
@@ -506,7 +506,7 @@ void IoTests::thumbnailDecodeSkipsOptionalMetadata() {
 }
 
 void IoTests::decoderMapsTypedExifIptcAndXmpMetadata() {
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("typed-metadata.jpg"));
@@ -525,7 +525,7 @@ void IoTests::decoderMapsTypedExifIptcAndXmpMetadata() {
     QVERIFY(result.frame->metadata.gpsMetadataPresent);
     QVERIFY2(result.frame->metadata.camera.has_value(),
              qPrintable(result.frame->metadata.metadataWarning));
-    QCOMPARE(result.frame->metadata.camera->make, QStringLiteral("ISPView"));
+    QCOMPARE(result.frame->metadata.camera->make, QStringLiteral("MvpView"));
     QCOMPARE(result.frame->metadata.camera->model, QStringLiteral("Synthetic Camera"));
     QCOMPARE(result.frame->metadata.camera->software, QStringLiteral("Synthetic ISP 1.0"));
     QCOMPARE(result.frame->metadata.camera->lens, QStringLiteral("Synthetic Prime"));
@@ -550,14 +550,14 @@ void IoTests::decoderMapsTypedExifIptcAndXmpMetadata() {
     QVERIFY2(unicodeResult.succeeded(), qPrintable(unicodeResult.error));
     QVERIFY2(unicodeResult.frame->metadata.camera.has_value(),
              qPrintable(unicodeResult.frame->metadata.metadataWarning));
-    QCOMPARE(unicodeResult.frame->metadata.camera->make, QStringLiteral("ISPView"));
+    QCOMPARE(unicodeResult.frame->metadata.camera->make, QStringLiteral("MvpView"));
 #else
     QSKIP("This build does not include Exiv2");
 #endif
 }
 
 void IoTests::metadataFailureDoesNotReplaceSuccessfulPixelDecode() {
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("broken-metadata.jpg"));
@@ -587,8 +587,8 @@ void IoTests::metadataFailureDoesNotReplaceSuccessfulPixelDecode() {
 }
 
 void IoTests::colorManagementCapabilityMatchesBuildFeature() {
-    QCOMPARE(EncodedColorManagement::isAvailable(), static_cast<bool>(ISPVIEW_HAS_LCMS2));
-#if ISPVIEW_HAS_LCMS2
+    QCOMPARE(EncodedColorManagement::isAvailable(), static_cast<bool>(MVPVIEW_HAS_LCMS2));
+#if MVPVIEW_HAS_LCMS2
     QVERIFY(!EncodedColorManagement::version().isEmpty());
 #else
     QVERIFY(EncodedColorManagement::version().isEmpty());
@@ -625,7 +625,7 @@ void IoTests::decoderConvertsEmbeddedLinearIccToSrgb() {
         QVERIFY2(result.succeeded(), qPrintable(result.error));
         QVERIFY(result.frame->metadata.colorProfile.has_value());
         QCOMPARE(result.frame->metadata.colorProfile->sourceFingerprint.size(), 16);
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
         QCOMPARE(result.frame->metadata.colorProfile->renderingIntent,
                  QStringLiteral("Relative colorimetric"));
         QVERIFY2(result.frame->metadata.colorWarning.isEmpty(),
@@ -807,7 +807,7 @@ void IoTests::colorManagementRejectsNonRgbProfileWithoutChangingPixels() {
     QVERIFY(metadata.colorProfile.has_value());
     QVERIFY(!metadata.colorProfile->converted);
     QCOMPARE(image.pixelColor(0, 0), original);
-#if ISPVIEW_HAS_LCMS2
+#if MVPVIEW_HAS_LCMS2
     QCOMPARE(metadata.colorWarning, QStringLiteral("Only embedded RGB ICC profiles are supported"));
 #else
     QVERIFY(metadata.colorWarning.isEmpty());
@@ -1035,9 +1035,9 @@ void IoTests::thumbnailDiskCacheRoundTripsImage() {
     const QImage restored = cache.load(QStringLiteral("stable-key"));
     QCOMPARE(restored.size(), source.size());
     QCOMPARE(restored.pixelColor(4, 5), source.pixelColor(4, 5));
-    QCOMPARE(restored.text(QStringLiteral("ispview.sourceWidth")), QStringLiteral("640"));
-    QCOMPARE(restored.text(QStringLiteral("ispview.sourceHeight")), QStringLiteral("480"));
-    QCOMPARE(restored.text(QStringLiteral("ispview.validBits")), QStringLiteral("12"));
+    QCOMPARE(restored.text(QStringLiteral("mvpview.sourceWidth")), QStringLiteral("640"));
+    QCOMPARE(restored.text(QStringLiteral("mvpview.sourceHeight")), QStringLiteral("480"));
+    QCOMPARE(restored.text(QStringLiteral("mvpview.validBits")), QStringLiteral("12"));
     QVERIFY(cache.load(QStringLiteral("missing-key")).isNull());
 }
 
@@ -1351,7 +1351,7 @@ void IoTests::defaultDecoderAndFormatCatalogStayConsistent() {
 
 void IoTests::cameraRawCapabilityMatchesBuildFeature() {
     CameraRawDecoder decoder;
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
     QVERIFY(CameraRawDecoder::isAvailable());
     QVERIFY(decoder.canDecode(QStringLiteral("capture.DNG")));
     QVERIFY(decoder.canDecode(QStringLiteral("capture.CR3")));
@@ -1363,7 +1363,7 @@ void IoTests::cameraRawCapabilityMatchesBuildFeature() {
 }
 
 void IoTests::cameraRawDecodesLocalDngWhenAvailable() {
-#if ISPVIEW_HAS_LIBRAW
+#if MVPVIEW_HAS_LIBRAW
     const QString path = QFINDTESTDATA("../test_images/img.dng");
     if (path.isEmpty()) {
         QSKIP("Optional local test_images/img.dng is not available");
@@ -1957,7 +1957,7 @@ void IoTests::imageLoaderSkipsFullPrefetchWhenFramesExceedBudget() {
 void IoTests::namedRawPresetsRoundTripOverwriteAndDelete() {
     QTemporaryDir settingsDirectory;
     QVERIFY(settingsDirectory.isValid());
-    QCoreApplication::setOrganizationName(QStringLiteral("ISPViewTests"));
+    QCoreApplication::setOrganizationName(QStringLiteral("MvpViewTests"));
     QCoreApplication::setApplicationName(QStringLiteral("IoPresetTests"));
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
@@ -2029,7 +2029,7 @@ void IoTests::namedRawPresetsRoundTripOverwriteAndDelete() {
 void IoTests::filenameRulesApplyOrderedPresetAndCapturedOverrides() {
     QTemporaryDir settingsDirectory;
     QVERIFY(settingsDirectory.isValid());
-    QCoreApplication::setOrganizationName(QStringLiteral("ISPViewTests"));
+    QCoreApplication::setOrganizationName(QStringLiteral("MvpViewTests"));
     QCoreApplication::setApplicationName(QStringLiteral("IoFilenameRuleTests"));
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
@@ -2335,7 +2335,7 @@ void IoTests::imageTransformerRotatesResizesAndRestoresEncodedImage() {
 }
 
 void IoTests::imageTransformerPreservesExifIptcAndXmpMetadata() {
-#if ISPVIEW_HAS_EXIV2
+#if MVPVIEW_HAS_EXIV2
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("metadata-edit.jpg"));
@@ -2354,7 +2354,7 @@ void IoTests::imageTransformerPreservesExifIptcAndXmpMetadata() {
 
         QCOMPARE(QString::fromStdString(
                      exif.findKey(Exiv2::ExifKey("Exif.Image.Make"))->toString()),
-                 QStringLiteral("ISPView"));
+                 QStringLiteral("MvpView"));
         QCOMPARE(exif.findKey(Exiv2::ExifKey("Exif.Image.Orientation"))->toUint32(), 1U);
         QCOMPARE(exif.findKey(Exiv2::ExifKey("Exif.Photo.PixelXDimension"))->toUint32(),
                  static_cast<uint32_t>(expectedSize.width()));
@@ -2378,7 +2378,7 @@ void IoTests::imageTransformerPreservesExifIptcAndXmpMetadata() {
         QtImageDecoder().decode({path, DecodePurpose::Full, {}, std::nullopt});
     QVERIFY2(decoded.succeeded(), qPrintable(decoded.error));
     QVERIFY(decoded.frame->metadata.camera.has_value());
-    QCOMPARE(decoded.frame->metadata.camera->make, QStringLiteral("ISPView"));
+    QCOMPARE(decoded.frame->metadata.camera->make, QStringLiteral("MvpView"));
     QCOMPARE(decoded.frame->metadata.camera->model, QStringLiteral("Synthetic Camera"));
     QVERIFY(decoded.frame->metadata.descriptive.has_value());
     QCOMPARE(decoded.frame->metadata.descriptive->title, QStringLiteral("XMP title"));
@@ -2421,7 +2421,7 @@ void IoTests::imageTransformerRotatesAndRestoresNv12Data() {
     QCOMPARE(restoredParameters->size, QSize(4, 2));
 }
 
-} // namespace ispview
+} // namespace mvpview
 
-QTEST_GUILESS_MAIN(ispview::IoTests)
+QTEST_GUILESS_MAIN(mvpview::IoTests)
 #include "io_tests.moc"

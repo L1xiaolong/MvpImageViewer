@@ -27,12 +27,12 @@ int main(int argc, char** argv) {
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
 #endif
     if (app.arguments().size() < 4) return 2;
-    ispview::diagnostics::Options options;
+    mvpview::diagnostics::Options options;
     options.root = app.arguments()[1]; options.crashEnabled = app.arguments()[3] != QStringLiteral("off");
-    ispview::diagnostics::Service service(options);
+    mvpview::diagnostics::Service service(options);
     service.startCrashCapture(QCoreApplication::applicationDirPath());
     if (options.crashEnabled && service.crashStatus() != QStringLiteral("active")) return 3;
-    service.record(ispview::diagnostics::Level::Info, "fixture", QStringLiteral("before.crash"), {}, true);
+    service.record(mvpview::diagnostics::Level::Info, "fixture", QStringLiteral("before.crash"), {}, true);
     service.flush();
     QFile ready(options.root + QStringLiteral("/ready")); if (!ready.open(QIODevice::WriteOnly)) return 4; ready.close();
     const QString mode = app.arguments()[2];
@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
             if (Process32FirstW(processes, &entry)) {
                 do {
                     if (QString::fromWCharArray(entry.szExeFile)
-                            .compare(QStringLiteral("ispview_crash_handler.exe"), Qt::CaseInsensitive) == 0) {
+                            .compare(QStringLiteral("mvpview_crash_handler.exe"), Qt::CaseInsensitive) == 0) {
                         if (HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, entry.th32ProcessID)) {
                             killed = TerminateProcess(process, 0) != FALSE;
                             CloseHandle(process);

@@ -8,7 +8,7 @@
 #include <QStringList>
 #include <QTimer>
 
-namespace ispview {
+namespace mvpview {
 
 class QmlImageCanvas;
 
@@ -87,4 +87,4 @@ class FullScreenController final : public QObject {
     QTimer fullLoadTimer_;
 };
 
-} // namespace ispview
+} // namespace mvpview

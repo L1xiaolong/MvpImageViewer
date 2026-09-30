@@ -15,7 +15,7 @@
 #include <QQuickTextureFactory>
 #include <QUrl>
 
-namespace ispview {
+namespace mvpview {
 
 SystemFolderIconProvider::SystemFolderIconProvider()
     : QQuickImageProvider(QQuickImageProvider::Image),
@@ -169,4 +169,4 @@ QSize ThumbnailImageProvider::bucketedSize(const QSize& requestedSize) {
     return {512, 512};
 }
 
-} // namespace ispview
+} // namespace mvpview

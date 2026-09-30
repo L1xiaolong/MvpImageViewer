@@ -5,7 +5,7 @@
 #include "io/qt_image_decoder.h"
 #include "io/raw_image_decoder.h"
 
-namespace ispview {
+namespace mvpview {
 
 std::shared_ptr<const IImageDecoder> createDefaultImageDecoder() {
     auto registry = std::make_shared<ImageDecoderRegistry>();
@@ -15,4 +15,4 @@ std::shared_ptr<const IImageDecoder> createDefaultImageDecoder() {
     return registry;
 }
 
-} // namespace ispview
+} // namespace mvpview

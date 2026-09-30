@@ -1,7 +1,7 @@
 #include "render/yuv_render_parameters.h"
 #include "core/color_conversion.h"
 
-namespace ispview {
+namespace mvpview {
 
 std::array<float, 28> makeYuvRenderUniformData(const RawImageParameters& parameters) {
     std::array<float, 28> values{};
@@ -64,4 +64,4 @@ std::array<float, 28> makeYuvRenderUniformData(const RawImageParameters& paramet
     return values;
 }
 
-} // namespace ispview
+} // namespace mvpview

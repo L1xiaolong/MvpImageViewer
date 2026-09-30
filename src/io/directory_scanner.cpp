@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 QString normalizedAbsolutePath(const QString& path) {
@@ -245,4 +245,4 @@ bool DirectoryScanner::isBrowsableEntry(const QFileInfo& info) {
            info.isReadable();
 }
 
-} // namespace ispview
+} // namespace mvpview

@@ -7,7 +7,7 @@
 
 #include <array>
 
-namespace ispview {
+namespace mvpview {
 
 enum class RawPixelFormat { NV12, NV21, I420, P010, MipiRaw10, MipiRaw12, Raw16 };
 enum class BayerPattern { RGGB, GRBG, GBRG, BGGR };
@@ -95,4 +95,4 @@ struct RawImageParameters {
 [[nodiscard]] QPoint displayToSourcePixel(const QPoint& displayPixel, const QSize& sourceSize,
                                           ImageOrientation orientation);
 
-} // namespace ispview
+} // namespace mvpview

@@ -9,7 +9,7 @@
 #include <cmath>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 qsizetype checkedMultiply(qsizetype left, qsizetype right) {
@@ -479,4 +479,4 @@ QImage orientedImage(QImage source, ImageOrientation orientation) {
     return oriented;
 }
 
-} // namespace ispview
+} // namespace mvpview

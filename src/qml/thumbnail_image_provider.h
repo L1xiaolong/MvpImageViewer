@@ -5,18 +5,18 @@
 
 #include <memory>
 
-namespace ispview {
+namespace mvpview {
 
 class IImageDecoder;
 class ImageLoader;
 
-} // namespace ispview
+} // namespace mvpview
 
 QT_BEGIN_NAMESPACE
 class QFileSystemModel;
 QT_END_NAMESPACE
 
-namespace ispview {
+namespace mvpview {
 
 // Resolves Windows Shell folder artwork for Quick Access entries. Other platforms keep using
 // the existing bundled folder artwork and do not register URLs for this provider.
@@ -48,4 +48,4 @@ class ThumbnailImageProvider final : public QQuickAsyncImageProvider {
     ImageLoader* loader_ = nullptr;
 };
 
-} // namespace ispview
+} // namespace mvpview

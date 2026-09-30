@@ -3,7 +3,7 @@
 #include <QCollator>
 #include <QSortFilterProxyModel>
 
-namespace ispview {
+namespace mvpview {
 
 enum class BrowserSortMode { Name, ModifiedTime, Size, Type };
 
@@ -27,4 +27,4 @@ class ThumbnailFilterProxyModel final : public QSortFilterProxyModel {
     QCollator collator_;
 };
 
-} // namespace ispview
+} // namespace mvpview

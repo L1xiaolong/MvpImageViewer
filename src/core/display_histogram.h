@@ -9,7 +9,7 @@
 #include <QVector>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 
 struct HistogramChannel {
     QVector<quint64> bins;
@@ -57,4 +57,4 @@ class DisplayHistogramAnalyzer final {
         qint64 maximumSamples = kDefaultMaximumSamples);
 };
 
-} // namespace ispview
+} // namespace mvpview

@@ -1,5 +1,5 @@
 import QtQuick
-import "../src/qml/Isp"
+import "../src/qml/Mvp"
 
 Item {
     id: root

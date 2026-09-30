@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 struct ChannelAccumulator {
@@ -304,4 +304,4 @@ QString rawHistogramChannelName(RawHistogramChannelId id) {
     return {};
 }
 
-} // namespace ispview
+} // namespace mvpview

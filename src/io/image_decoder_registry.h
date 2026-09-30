@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-namespace ispview {
+namespace mvpview {
 
 class ImageDecoderRegistry final : public IImageDecoder {
   public:
@@ -20,4 +20,4 @@ class ImageDecoderRegistry final : public IImageDecoder {
     std::vector<std::shared_ptr<const IImageDecoder>> decoders_;
 };
 
-} // namespace ispview
+} // namespace mvpview

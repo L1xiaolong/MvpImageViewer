@@ -5,7 +5,7 @@
 #include <QTimer>
 #include <atomic>
 #include <thread>
-namespace ispview {
+namespace mvpview {
 class DiagnosticsController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QVariantList recentReports READ recentReports NOTIFY changed)

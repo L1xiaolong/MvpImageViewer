@@ -10,7 +10,7 @@
 #include <array>
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 constexpr int kMeasuredRuns = 3;
@@ -64,21 +64,21 @@ bool printMeasurement(QTextStream& output, const QString& label, const QSize& si
 }
 
 } // namespace
-} // namespace ispview
+} // namespace mvpview
 
 int main(int argc, char* argv[]) {
     QCoreApplication application(argc, argv);
     QTextStream output(stdout);
-    if (!ispview::EncodedColorManagement::isAvailable()) {
+    if (!mvpview::EncodedColorManagement::isAvailable()) {
         output << "LittleCMS is not available in this build\n";
         return 0;
     }
     output << "Input\tSize\tICCMedianMs\tImageMiB\n";
-    if (!ispview::printMeasurement(output, QStringLiteral("12MP linear-sRGB"), {4000, 3000})) {
+    if (!mvpview::printMeasurement(output, QStringLiteral("12MP linear-sRGB"), {4000, 3000})) {
         return 1;
     }
     if (application.arguments().contains(QStringLiteral("--48mp")) &&
-        !ispview::printMeasurement(output, QStringLiteral("48MP linear-sRGB"), {8000, 6000})) {
+        !mvpview::printMeasurement(output, QStringLiteral("48MP linear-sRGB"), {8000, 6000})) {
         return 1;
     }
     return 0;

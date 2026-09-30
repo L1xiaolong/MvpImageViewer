@@ -11,7 +11,7 @@
 #include <array>
 #include <optional>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 constexpr QSize kDefaultFrameSize{3840, 2160};
@@ -115,7 +115,7 @@ bool runFrameSize(QTextStream& output, const QString& directory, const QString& 
 }
 
 } // namespace
-} // namespace ispview
+} // namespace mvpview
 
 int main(int argc, char* argv[]) {
     QCoreApplication application(argc, argv);
@@ -127,14 +127,14 @@ int main(int argc, char* argv[]) {
     }
 
     output << "Source\tFormat\tPurpose\tMedianMs\tFrameMiB\tOutput\n";
-    if (!ispview::runFrameSize(output, directory.path(), QStringLiteral("4K"),
-                               ispview::kDefaultFrameSize)) {
+    if (!mvpview::runFrameSize(output, directory.path(), QStringLiteral("4K"),
+                               mvpview::kDefaultFrameSize)) {
         output << "Decode failed\n";
         return 2;
     }
     if (application.arguments().contains(QStringLiteral("--48mp")) &&
-        !ispview::runFrameSize(output, directory.path(), QStringLiteral("48MP"),
-                               ispview::kLargeFrameSize)) {
+        !mvpview::runFrameSize(output, directory.path(), QStringLiteral("48MP"),
+                               mvpview::kLargeFrameSize)) {
         output << "48MP decode failed\n";
         return 3;
     }

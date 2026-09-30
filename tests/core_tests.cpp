@@ -18,7 +18,7 @@
 #include <cmath>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 
 class CoreTests final : public QObject {
     Q_OBJECT
@@ -1204,7 +1204,7 @@ void CoreTests::unifiedHistogramUsesExactPixelsAndBayerColors() {
     QCOMPARE(interpolated.luma.bins.at(90), quint64{2});
 }
 
-} // namespace ispview
+} // namespace mvpview
 
-QTEST_GUILESS_MAIN(ispview::CoreTests)
+QTEST_GUILESS_MAIN(mvpview::CoreTests)
 #include "core_tests.moc"

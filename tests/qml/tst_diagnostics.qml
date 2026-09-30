@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../../src/qml/Isp"
+import "../../src/qml/Mvp"
 
 TestCase {
     id: root

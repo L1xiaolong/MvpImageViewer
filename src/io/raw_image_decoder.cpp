@@ -14,7 +14,7 @@
 #include <cstddef>
 #include <limits>
 
-namespace ispview {
+namespace mvpview {
 namespace {
 
 // Full frames keep source planes for GPU display and exact probes. The CPU image is an
@@ -295,7 +295,7 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     frame->metadata.format = rawPixelFormatName(parameters.format);
     frame->metadata.fileSize = info.size();
     frame->metadata.modifiedAt = info.lastModified();
-    frame->metadata.decoderName = QStringLiteral("ISPView RAW/YUV");
+    frame->metadata.decoderName = QStringLiteral("MvpView RAW/YUV");
     frame->metadata.sourceSize = logicalDisplaySize;
     frame->rawParameters = parameters;
     // Only a full decode keeps the source planes the exact probes read.
@@ -332,4 +332,4 @@ QString RawImageDecoder::pixelDescription(const ImageFrame& frame, int x, int y)
     return RawPlaneAccessor(frame).pixelDescriptionAtDisplayPixel({x, y});
 }
 
-} // namespace ispview
+} // namespace mvpview
