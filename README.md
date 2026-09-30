@@ -149,7 +149,7 @@ TIFF、WebP、OpenEXR、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当前不在支
 使用项目脚本：
 
 ```sh
-./build_macos.sh dev --test
+./build_macos.sh dev
 ./build_macos.sh release
 ./build_macos.sh package
 ```
@@ -163,22 +163,21 @@ TIFF、WebP、OpenEXR、AVIF、JPEG XL、PSD、SVG、PDF 和 GIF 当前不在支
 ```sh
 cmake --preset macos-debug -DCMAKE_PREFIX_PATH="$(brew --prefix)"
 cmake --build --preset macos-debug
-ctest --preset macos-debug --output-on-failure
 ```
 
-运行 `./build_macos.sh --help` 可查看清理、签名、RHI 验证、并行任务数等选项。
+运行 `./build_macos.sh --help` 可查看清理、签名、并行任务数等选项。
 
 如需进一步缩小包体，可以构建项目验证过的 Qt 6.9 No-ICU 变体：
 
 ```sh
 ./scripts/build_qt_no_icu_macos.sh -j 8
-./build_macos.sh debug --qt-prefix build/qt-no-icu/install --test
+./build_macos.sh debug --qt-prefix build/qt-no-icu/install
 ./build_macos.sh package --qt-prefix build/qt-no-icu/install
 ```
 
 该变体保留 QML、SVG、国际化文件名和原生自然排序，但不再打包 ICU。首次编译 Qt
 耗时较长，后续会复用 `build/qt-no-icu`。目前这条自定义 Qt 构建链只在 macOS arm64
-完成了编译、自动测试和打包验证；Windows 仍使用常规 Qt，不能直接复用 macOS 产物。
+完成了编译和打包验证；Windows 仍使用常规 Qt，不能直接复用 macOS 产物。
 
 ### Windows
 
@@ -192,7 +191,7 @@ pacman -S --needed mingw-w64-ucrt-x86_64-libraw mingw-w64-ucrt-x86_64-exiv2 ming
 
 ```powershell
 $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
-.\build_windows.ps1 -Toolchain msys2 -Mode dev -Test
+.\build_windows.ps1 -Toolchain msys2 -Mode dev
 .\build_windows.ps1 -Toolchain msys2 -Mode release
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
@@ -206,7 +205,6 @@ Windows 的 `package` 模式采用与 macOS 相同的 Qt 运行时裁剪清单�
 ```powershell
 cmake --preset windows-msys2-debug
 cmake --build --preset windows-msys2-debug
-ctest --preset windows-msys2-debug --output-on-failure
 ```
 
 脚本仍保留 `-Toolchain msvc` 作为可选的 Visual Studio 构建路径。
@@ -228,26 +226,6 @@ GitHub Release 的 macOS DMG 和 Windows 安装器都会附带 LibRaw、Exiv2 �
 
 > **许可证提示：** Exiv2 采用 GPL-2.0-or-later。分发前须确认整个应用的分发方案符合其许可证，包括相应的源码交付要求。Qt、LibRaw、LittleCMS 及打包产生的传递依赖也各自保留原有许可证。
 
-## 测试与性能工具
-
-Debug Preset 会构建自动测试：
-
-```sh
-ctest --preset macos-debug --output-on-failure
-```
-
-Release Preset 可构建 RAW 解码、直方图、颜色管理和大目录浏览 benchmark：
-
-```sh
-cmake --build --preset macos-release
-./build/macos-preset-release/tools/mvpview_raw_benchmark --48mp
-./build/macos-preset-release/tools/mvpview_histogram_benchmark --48mp
-./build/macos-preset-release/tools/mvpview_color_benchmark --48mp
-./build/macos-preset-release/tools/mvpview_browser_benchmark --enforce
-```
-
-需要真实图片的测试数据应保存在本地，不应提交包含个人信息、精确位置或来源不明的素材。
-
 ## 项目结构
 
 ```text
@@ -257,8 +235,7 @@ src/render     RHI 渲染参数与 Shader
 src/browser    目录、缩略图、拖放与剪贴板模型
 src/platform   macOS/Windows 平台服务与快捷键
 src/qml        应用入口、控制器和 QML 界面
-tests          C++ 与 QML 自动测试
-tools          性能测试和诊断工具
+tools          图标与翻译维护脚本
 ```
 
 ## 许可证

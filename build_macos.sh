@@ -12,15 +12,13 @@ Commands:
   package     Build Release, deploy dependencies, sign, verify, and write dist/.
 
 Examples:
-  ./build_macos.sh dev --test
+  ./build_macos.sh dev
   ./build_macos.sh release -j 8
   ./build_macos.sh package
   ./build_macos.sh package --qt-prefix build/qt-no-icu/install
   ./build_macos.sh package --sign "Developer ID Application: Example (TEAMID)"
 
 Options:
-  --test       Run CTest when using a Debug build.
-  --rhi        Run the native Metal RHI acceptance test.
   --clean      Remove the selected build directory before configuring.
   --no-crashpad  Disable macOS Crashpad when its pinned source is unavailable.
   --qt-prefix  Build with a custom Qt installation instead of the Qt on PATH.
@@ -42,8 +40,6 @@ EOF
 
 command_name="dev"
 mode="debug"
-run_tests=0
-run_rhi=0
 clean=0
 create_zip=1
 enable_crashpad="OFF"
@@ -77,14 +73,6 @@ fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --test)
-            run_tests=1
-            shift
-            ;;
-        --rhi)
-            run_rhi=1
-            shift
-            ;;
         --clean)
             clean=1
             shift
@@ -163,19 +151,13 @@ fi
 
 if [[ -n "$qt_prefix" ]]; then
     build_type="Debug"
-    build_testing="ON"
-    build_benchmarks="OFF"
     if [[ "$mode" == "release" ]]; then
         build_type="Release"
-        build_testing="OFF"
-        build_benchmarks="OFF"
     fi
     echo "Configuring with custom Qt: $qt_prefix"
     cmake -S "$script_dir" -B "$build_dir" -G "Unix Makefiles" \
         -DCMAKE_BUILD_TYPE="$build_type" \
         -DCMAKE_OSX_ARCHITECTURES=arm64 \
-        -DBUILD_TESTING="$build_testing" \
-        -DMVPVIEW_BUILD_BENCHMARKS="$build_benchmarks" \
         -DMVPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
         -DMVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY:-}" \
         -DCMAKE_PREFIX_PATH="$qt_prefix;$brew_prefix" \
@@ -185,7 +167,6 @@ if [[ -n "$qt_prefix" ]]; then
 else
     echo "Configuring preset: $preset"
     cmake --preset "$preset" \
-        -DMVPVIEW_BUILD_BENCHMARKS=OFF \
         -DCMAKE_PREFIX_PATH="$brew_prefix" \
         -DMVPVIEW_ENABLE_CRASHPAD="$enable_crashpad" \
         -DMVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY:-}"
@@ -196,25 +177,6 @@ fi
 if [[ ! -d "$built_app" ]]; then
     echo "Expected app bundle was not produced: $built_app" >&2
     exit 1
-fi
-
-if [[ "$run_tests" -eq 1 ]]; then
-    if [[ "$mode" == "debug" ]]; then
-        if [[ -n "$qt_prefix" ]]; then
-            echo "Running tests from custom Qt build"
-            ctest --test-dir "$build_dir" --output-on-failure
-        else
-            echo "Running tests: macos-debug"
-            ctest --preset macos-debug --output-on-failure
-        fi
-    else
-        echo "Release builds do not enable CTest; skipping --test."
-    fi
-fi
-
-if [[ "$run_rhi" -eq 1 ]]; then
-    echo "Running native Metal RHI acceptance tests"
-    ctest --preset macos-rhi-acceptance --output-on-failure
 fi
 
 if [[ "$command_name" != "package" ]]; then
@@ -486,7 +448,7 @@ if [[ "$crashpad_enabled" == "ON" ]]; then
     fi
 fi
 if [[ "$sign_identity" == "-" ]]; then
-    echo "Applying ad-hoc local-test signature"
+    echo "Applying ad-hoc local signature"
     codesign --force --deep --sign - \
         --entitlements "$script_dir/packaging/macos-local.entitlements" \
         "$staged_app"

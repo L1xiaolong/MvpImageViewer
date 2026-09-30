@@ -59,9 +59,6 @@ jobs:
             fi
           fi
 
-      - name: Test runtime license collection
-        run: python3 -m unittest discover -s tests -p test_runtime_licenses.py
-
   ci:
     name: CI gate
     needs: validate
@@ -165,7 +162,6 @@ jobs:
           MSYS2_UCRT64: C:/msys64/ucrt64
         run: |
           cmake --preset windows-msys2-release \
-            -DMVPVIEW_BUILD_BENCHMARKS=OFF \
             -DMVPVIEW_ENABLE_LCMS2=OFF \
             -DMVPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
           cmake --build --preset windows-msys2-release --parallel

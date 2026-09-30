@@ -39,7 +39,7 @@ class ThumbnailImageProvider final : public QQuickAsyncImageProvider {
 
     QQuickImageResponse* requestImageResponse(const QString& id,
                                               const QSize& requestedSize) override;
-    // Synchronous compatibility helper used by deterministic unit tests only.
+    // Synchronous compatibility helper for callers that need an immediate image.
     QImage requestImage(const QString& id, QSize* size,
                         const QSize& requestedSize) override;
     [[nodiscard]] static QSize bucketedSize(const QSize& requestedSize);

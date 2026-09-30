@@ -13,8 +13,7 @@
       "binaryDir": "${sourceDir}/build/macos-preset-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_OSX_ARCHITECTURES": "arm64",
-        "BUILD_TESTING": "ON"
+        "CMAKE_OSX_ARCHITECTURES": "arm64"
       },
       "condition": {
         "type": "equals",
@@ -28,9 +27,7 @@
       "inherits": "macos-debug",
       "binaryDir": "${sourceDir}/build/macos-preset-release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_TESTING": "OFF",
-        "MVPVIEW_BUILD_BENCHMARKS": "ON"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
@@ -39,9 +36,6 @@
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows-debug",
-      "cacheVariables": {
-        "BUILD_TESTING": "ON"
-      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -52,11 +46,7 @@
       "name": "windows-release",
       "displayName": "Windows x64 Release",
       "inherits": "windows-debug",
-      "binaryDir": "${sourceDir}/build/windows-release",
-      "cacheVariables": {
-        "BUILD_TESTING": "OFF",
-        "MVPVIEW_BUILD_BENCHMARKS": "ON"
-      }
+      "binaryDir": "${sourceDir}/build/windows-release"
     },
     {
       "name": "windows-msys2-debug",
@@ -65,8 +55,7 @@
       "binaryDir": "${sourceDir}/build/windows-msys2-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PREFIX_PATH": "$env{MSYS2_UCRT64}",
-        "BUILD_TESTING": "ON"
+        "CMAKE_PREFIX_PATH": "$env{MSYS2_UCRT64}"
       },
       "condition": {
         "type": "equals",
@@ -81,9 +70,7 @@
       "binaryDir": "${sourceDir}/build/windows-msys2-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PREFIX_PATH": "$env{MSYS2_UCRT64}",
-        "BUILD_TESTING": "OFF",
-        "MVPVIEW_BUILD_BENCHMARKS": "ON"
+        "CMAKE_PREFIX_PATH": "$env{MSYS2_UCRT64}"
       },
       "condition": {
         "type": "equals",
@@ -99,23 +86,5 @@
     { "name": "windows-release", "configurePreset": "windows-release", "configuration": "Release" },
     { "name": "windows-msys2-debug", "configurePreset": "windows-msys2-debug" },
     { "name": "windows-msys2-release", "configurePreset": "windows-msys2-release" }
-  ],
-  "testPresets": [
-    {
-      "name": "macos-debug",
-      "configurePreset": "macos-debug",
-      "output": { "outputOnFailure": true }
-    },
-    {
-      "name": "windows-debug",
-      "configurePreset": "windows-debug",
-      "configuration": "Debug",
-      "output": { "outputOnFailure": true }
-    },
-    {
-      "name": "windows-msys2-debug",
-      "configurePreset": "windows-msys2-debug",
-      "output": { "outputOnFailure": true }
-    }
   ]
 }

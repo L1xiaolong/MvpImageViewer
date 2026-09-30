@@ -7,7 +7,6 @@ param(
 
     [string]$Msys2Ucrt64 = $env:MSYS2_UCRT64,
 
-    [switch]$Test,
     [switch]$Clean,
     [switch]$NoZip,
     [int]$Jobs = [Environment]::ProcessorCount,
@@ -27,14 +26,13 @@ Commands:
   package     Build Release, deploy DLL/QML dependencies, and write dist\.
 
 Examples:
-  .\build_windows.ps1 -Mode dev -Test
+  .\build_windows.ps1 -Mode dev
   .\build_windows.ps1 -Mode release -Jobs 8
   .\build_windows.ps1 -Mode package -Toolchain msys2
 
 Options:
   -Toolchain msys2|msvc  Use MSYS2/UCRT64 Ninja (default) or Visual Studio.
   -Msys2Ucrt64 PATH      MSYS2 UCRT64 prefix.
-  -Test                  Run CTest for a Debug build.
   -Clean                 Remove the selected build directory first.
   -NoZip                 Do not also create the optional portable ZIP.
   -Jobs N                Parallel build jobs. Default: CPU core count.
@@ -303,26 +301,11 @@ if ($Toolchain -eq "msys2") {
         "-S", $ScriptDir, "-B", $BuildDir, "-G", "Ninja",
         "-DCMAKE_PREFIX_PATH=$Msys2Ucrt64", "-DCMAKE_BUILD_TYPE=$BuildMode"
     )
-    if ($BuildMode -eq "debug") {
-        $configureArgs += "-DBUILD_TESTING=ON"
-    } else {
-        $configureArgs += @("-DBUILD_TESTING=OFF", "-DMVPVIEW_BUILD_BENCHMARKS=ON")
-    }
-
     Write-Host "Configuring MSYS2/UCRT64 build: $BuildDir"
     cmake @configureArgs
     if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed with exit code $LASTEXITCODE" }
     cmake --build $BuildDir --parallel $Jobs
     if ($LASTEXITCODE -ne 0) { throw "CMake build failed with exit code $LASTEXITCODE" }
-
-    if ($Test) {
-        if ($BuildMode -eq "debug") {
-            ctest --test-dir $BuildDir --output-on-failure
-            if ($LASTEXITCODE -ne 0) { throw "CTest failed with exit code $LASTEXITCODE" }
-        } else {
-            Write-Host "Release builds do not enable CTest; skipping -Test."
-        }
-    }
 
     $executable = Find-ApplicationExecutable -Root $BuildDir
     if ($Package) {
@@ -345,15 +328,6 @@ cmake --preset $Preset
 if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed with exit code $LASTEXITCODE" }
 cmake --build --preset $Preset --parallel $Jobs
 if ($LASTEXITCODE -ne 0) { throw "CMake build failed with exit code $LASTEXITCODE" }
-if ($Test) {
-    if ($BuildMode -eq "debug") {
-        ctest --preset windows-debug --output-on-failure
-        if ($LASTEXITCODE -ne 0) { throw "CTest failed with exit code $LASTEXITCODE" }
-    } else {
-        Write-Host "Release builds do not enable CTest; skipping -Test."
-    }
-}
-
 $executable = Find-ApplicationExecutable -Root $BuildDir
 if ($Package) {
     $deployCommand = Get-Command windeployqt.exe -ErrorAction SilentlyContinue

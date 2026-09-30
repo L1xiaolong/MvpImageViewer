@@ -149,7 +149,7 @@ Install the image libraries first: `brew install libraw exiv2 pkgconf`.
 Use the project wrapper:
 
 ```sh
-./build_macos.sh dev --test
+./build_macos.sh dev
 ./build_macos.sh release
 ./build_macos.sh package
 ```
@@ -163,23 +163,22 @@ Equivalent CMake Preset commands:
 ```sh
 cmake --preset macos-debug -DCMAKE_PREFIX_PATH="$(brew --prefix)"
 cmake --build --preset macos-debug
-ctest --preset macos-debug --output-on-failure
 ```
 
-Run `./build_macos.sh --help` for cleanup, signing, RHI validation, and parallel-build options.
+Run `./build_macos.sh --help` for cleanup, signing, and parallel-build options.
 
 For a smaller package, build the validated Qt 6.9 No-ICU variant:
 
 ```sh
 ./scripts/build_qt_no_icu_macos.sh -j 8
-./build_macos.sh debug --qt-prefix build/qt-no-icu/install --test
+./build_macos.sh debug --qt-prefix build/qt-no-icu/install
 ./build_macos.sh package --qt-prefix build/qt-no-icu/install
 ```
 
 This variant retains QML, SVG, international file names, and native natural sorting while
 removing the packaged ICU libraries. The initial Qt build is long; later runs reuse
-`build/qt-no-icu`. This custom Qt toolchain has currently been build-, test-, and
-package-validated on macOS arm64 only. Windows continues to use the regular Qt build and
+`build/qt-no-icu`. This custom Qt toolchain has currently been build- and package-validated
+on macOS arm64 only. Windows continues to use the regular Qt build and
 cannot reuse the macOS artifacts.
 
 ### Windows
@@ -194,7 +193,7 @@ pacman -S --needed mingw-w64-ucrt-x86_64-libraw mingw-w64-ucrt-x86_64-exiv2 ming
 
 ```powershell
 $env:MSYS2_UCRT64 = (& qmake -query QT_INSTALL_PREFIX).Trim()
-.\build_windows.ps1 -Toolchain msys2 -Mode dev -Test
+.\build_windows.ps1 -Toolchain msys2 -Mode dev
 .\build_windows.ps1 -Toolchain msys2 -Mode release
 .\build_windows.ps1 -Toolchain msys2 -Mode package
 ```
@@ -208,7 +207,6 @@ Equivalent CMake Preset commands:
 ```powershell
 cmake --preset windows-msys2-debug
 cmake --build --preset windows-msys2-debug
-ctest --preset windows-msys2-debug --output-on-failure
 ```
 
 The wrapper also retains `-Toolchain msvc` as an optional Visual Studio path.
@@ -230,26 +228,6 @@ GitHub Release packages include LibRaw, Exiv2, and their runtime dependencies in
 
 > **License note:** Exiv2 is licensed under GPL-2.0-or-later. Before distributing, make sure the combined application's distribution complies with it, including applicable source-delivery requirements. Qt, LibRaw, LittleCMS, and transitive packaged dependencies retain their respective licenses as well.
 
-## Tests and benchmarks
-
-Debug presets build the automated test suite:
-
-```sh
-ctest --preset macos-debug --output-on-failure
-```
-
-Release presets can build RAW decoding, histogram, color-management, and large-directory benchmarks:
-
-```sh
-cmake --build --preset macos-release
-./build/macos-preset-release/tools/mvpview_raw_benchmark --48mp
-./build/macos-preset-release/tools/mvpview_histogram_benchmark --48mp
-./build/macos-preset-release/tools/mvpview_color_benchmark --48mp
-./build/macos-preset-release/tools/mvpview_browser_benchmark --enforce
-```
-
-Real-world image fixtures should remain local. Do not commit media containing personal information, precise locations, or unclear ownership.
-
 ## Project layout
 
 ```text
@@ -259,8 +237,7 @@ src/render     RHI rendering parameters and shaders
 src/browser    Directory, thumbnail, drag-and-drop, and clipboard models
 src/platform   macOS/Windows platform services and shortcuts
 src/qml        Application entry point, controllers, and QML UI
-tests          C++ and QML automated tests
-tools          Benchmarks and diagnostic tools
+tools          Icon and translation maintenance scripts
 ```
 
 ## License

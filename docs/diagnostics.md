@@ -50,17 +50,4 @@ python scripts/analyze_minidump.py crash.dmp --binary build/symbols/<matching-bu
 
 CI 把 `dist/symbols/` 作为独立 artifact 保留 90 天。发布维护者应为需要长期支持的版本另外保存该目录，避免 CI artifact 过期后丢失旧版本符号。程序不具备远程符号存储或上传功能。
 
-## 验证
-
-```powershell
-cmake --build build/windows-msys2-debug --parallel 6
-ctest --test-dir build/windows-msys2-debug --output-on-failure
-# Release 构建开启 MVPVIEW_BUILD_BENCHMARKS 后：
-build/windows-msys2-release/mvpview_diagnostics_benchmark.exe build/diagnostics-benchmark.json
-```
-
-诊断测试使用独立临时目录和子进程，验证等级、中文/路径过滤、并发过载、轮转、故障写入、独立开关、清理、多实例快照、ZIP 完整性与取消，以及主线程/工作线程的访问异常、未处理 C++ 异常、abort、qFatal。测试驱动逐项检查 QtTest 完整结束，不能只凭子进程退出码判断成功。QML 测试检查两个开关独立，以及默认不导出转储。
-
-性能工具交错运行关闭诊断和默认 Info 模式，以中位数比较 2000 文件扫描、连续 PNG 解码和 NV12 原始图像解码；输出是否在 5% 以内。它不代替实际 GPU 切图、全屏、相机 RAW 和 macOS 签名发布包测试。
-
 断电、强制杀进程以及某些 fail-fast/驱动/内核故障不保证生成转储。只有未关闭会话时，下次启动报告“异常退出”，不会宣称已捕获崩溃。日志或辅助进程初始化失败不阻止使用软件，设置页显示降级状态。

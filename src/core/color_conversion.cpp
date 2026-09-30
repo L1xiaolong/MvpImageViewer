@@ -28,8 +28,8 @@ double encodeSrgb(double linear) {
 }
 
 // sRGB primaries mapped into a display space's primaries. Derived from the primaries themselves
-// (all four spaces are D65, so the matrices are pure gamut scalings) and verified against Qt's
-// QColorSpace conversion in the unit tests.
+// (all four spaces are D65, so the matrices are pure gamut scalings) and cross-checked against
+// Qt's QColorSpace conversion.
 std::array<double, 9> srgbToDisplayMatrix(DisplayPrimaries display) {
     switch (display) {
     case DisplayPrimaries::DisplayP3:

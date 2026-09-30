@@ -20,7 +20,7 @@ bool isKnownSpace(DisplayColorSpace space) {
 
 // Saturated and neutral probes: the spaces the viewer supports differ by at least 83 8-bit levels
 // on these, so a 4 level tolerance recognises a platform profile without ever confusing two of
-// them (verified in the unit tests).
+// them.
 constexpr int kAgreementTolerance = 4;
 
 const std::array<QColor, 10>& agreementProbes() {

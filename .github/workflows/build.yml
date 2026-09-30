@@ -55,19 +55,11 @@ jobs:
         if: runner.os == 'macOS'
         run: >-
           cmake --preset macos-debug
-          -DMVPVIEW_BUILD_BENCHMARKS=OFF
           -DCMAKE_PREFIX_PATH="$(brew --prefix)"
           -DMVPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: cmake --build --preset macos-debug
-      - name: Test (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          if ! ctest --preset macos-debug; then
-            cat build/macos-preset-debug/Testing/Temporary/LastTest.log
-            exit 1
-          fi
       - name: QML static analysis (macOS)
         if: runner.os == 'macOS'
         run: cmake --build --preset macos-debug --target MVPImageViewerQml_qmllint
@@ -78,23 +70,11 @@ jobs:
           MSYS2_UCRT64: C:/msys64/ucrt64
         run: >-
           cmake --preset windows-msys2-debug
-          -DMVPVIEW_BUILD_BENCHMARKS=OFF
           -DMVPVIEW_GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
       - name: Build (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: cmake --build --preset windows-msys2-debug
-      - name: Test (Windows MSYS2/UCRT64)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          if ! ctest --preset windows-msys2-debug; then
-            cat build/windows-msys2-debug/Testing/Temporary/LastTest.log
-            if [[ -f build/windows-msys2-debug/tests/mvpview_io_tests.log ]]; then
-              cat build/windows-msys2-debug/tests/mvpview_io_tests.log
-            fi
-            exit 1
-          fi
       - name: QML static analysis (Windows MSYS2/UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}

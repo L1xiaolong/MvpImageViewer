@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.25)
 project(MVPImageViewer VERSION 0.2.11 LANGUAGES CXX)
 enable_language(C)
 
-option(MVPVIEW_BUILD_BENCHMARKS "Build repeatable local performance tools" OFF)
 option(MVPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
 option(MVPVIEW_ENABLE_CRASHPAD "Enable macOS Crashpad crash capture when the pinned build succeeds" ON)
 set(MVPVIEW_GITHUB_REPOSITORY "L1xiaolong/MvpImageViewer" CACHE STRING
@@ -85,13 +84,6 @@ if(NOT TARGET Qt6::GuiPrivate)
         "private QtGui development headers for the selected Qt SDK.")
 endif()
 
-if(BUILD_TESTING OR MVPVIEW_BUILD_BENCHMARKS)
-    find_package(Qt6 6.9 REQUIRED COMPONENTS Test)
-endif()
-if(BUILD_TESTING)
-    find_package(Qt6 6.9 REQUIRED COMPONENTS QuickTest)
-endif()
-
 # macOS 26 keeps the legacy AGL framework directory but removes its binary. Qt 6.9's
 # WrapOpenGL probe sees the directory and adds an unusable link flag even though this app uses
 # Metal. Keep OpenGL (required by QtGui's interface) while dropping only the missing AGL link.
@@ -102,7 +94,6 @@ if(APPLE AND TARGET WrapOpenGL::WrapOpenGL
 endif()
 
 qt_standard_project_setup()
-include(CTest)
 include(cmake/Warnings.cmake)
 
 execute_process(COMMAND git rev-parse --short=12 HEAD WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
@@ -118,11 +109,3 @@ else()
 endif()
 add_subdirectory(third_party/miniz)
 add_subdirectory(src)
-
-if(MVPVIEW_BUILD_BENCHMARKS)
-    add_subdirectory(tools)
-endif()
-
-if(BUILD_TESTING)
-    add_subdirectory(tests)
-endif()

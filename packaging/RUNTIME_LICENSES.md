@@ -134,14 +134,3 @@ In particular:
   or remove rendering dependencies solely to make this check pass.
 
 Reference: https://www.qt.io/development/open-source-lgpl-obligations
-
-## Tests
-
-```sh
-python3 -m unittest discover -s tests -p test_runtime_licenses.py
-```
-
-These tests exercise provenance mismatches, unknown nested runtime files,
-missing notices, vendor catalogs, stale entries, traversal rejection, and
-macOS framework detection without a Qt SDK. The release validation job runs
-them before packaging. They do not replace an actual macOS packaging test.
