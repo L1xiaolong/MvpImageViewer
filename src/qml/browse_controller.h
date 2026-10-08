@@ -24,6 +24,7 @@ class DirectoryScanner;
 class FullScreenWindow;
 class IImageDecoder;
 class ThumbnailModel;
+class FolderTreeBranchModel;
 
 // QML-facing application service for the Browse design. Filesystem work remains in C++ so the
 // visual layer never reimplements scanning, RAW inference, clipboard operations, or Trash logic.
@@ -38,7 +39,7 @@ class BrowseController final : public QObject {
     Q_PROPERTY(QStringList recentFolders READ recentFolders NOTIFY recentFoldersChanged)
     Q_PROPERTY(QStringList recentLocations READ recentLocations NOTIFY recentLocationsChanged)
     Q_PROPERTY(QVariantList nativeSidebarPlaces READ nativeSidebarPlaces CONSTANT)
-    Q_PROPERTY(QVariantList nativeDrivePlaces READ nativeDrivePlaces CONSTANT)
+    Q_PROPERTY(QVariantList nativeDrivePlaces READ nativeDrivePlaces NOTIFY nativeDrivePlacesChanged)
     Q_PROPERTY(QStringList selectedPaths READ selectedPaths NOTIFY selectionChanged)
     Q_PROPERTY(QList<QUrl> selectedFileUrls READ selectedFileUrls NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedUriList READ selectedUriList NOTIFY selectionChanged)
@@ -110,6 +111,8 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void openDirectory(const QString& path);
     Q_INVOKABLE void openDirectoryUrl(const QUrl& url);
     Q_INVOKABLE void loadFolderTreeChildren(const QString& path);
+    Q_INVOKABLE QModelIndex folderTreeIndex(const QString& path, const QString& branchPath = {}) const;
+    Q_INVOKABLE QAbstractItemModel* folderTreeBranch(const QString& path);
     void restoreInitialDirectoryAsync(const QString& initialDirectory = {});
     Q_INVOKABLE void chooseDirectory();
     Q_INVOKABLE void navigateBack();
@@ -159,6 +162,7 @@ class BrowseController final : public QObject {
     void currentDirectoryChanged();
     void recentFoldersChanged();
     void recentLocationsChanged();
+    void nativeDrivePlacesChanged();
     void selectionChanged();
     void statusTextChanged();
     void navigationStateChanged();
@@ -194,6 +198,7 @@ class BrowseController final : public QObject {
     void initialize(const QString& initialDirectory, bool startEmpty);
     [[nodiscard]] QString transformSelected(bool clockwise);
     void refreshTransformedPath(const QString& path);
+    void refreshNativeDrivePlaces();
 
     ImageLoader* loader_ = nullptr;
     DirectoryScanner* scanner_ = nullptr;
@@ -208,6 +213,8 @@ class BrowseController final : public QObject {
     QString recentCandidateDirectory_;
     QStringList recentFolders_;
     QStringList recentLocations_;
+    QVariantList nativeDrivePlaces_;
+    QHash<QString, FolderTreeBranchModel*> folderTreeBranches_;
     QStringList selectedPaths_;
     QStringList navigationHistory_;
     QString statusText_;

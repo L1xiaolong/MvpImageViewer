@@ -7,6 +7,7 @@ qt_add_executable(MVPImageViewerQml
     app_settings.cpp
     browse_controller.h
     browse_controller.cpp
+    folder_tree_branch_model.h
     browse_workspace_controller.h
     browse_workspace_controller.cpp
     thumbnail_image_provider.h

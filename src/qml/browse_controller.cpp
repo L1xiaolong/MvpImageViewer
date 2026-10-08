@@ -1,5 +1,6 @@
 #include "diagnostics/diagnostics.h"
 #include "qml/browse_controller.h"
+#include "qml/folder_tree_branch_model.h"
 
 #include "core/comparison_pixel_probe.h"
 #include "core/raw_plane_access.h"
@@ -115,11 +116,8 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
         // for custom folder icons is wasted work and can stall drive discovery on Windows when
         // removable or network-backed locations are present.
         fileSystemModel_->setOption(QFileSystemModel::DontUseCustomDirectoryIcons, true);
-#ifdef Q_OS_WIN
-        // The active directory has its own watcher below. Watching every expanded navigation-tree
-        // directory is both redundant and hazardous when a mapped server disappears.
-        fileSystemModel_->setOption(QFileSystemModel::DontWatchForChanges, true);
-#endif
+        // The scanner updates the gallery, not this model. Keep navigation watchers enabled so
+        // loaded branches reflect folder creation, deletion and renaming as well.
         fileSystemModel_->setFilter(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Drives);
 #ifdef Q_OS_WIN
         // Never ask QFileSystemModel to enumerate the Windows "Computer" root: doing so probes
@@ -131,6 +129,14 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
         fileSystemModel_->setRootPath(QDir::rootPath());
 #endif
     }
+
+#ifdef Q_OS_WIN
+    refreshNativeDrivePlaces();
+    auto* driveTimer = new QTimer(this);
+    driveTimer->setInterval(2000);
+    connect(driveTimer, &QTimer::timeout, this, &BrowseController::refreshNativeDrivePlaces);
+    driveTimer->start();
+#endif
 
     QSettings settings;
     settings.remove(QStringLiteral("browser/favoriteFolders"));
@@ -321,6 +327,21 @@ QModelIndex BrowseController::currentFolderTreeIndex() const {
     return currentDirectory_.isEmpty() ? QModelIndex{} : fileSystemModel_->index(currentDirectory_);
 }
 
+QModelIndex BrowseController::folderTreeIndex(const QString& path, const QString& branchPath) const {
+    const QModelIndex index = path.isEmpty() ? QModelIndex{}
+                                           : fileSystemModel_->index(QDir::cleanPath(path));
+    if (branchPath.isEmpty()) return index;
+    const auto* branch = folderTreeBranches_.value(branchPath);
+    return branch ? branch->indexForSource(index) : QModelIndex{};
+}
+
+QAbstractItemModel* BrowseController::folderTreeBranch(const QString& path) {
+    auto*& branch = folderTreeBranches_[path];
+    if (!branch) branch = new FolderTreeBranchModel(fileSystemModel_, folderTreeIndex(path), this);
+    else if (!branch->hasValidRoot()) branch->setRootIndex(folderTreeIndex(path));
+    return branch;
+}
+
 void BrowseController::loadFolderTreeChildren(const QString& path) {
     if (path.trimmed().isEmpty()) return;
     // setRootPath() controls which directory the QFileSystemModel watches and initially
@@ -464,10 +485,25 @@ QVariantList BrowseController::nativeSidebarPlaces() const {
 }
 
 QVariantList BrowseController::nativeDrivePlaces() const {
+    QVariantList drives = nativeDrivePlaces_;
+#ifdef Q_OS_WIN
+    // UNC shares have no drive letter, but still need a parent row for their folder tree.
+    const QString root = QDir::fromNativeSeparators(windowsDriveRoot(currentDirectory_));
+    if (root.startsWith(QStringLiteral("//"))) {
+        drives.append(QVariantMap{{QStringLiteral("label"), root.chopped(1)},
+                                  {QStringLiteral("path"), root},
+                                  {QStringLiteral("kind"), QStringLiteral("drive")},
+                                  {QStringLiteral("remote"), true}});
+    }
+#endif
+    return drives;
+}
+
+void BrowseController::refreshNativeDrivePlaces() {
     QVariantList drives;
 #ifdef Q_OS_WIN
     const DWORD mask = GetLogicalDrives();
-    if (mask == 0) return drives;
+    if (mask == 0) return;
     for (int index = 0; index < 26; ++index) {
         if ((mask & (DWORD{1} << index)) == 0) continue;
         const QChar letter = QChar::fromLatin1(static_cast<char>('A' + index));
@@ -480,7 +516,9 @@ QVariantList BrowseController::nativeDrivePlaces() const {
                                   {QStringLiteral("remote"), type == DRIVE_REMOTE}});
     }
 #endif
-    return drives;
+    if (drives == nativeDrivePlaces_) return;
+    nativeDrivePlaces_ = std::move(drives);
+    emit nativeDrivePlacesChanged();
 }
 
 void BrowseController::restoreInitialDirectoryAsync(const QString& initialDirectory) {
@@ -1207,18 +1245,21 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
         setStatusText(QStringLiteral("Folder is hidden, unreadable, or unavailable: %1").arg(path));
         return;
     }
-#ifdef Q_OS_WIN
-    const QString treeRoot = windowsDriveRoot(info.absoluteFilePath());
-    if (!treeRoot.isEmpty()
-        && fileSystemModel_->rootPath().compare(treeRoot, Qt::CaseInsensitive) != 0) {
-        fileSystemModel_->setRootPath(treeRoot);
-    }
-#endif
     // The gallery owns an asynchronous decode independently of the thumbnail model. Clear it
     // before publishing the directory change so neither the old frame nor a late completion from
     // the previous folder can remain visible while the new folder is scanned.
     setGalleryPath({});
+    const QString previousDirectory = currentDirectory_;
     currentDirectory_ = info.absoluteFilePath();
+#ifdef Q_OS_WIN
+    if (windowsDriveRoot(previousDirectory) != windowsDriveRoot(currentDirectory_)
+        && (previousDirectory.startsWith(QStringLiteral("//"))
+            || currentDirectory_.startsWith(QStringLiteral("//")))) {
+        emit nativeDrivePlacesChanged();
+    }
+#else
+    Q_UNUSED(previousDirectory);
+#endif
     // Persist at navigation time so an ordinary force-quit or crash still restores the last
     // meaningful workspace on the next start.
     diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.open"),
