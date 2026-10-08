@@ -309,7 +309,12 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     }
 
     if (mvpview::performance::enabled() && !performanceScenario.isEmpty()) {
-        QTimer::singleShot(1000, mainWindow, [mainWindow, performanceScenario, selectedPath] {
+        QTimer::singleShot(1000, mainWindow, [mainWindow, performanceScenario, selectedPath, &browseController] {
+            if (performanceScenario == QStringLiteral("refresh")) {
+                browseController.refreshAll();
+                mvpview::performance::mark(QStringLiteral("scenario.refresh"));
+                return;
+            }
             if (performanceScenario == QStringLiteral("fullscreen") && !selectedPath.isEmpty()) {
                 QMetaObject::invokeMethod(mainWindow, "openFullScreen",
                     Q_ARG(QVariant, QVariant(QStringList{selectedPath})), Q_ARG(QVariant, QVariant(0)));

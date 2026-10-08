@@ -83,7 +83,7 @@ QString compactDataSize(qint64 bytes) {
 CompareController::CompareController(ImageLoader* loader, QObject* parent)
     : QObject(parent), loader_(loader) {
     automaticFullLoadTimer_.setSingleShot(true);
-    automaticFullLoadTimer_.setInterval(260);
+    automaticFullLoadTimer_.setInterval(250);
     connect(&automaticFullLoadTimer_, &QTimer::timeout, this,
             &CompareController::requestAutomaticFullFrames);
     const QSettings settings;
@@ -125,8 +125,9 @@ QString CompareController::fileText(int slot) const {
 
 QString CompareController::cameraText(int slot) const {
     const auto value = frame(slot);
-    if (!value || !value->metadata.camera) return QStringLiteral("No EXIF camera data");
-    const auto& camera = *value->metadata.camera;
+    const auto details = metadata_.value(slot);
+    if (!value || !details.camera) return QStringLiteral("No EXIF camera data");
+    const auto& camera = *details.camera;
     QStringList parts;
     const QString model = QStringLiteral("%1 %2").arg(camera.make, camera.model).trimmed();
     if (!model.isEmpty()) parts.append(model);
@@ -149,6 +150,11 @@ void CompareController::setPaths(const QStringList& requested) {
     frames_.fill({}, paths_.size());
     errors_.fill({}, paths_.size());
     generations_.fill(0, paths_.size());
+    for (const auto& handle : metadataHandles_) handle.cancel();
+    metadataHandles_.fill({}, paths_.size());
+    metadata_.fill({}, paths_.size());
+    for (const auto& handle : histogramHandles_) handle.cancel();
+    histogramHandles_.fill({}, paths_.size());
     histogramGenerations_.fill(0, paths_.size());
     histogramRequested_.fill(false, paths_.size());
     displayHistograms_.fill({}, paths_.size());
@@ -178,8 +184,7 @@ void CompareController::closeSession() {
                            QStringLiteral("compare.session_close"),
                            {{QStringLiteral("slots"), slotCount}}, true);
     if (canvas_) canvas_->setFrames({}, -1, true);
-    if (loader_) loader_->clearTransientCaches();
-    QTimer::singleShot(500, this, [] { PlatformServices::releaseUnusedMemory(); });
+    // Shared caches survive session transitions; the loader enforces their budget.
 }
 
 void CompareController::reload() {
@@ -224,6 +229,8 @@ void CompareController::requestFrame(int slot, const QString& path) {
             }
             self->errors_[slot].clear();
             self->frames_[slot] = result.frame;
+            self->metadata_[slot] = result.frame->metadata;
+            if (self->exifVisible_) self->requestMetadata(slot);
             self->fullRequested_[slot] = false;
             self->fullResolution_[slot] = false;
             self->refreshCanvas(slot, true);
@@ -277,6 +284,10 @@ void CompareController::requestFullFrame(int slot, LoadCategory category) {
 }
 
 void CompareController::requestAutomaticFullFrames() {
+    if (loader_ && !frames_.isEmpty() && (loader_->fastScrolling() || loader_->hasInteractiveWork())) {
+        automaticFullLoadTimer_.start();
+        return;
+    }
     if (!loader_ || frames_.isEmpty() || !loader_->canAutomaticallyLoadFull(frames_)) {
         return;
     }
@@ -364,9 +375,25 @@ void CompareController::setFileInformationVisible(bool visible) {
     emit fileInformationVisibleChanged();
 }
 
+void CompareController::requestMetadata(int slot) {
+    if (slot < 0 || slot >= frames_.size() || !frames_.value(slot)) return;
+    metadataHandles_[slot].cancel();
+    const quint64 generation = generations_.at(slot);
+    const QPointer<CompareController> self(this);
+    metadataHandles_[slot] = loader_->requestMetadata(generation, frames_.at(slot),
+        [self, slot, generation](quint64, const DecodeResult& result) {
+            if (!self || slot >= self->generations_.size() || self->generations_.at(slot) != generation || !result.frame) return;
+            self->metadata_[slot] = result.frame->metadata;
+            ++self->revision_;
+            emit self->revisionChanged();
+        });
+}
+
 void CompareController::setExifVisible(bool visible) {
     if (exifVisible_ == visible) return;
     exifVisible_ = visible;
+    if (visible) for (int slot = 0; slot < frames_.size(); ++slot) requestMetadata(slot);
+    else for (const auto& handle : metadataHandles_) handle.cancel();
     QSettings().setValue(QStringLiteral("compare/exifVisible"), visible);
     emit exifVisibleChanged();
 }
@@ -478,13 +505,12 @@ void CompareController::requestHistogram(int slot) {
     const quint64 generation = ++histogramGenerations_[slot];
     const ImageFramePtr frame = frames_.at(slot);
     const QPointer<CompareController> self(this);
-    QThreadPool::globalInstance()->start([self, frame, slot, generation] {
-        const QVariantMap result = displayHistogramMap(DisplayHistogramAnalyzer::analyze(*frame));
-        if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, slot, generation, result] {
-            if (self) self->completeHistogram(slot, generation, result);
-        }, Qt::QueuedConnection);
-    }, -20);
+    histogramHandles_[slot] = loader_->requestAnalysis([frame](const auto& cancelled) {
+        return displayHistogramMap(DisplayHistogramAnalyzer::analyze(*frame,
+            DisplayHistogramAnalyzer::kDefaultMaximumSamples, cancelled));
+    }, [self, slot, generation](QVariantMap result) {
+        if (self) self->completeHistogram(slot, generation, std::move(result));
+    });
 }
 
 QVariantMap CompareController::histogram(int slot) const {
@@ -502,6 +528,7 @@ void CompareController::completeHistogram(int slot, quint64 generation, QVariant
 
 void CompareController::clearHistograms(int slot) {
     if (slot < 0 || slot >= frames_.size()) return;
+    histogramHandles_[slot].cancel();
     ++histogramGenerations_[slot];
     displayHistograms_[slot] = {};
     ++histogramRevision_;

@@ -247,6 +247,7 @@ ImagePropertiesController::ImagePropertiesController(ImageLoader* loader, QObjec
 
 void ImagePropertiesController::loadPath(const QString& requestedPath) {
     loadHandle_.cancel();
+    metadataHandle_.cancel();
     const QFileInfo info(requestedPath);
     path_ = info.absoluteFilePath();
     fileName_ = info.fileName().isEmpty() ? QDir::toNativeSeparators(path_) : info.fileName();
@@ -288,6 +289,11 @@ void ImagePropertiesController::loadPath(const QString& requestedPath) {
             return;
         }
         self->setFrame(result.frame);
+        self->metadataHandle_ = self->loader_->requestMetadata(generation, result.frame,
+            [self, generation](quint64 id, const DecodeResult& metadata) {
+                if (self && self->loadGeneration_ == generation && id == generation && metadata.frame)
+                    self->setFrame(metadata.frame);
+            });
     }, RequestOptions{LoadCategory::Metadata, 10, QStringLiteral("properties")});
 }
 
@@ -426,17 +432,18 @@ void ImagePropertiesController::requestHistogram(int source) {
 
     const ImageFramePtr frame = frame_;
     const QPointer<ImagePropertiesController> self(this);
-    QThreadPool::globalInstance()->start([self, frame, source, requestedGeneration] {
-        const QVariantMap result = source == 0
-            ? displayHistogramMap(DisplayHistogramAnalyzer::analyze(*frame))
+    histogramHandles_[source].cancel();
+    histogramHandles_[source] = loader_->requestAnalysis([frame, source](const auto& cancelled) {
+        return source == 0
+            ? displayHistogramMap(DisplayHistogramAnalyzer::analyze(*frame,
+                DisplayHistogramAnalyzer::kDefaultMaximumSamples, cancelled))
             : RawPlaneAccessor(*frame).isValid()
-                ? rawHistogramMap(RawPlaneHistogramAnalyzer::analyze(*frame))
-                : displayHistogramMap(DisplayHistogramAnalyzer::analyzeNativeRgb(*frame));
-        if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, source, requestedGeneration, result] {
-            if (self) self->setHistogram(source, requestedGeneration, result);
-        }, Qt::QueuedConnection);
-    }, -20);
+                ? rawHistogramMap(RawPlaneHistogramAnalyzer::analyze(*frame,
+                    RawPlaneHistogramAnalyzer::kDefaultMaximumSamplesPerChannel, cancelled))
+                : displayHistogramMap(DisplayHistogramAnalyzer::analyzeNativeRgb(*frame, cancelled));
+    }, [self, source, requestedGeneration](QVariantMap result) {
+        if (self) self->setHistogram(source, requestedGeneration, std::move(result));
+    });
 }
 
 QVariantMap ImagePropertiesController::histogram(int source) const {
@@ -453,6 +460,7 @@ void ImagePropertiesController::setHistogram(int source, quint64 generation, QVa
 }
 
 void ImagePropertiesController::resetHistograms() {
+    for (const auto& handle : histogramHandles_) handle.cancel();
     ++displayHistogramGeneration_;
     ++sourceHistogramGeneration_;
     displayHistogram_.clear();

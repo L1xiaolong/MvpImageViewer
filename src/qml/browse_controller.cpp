@@ -210,6 +210,9 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                    quint64 generation) {
                 if (generation != scanGeneration_ || directory != currentDirectory_ ||
                     !incrementalScan_) {
+                    // Refresh scans consume only the final snapshot, but still return
+                    // credits for ignored intermediate batches.
+                    scanner_->acknowledgeBatch(generation);
                     return;
                 }
                 pendingScanFiles_ += files;
@@ -232,6 +235,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                     });
                     return;
                 }
+                performance::mark(QStringLiteral("directory.finished"), {{"items", files.size()}});
                 diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.scan_complete"),
                     {{"directory", diagnostics::fileId(directory)}, {"generation", static_cast<qint64>(generation)}, {"items", files.size()}}, true);
                 if (!incrementalScan_) {

@@ -120,7 +120,7 @@ Item {
     Drag.dragType: Drag.Automatic
     Drag.supportedActions: Qt.CopyAction
     Drag.mimeData: ({ "text/uri-list": root.controller.selectedUriList })
-    Drag.imageSource: root.thumbnailUrl
+    Drag.imageSource: tileDragHandler.active && root.requestThumbnail ? root.thumbnailUrl : ""
     Drag.hotSpot.x: Math.min(root.width / 2, 80)
     Drag.hotSpot.y: Math.min(root.height / 2, 60)
 

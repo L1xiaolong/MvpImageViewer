@@ -28,6 +28,7 @@ class ThumbnailDiskCache final {
     mutable QMutex writeKeysMutex_;
     mutable QSet<QString> writingKeys_;
     mutable std::atomic<qint64> lastTrimMs_{0};
+    mutable std::atomic_bool maintenanceScheduled_{false};
     mutable QMutex trimMutex_;
     mutable QThreadPool maintenancePool_;
 };

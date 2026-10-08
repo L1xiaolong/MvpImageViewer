@@ -94,6 +94,7 @@ class CompareController final : public QObject {
   private:
     void requestFrame(int slot, const QString& path);
     void requestFullFrame(int slot, LoadCategory category);
+    void requestMetadata(int slot);
     void requestAutomaticFullFrames();
     void ensureFullFrames();
     void applyHoldFrame();
@@ -121,6 +122,9 @@ class CompareController final : public QObject {
     QVector<quint64> histogramGenerations_;
     QVector<bool> histogramRequested_;
     QVector<QVariantMap> displayHistograms_;
+    QVector<LoadHandle> histogramHandles_;
+    QVector<LoadHandle> metadataHandles_;
+    QVector<ImageMetadata> metadata_;
     QVector<LoadHandle> previewHandles_;
     QVector<LoadHandle> fullHandles_;
     QVector<bool> fullRequested_;

@@ -148,6 +148,13 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             if ((reusable = previewCache_.get(cacheKey(candidate, decoder_->cacheIdentity())))) break;
         }
     }
+    if (!reusable && request.purpose == DecodePurpose::Thumbnail) {
+        for (const int bucket : {128, 256, 384, 512}) {
+            if (bucket < std::max(request.maximumSize.width(), request.maximumSize.height())) continue;
+            auto candidate = request; candidate.maximumSize = QSize(bucket, bucket);
+            if ((reusable = thumbnailCache_.get(cacheKey(candidate, decoder_->cacheIdentity())))) break;
+        }
+    }
     if (auto cached = reusable ? reusable : cacheFor(request.purpose).get(key)) {
         performance::mark(QStringLiteral("loader.memory_hit"), {{"purpose", int(request.purpose)}});
         if (request.purpose == DecodePurpose::Thumbnail) {

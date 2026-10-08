@@ -16,6 +16,7 @@ namespace mvpview {
 
 ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
     : rootDirectory_(std::move(rootDirectory)) {
+    if (rootDirectory_.isEmpty()) rootDirectory_ = qEnvironmentVariable("MVPVIEW_THUMBNAIL_CACHE_DIR");
     if (rootDirectory_.isEmpty()) {
         rootDirectory_ = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
                          QStringLiteral("/thumbnails-v2");
@@ -84,8 +85,14 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     if ((++storeCount_ % 64U) == 0U) {
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
         qint64 previous = lastTrimMs_.load();
-        if (now - previous >= 60'000 && lastTrimMs_.compare_exchange_strong(previous, now))
-            maintenancePool_.start([this] { trimIfNeeded(); });
+        bool idle = false;
+        if (now - previous >= 60'000 && lastTrimMs_.compare_exchange_strong(previous, now) &&
+            maintenanceScheduled_.compare_exchange_strong(idle, true)) {
+            maintenancePool_.start([this] {
+                const auto finished = qScopeGuard([this] { maintenanceScheduled_.store(false); });
+                trimIfNeeded();
+            });
+        }
     }
     return true;
 }

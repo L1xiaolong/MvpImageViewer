@@ -75,6 +75,8 @@ class ImagePropertiesController final : public QObject {
     QVariantMap sourceHistogram_;
     QSet<int> pendingHistogramSources_;
     LoadHandle loadHandle_;
+    LoadHandle metadataHandle_;
+    LoadHandle histogramHandles_[2];
 };
 
 } // namespace mvpview

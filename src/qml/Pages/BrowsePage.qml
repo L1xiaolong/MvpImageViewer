@@ -1063,7 +1063,8 @@ Rectangle {
                     Drag.dragType: Drag.Automatic
                     Drag.supportedActions: Qt.CopyAction
                     Drag.mimeData: ({ "text/uri-list": root.controller.selectedUriList })
-                    Drag.imageSource: galleryDelegate.thumbnailUrl
+                    Drag.imageSource: galleryDragHandler.active && galleryDelegate.thumbnailDemand
+                                      ? galleryDelegate.thumbnailUrl : ""
                     Drag.hotSpot.x: galleryDelegate.width / 2
                     Drag.hotSpot.y: Math.min(galleryDelegate.height / 2, 52)
 
