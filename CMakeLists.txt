@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(MVPImageViewer VERSION 0.2.12 LANGUAGES CXX)
+project(MVPImageViewer VERSION 0.2.13 LANGUAGES CXX)
 enable_language(C)
 
 option(MVPVIEW_ENABLE_LCMS2 "Enable embedded ICC conversion with LittleCMS when available" ON)
