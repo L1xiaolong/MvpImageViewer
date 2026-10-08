@@ -102,7 +102,10 @@ Rectangle {
         implicitHeight: root.itemHeight
         color: "transparent"
         readonly property bool selected:
-            String(entry.path) === root.controller.currentDirectory
+            entry.kind === "drive"
+            ? root.controller.currentDirectory.toLowerCase().startsWith(
+                  String(entry.path).toLowerCase())
+            : String(entry.path) === root.controller.currentDirectory
 
         Rectangle {
             anchors.fill: parent
@@ -120,7 +123,10 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: root.iconSize_
             height: root.iconSize_
-            source: parent.entry.icon ? parent.entry.icon : root.folderIcon(parent.selected)
+            source: parent.entry.icon ? parent.entry.icon
+                  : parent.entry.kind === "drive"
+                    ? root.iconPrefix + "windows-drive.svg"
+                    : root.folderIcon(parent.selected)
             sourceSize: Qt.size(32, 32)
             opacity: root.macStyle ? 0.86 : 1
         }
@@ -237,6 +243,15 @@ Rectangle {
             }
         }
 
+        Repeater {
+            model: root.platformName === "windows" && root.browsingEnabled
+                   ? root.controller.nativeDrivePlaces : []
+            delegate: SidebarPlace {
+                required property var modelData
+                entry: modelData
+            }
+        }
+
         TreeView {
             id: folderTree
             objectName: "nativeFolderTree"
@@ -308,9 +323,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: root.iconSize_
                     height: root.iconSize_
-                    source: !root.macStyle && treeDelegate.depth === 0
-                            ? root.iconPrefix + "windows-drive.svg"
-                            : root.folderIcon(treeDelegate.expanded)
+                    source: root.folderIcon(treeDelegate.expanded)
                     sourceSize: Qt.size(32, 32)
                     opacity: root.macStyle ? 0.86 : 1
                 }

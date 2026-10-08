@@ -31,13 +31,14 @@ class BrowseController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QAbstractItemModel* thumbnails READ thumbnails CONSTANT)
     Q_PROPERTY(QAbstractItemModel* folderTree READ folderTree CONSTANT)
-    Q_PROPERTY(QModelIndex folderRootIndex READ folderRootIndex CONSTANT)
+    Q_PROPERTY(QModelIndex folderRootIndex READ folderRootIndex NOTIFY currentDirectoryChanged)
     Q_PROPERTY(QModelIndex currentFolderTreeIndex READ currentFolderTreeIndex NOTIFY currentDirectoryChanged)
     Q_PROPERTY(QString currentDirectory READ currentDirectory NOTIFY currentDirectoryChanged)
     Q_PROPERTY(QString currentFolderName READ currentFolderName NOTIFY currentDirectoryChanged)
     Q_PROPERTY(QStringList recentFolders READ recentFolders NOTIFY recentFoldersChanged)
     Q_PROPERTY(QStringList recentLocations READ recentLocations NOTIFY recentLocationsChanged)
     Q_PROPERTY(QVariantList nativeSidebarPlaces READ nativeSidebarPlaces CONSTANT)
+    Q_PROPERTY(QVariantList nativeDrivePlaces READ nativeDrivePlaces CONSTANT)
     Q_PROPERTY(QStringList selectedPaths READ selectedPaths NOTIFY selectionChanged)
     Q_PROPERTY(QList<QUrl> selectedFileUrls READ selectedFileUrls NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedUriList READ selectedUriList NOTIFY selectionChanged)
@@ -77,6 +78,7 @@ class BrowseController final : public QObject {
     [[nodiscard]] QStringList recentFolders() const { return recentFolders_; }
     [[nodiscard]] QStringList recentLocations() const { return recentLocations_; }
     [[nodiscard]] QVariantList nativeSidebarPlaces() const;
+    [[nodiscard]] QVariantList nativeDrivePlaces() const;
     [[nodiscard]] QStringList selectedPaths() const { return selectedPaths_; }
     [[nodiscard]] QList<QUrl> selectedFileUrls() const;
     [[nodiscard]] QString selectedUriList() const;

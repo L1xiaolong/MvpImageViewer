@@ -168,6 +168,10 @@ QtObject {
         { label: "Downloads", path: "/Users/demo/Downloads", kind: "downloads" },
         { label: "Pictures", path: "/Users/demo/Pictures", kind: "pictures" }
     ]
+    property var nativeDrivePlaces: [
+        { label: "C:", path: "C:/", kind: "drive", remote: false },
+        { label: "Z:", path: "Z:/", kind: "drive", remote: true }
+    ]
 
     function setFilterText(text) {
         filterText = text;

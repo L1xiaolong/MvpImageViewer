@@ -721,17 +721,17 @@ Choose another folder or drop images here</source>
 <context>
     <name>FolderNavigator</name>
     <message>
-        <location filename="../Mvp/FolderNavigator.qml" line="168"/>
+        <location filename="../Mvp/FolderNavigator.qml" line="174"/>
         <source>Recent</source>
         <translation>最近使用</translation>
     </message>
     <message>
-        <location filename="../Mvp/FolderNavigator.qml" line="200"/>
+        <location filename="../Mvp/FolderNavigator.qml" line="206"/>
         <source>Quick Access</source>
         <translation>快速访问</translation>
     </message>
     <message>
-        <location filename="../Mvp/FolderNavigator.qml" line="232"/>
+        <location filename="../Mvp/FolderNavigator.qml" line="238"/>
         <source>Locations</source>
         <translation>位置</translation>
     </message>
@@ -1837,19 +1837,33 @@ Choose another folder or drop images here</source>
 <context>
     <name>mvpview::AppSettings</name>
     <message>
-        <location filename="../app_settings.cpp" line="740"/>
+        <location filename="../app_settings.cpp" line="739"/>
         <source>The application cannot be closed automatically.</source>
         <translation>无法自动关闭应用程序。</translation>
     </message>
     <message>
-        <location filename="../app_settings.cpp" line="747"/>
+        <location filename="../app_settings.cpp" line="746"/>
         <source>The application settings could not be cleared.</source>
         <translation>无法清除应用程序设置。</translation>
     </message>
     <message>
-        <location filename="../app_settings.cpp" line="783"/>
+        <location filename="../app_settings.cpp" line="782"/>
         <source>Some local application data could not be removed: %1</source>
         <translation>无法删除部分本机应用数据：%1</translation>
+    </message>
+</context>
+<context>
+    <name>mvpview::BrowseController</name>
+    <message>
+        <location filename="../browse_controller.cpp" line="1169"/>
+        <source>Connecting to network folder…</source>
+        <translation>正在连接网络文件夹…</translation>
+    </message>
+    <message>
+        <location filename="../browse_controller.cpp" line="1173"/>
+        <location filename="../browse_controller.cpp" line="1187"/>
+        <source>Network folder is unavailable: %1</source>
+        <translation>网络文件夹不可用：%1</translation>
     </message>
 </context>
 <context>
