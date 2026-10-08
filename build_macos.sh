@@ -495,13 +495,44 @@ mkdir -p "$dmg_root"
 ditto "$staged_app" "$dmg_root/MVPImageViewer.app"
 ln -s /Applications "$dmg_root/Applications"
 rm -f "$dmg_path"
-hdiutil create \
-    -volname "MVP Image Viewer" \
-    -srcfolder "$dmg_root" \
-    -fs HFS+ \
-    -format UDZO \
-    -imagekey zlib-level=9 \
-    "$dmg_path"
+
+# DiskImages occasionally returns EBUSY on hosted macOS runners while it is
+# acquiring the exclusive resources needed by `create -srcfolder`.  Build into
+# a fresh temporary image on every attempt so a failed attempt can never leave
+# a truncated release artifact in dist/.  Retry only EBUSY; all deterministic
+# packaging errors still fail immediately.
+max_dmg_attempts=3
+for ((dmg_attempt = 1; dmg_attempt <= max_dmg_attempts; dmg_attempt++)); do
+    temporary_dmg="$stage_dir/MVPImageViewer-${version}-attempt-${dmg_attempt}.dmg"
+    hdiutil_log="$stage_dir/hdiutil-create-${dmg_attempt}.log"
+    rm -f "$temporary_dmg"
+
+    if hdiutil create \
+        -volname "MVP Image Viewer $version" \
+        -srcfolder "$dmg_root" \
+        -fs HFS+ \
+        -format UDZO \
+        -imagekey zlib-level=9 \
+        "$temporary_dmg" >"$hdiutil_log" 2>&1; then
+        cat "$hdiutil_log"
+        mv "$temporary_dmg" "$dmg_path"
+        break
+    else
+        hdiutil_status=$?
+    fi
+
+    cat "$hdiutil_log" >&2
+    if ! grep -Fqi 'Resource busy' "$hdiutil_log" \
+        || [[ "$dmg_attempt" -eq "$max_dmg_attempts" ]]; then
+        exit "$hdiutil_status"
+    fi
+
+    retry_delay=$((dmg_attempt * 5))
+    echo "hdiutil reported a busy resource; retrying in ${retry_delay}s " \
+         "($((dmg_attempt + 1))/$max_dmg_attempts)" >&2
+    sleep "$retry_delay"
+done
+
 hdiutil verify "$dmg_path"
 echo "SHA-256: $(shasum -a 256 "$dmg_path" | awk '{print $1}')"
 echo "macOS installer: $dmg_path"
