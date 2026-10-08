@@ -131,6 +131,8 @@ class BrowseController final : public QObject {
     bool performanceTracing() const;
     Q_INVOKABLE void reportThumbnailPresentation(const QString& owner, int generation,
                                                   int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs);
+    Q_INVOKABLE void reportThumbnailObservation(const QString& state, const QString& owner,
+                                                 int generation, int count, qint64 elapsedMs);
     Q_INVOKABLE void setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast);
     Q_INVOKABLE int thumbnailIndexForPath(const QString& path) const;
     Q_INVOKABLE void setFilterText(const QString& text);

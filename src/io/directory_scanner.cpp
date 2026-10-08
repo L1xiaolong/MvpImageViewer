@@ -199,16 +199,6 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
 
     // Images directly in the selected folder remain selectable. Descendant images are represented
     // by their containing folders, so a large tree does not turn into one unstructured image list.
-    const QFileInfoList directImages = root.entryInfoList(
-        supportedImageNameFilters(), QDir::Files | QDir::Readable | QDir::NoSymLinks, QDir::NoSort);
-    result.reserve(directImages.size());
-    for (const QFileInfo& image : directImages) {
-        if (cancelled && cancelled->load()) return {};
-        if (!isBrowsableEntry(image)) continue;
-        result.push_back({image.absoluteFilePath(), image.fileName(), image.size(),
-                          image.lastModified(), false, image.suffix().toCaseFolded()});
-    }
-
     QSet<QString> imageFolders;
     QDirIterator iterator(rootPath, supportedImageNameFilters(),
                           QDir::Files | QDir::Readable | QDir::NoSymLinks,
@@ -219,6 +209,8 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
         if (!isBrowsableEntry(image)) continue;
         QString folder = QDir::cleanPath(image.absolutePath());
         if (folder == rootPath) {
+            result.push_back({image.absoluteFilePath(), image.fileName(), image.size(),
+                              image.lastModified(), false, image.suffix().toCaseFolded()});
             continue;
         }
 
@@ -226,6 +218,7 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
         // every branch that can lead to an image visible while excluding empty/document-only trees.
         while (normalizedAbsolutePath(folder) != normalizedRootPath &&
                isDescendantPath(root, folder)) {
+            if (cancelled && cancelled->load(std::memory_order_relaxed)) return {};
             const QFileInfo folderInfo(folder);
             if (!isBrowsableEntry(folderInfo)) break;
             imageFolders.insert(folder);
@@ -238,6 +231,7 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
     }
 
     for (const QString& folder : std::as_const(imageFolders)) {
+        if (cancelled && cancelled->load(std::memory_order_relaxed)) return {};
         const QFileInfo info(folder);
         result.push_back({folder, root.relativeFilePath(folder), 0, info.lastModified(), true,
                           QStringLiteral("folder")});
@@ -246,12 +240,18 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
     QCollator collator;
     collator.setNumericMode(true);
     collator.setCaseSensitivity(Qt::CaseInsensitive);
+    for (auto& record : result) {
+        if (cancelled && cancelled->load(std::memory_order_relaxed)) return {};
+        record.nameSortKey = collator.sortKey(record.fileName);
+        record.typeSortKey = collator.sortKey(record.fileType);
+    }
     std::sort(result.begin(), result.end(), [&collator](const auto& left, const auto& right) {
         if (left.isDirectory != right.isDirectory) {
             return left.isDirectory;
         }
-        return collator.compare(left.fileName, right.fileName) < 0;
+        return left.nameSortKey->compare(*right.nameSortKey) < 0;
     });
+    if (cancelled && cancelled->load(std::memory_order_relaxed)) return {};
     return result;
 }
 

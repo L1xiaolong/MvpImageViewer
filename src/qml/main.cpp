@@ -68,6 +68,7 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     QString displayMode;
     int initialFileManagerCount = 1;
     QString performanceScenario;
+    QStringList performancePaneDirectories;
     bool nativeScreenshot = false;
     bool showSettings = false;
     int settingsStartupSection = 0;
@@ -76,6 +77,8 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     for (int i = 1; i < arguments.size(); ++i) {
         if (arguments.at(i) == QStringLiteral("--perf-scenario") && i + 1 < arguments.size()) {
             performanceScenario = arguments.at(++i);
+        } else if (arguments.at(i) == QStringLiteral("--perf-pane-directory") && i + 1 < arguments.size()) {
+            performancePaneDirectories.append(QFileInfo(arguments.at(++i)).absoluteFilePath());
         } else if (arguments.at(i) == QStringLiteral("--screenshot") && i + 1 < arguments.size()) {
             screenshotPath = arguments.at(++i);
         } else if (arguments.at(i) == QStringLiteral("--screenshot-native")) {
@@ -265,16 +268,18 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                      });
     auto firstFrameConnection = std::make_shared<QMetaObject::Connection>();
     *firstFrameConnection = QObject::connect(mainWindow, &QQuickWindow::frameSwapped, &browseController,
-        [&browseController, firstFrameConnection, initialDirectory, performanceScenario, displayMode] {
+        [&browseController, firstFrameConnection, initialDirectory, performanceScenario, displayMode, performancePaneDirectories] {
             QObject::disconnect(*firstFrameConnection);
             mvpview::performance::mark(QStringLiteral("startup.first_frame"));
             browseController.startDeferredInitialDirectory();
-            if (mvpview::performance::enabled() && performanceScenario == QStringLiteral("scroll")) {
+            if (mvpview::performance::enabled() &&
+                (performanceScenario == QStringLiteral("scroll") || browseController.paneCount() > 1)) {
                 const auto panes = browseController.panes();
                 for (int index = 0; index < panes.size(); ++index) {
                     auto* pane = qobject_cast<mvpview::BrowseController*>(panes.at(index).value<QObject*>());
                     if (!pane) continue;
-                    if (index > 0) pane->openDirectory(initialDirectory);
+                    if (index > 0) pane->openDirectory(index - 1 < performancePaneDirectories.size()
+                        ? performancePaneDirectories.at(index - 1) : initialDirectory);
                     pane->setDisplayMode(displayMode == QStringLiteral("list") ? 1 :
                                          displayMode == QStringLiteral("gallery") && panes.size() == 1 ? 2 : 0);
                 }
@@ -362,7 +367,7 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                 QElapsedTimer movementWork; movementWork.start();
                 for (const auto& sheet : *sheets) {
                     if (!sheet || !sheet->property("visible").toBool()) continue;
-                    sheet->setProperty("benchmarkMoving", *step <= 90 || (*step > 150 && *step <= 240));
+                    sheet->setProperty("benchmarkMoving", *step <= 90 || *step == 120 || (*step > 150 && *step <= 240));
                     const qreal height = sheet->property("height").toDouble();
                     const qreal contentHeight = sheet->property("contentHeight").toDouble();
                     const qreal maximum = std::max<qreal>(0, contentHeight - height);
@@ -371,6 +376,7 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                     else if (*step == 120) y = maximum * 0.8;
                     else if (*step > 150 && *step <= 240) y -= height * 0.08;
                     sheet->setProperty("contentY", std::clamp(y, qreal(0), maximum));
+                    if (*step == 120) sheet->setProperty("benchmarkMoving", false);
                 }
                 if (movementWork.elapsed() > 4)
                     mvpview::performance::mark(QStringLiteral("scenario.step_work"), {{"elapsedMs", movementWork.elapsed()}});
@@ -404,12 +410,24 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("MvpView"));
     QCoreApplication::setApplicationVersion(QStringLiteral(MVPVIEW_PROJECT_VERSION));
+    // Test processes must not overwrite normal registry settings or recent folders.
+    // Apply before the first QSettings instance, including early crash configuration.
+    const QString performanceSettings = mvpview::performance::enabled()
+        ? qEnvironmentVariable("MVPVIEW_PERF_SETTINGS_DIR") : QString();
+    if (!performanceSettings.isEmpty()) {
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, performanceSettings);
+        QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, performanceSettings);
+        QSettings().setValue(QStringLiteral("updates/automaticChecks"), false);
+    }
+    mvpview::performance::mark(QStringLiteral("benchmark.settings"), {{"isolated", !performanceSettings.isEmpty()}});
     int result = 0;
     {
         const QSettings diagnosticSettings;
         mvpview::diagnostics::Options diagnosticOptions;
-        diagnosticOptions.root = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
-                                 + QStringLiteral("/diagnostics");
+        diagnosticOptions.root = (performanceSettings.isEmpty()
+            ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
+            : performanceSettings) + QStringLiteral("/diagnostics");
         diagnosticOptions.loggingEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/loggingEnabled"), true).toBool();
         diagnosticOptions.crashEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/crashReportingEnabled"), true).toBool();
         diagnosticOptions.level = mvpview::diagnostics::parseLevel(diagnosticSettings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString());

@@ -340,6 +340,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     if (result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
                         if (!metadataOnly) self->cacheFor(purpose).put(key, result.frame, result.frame->byteSize());
                         self->enforceMemoryBudget(purpose);
+                        performance::mark(QStringLiteral("loader.cache_state"),
+                            {{"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
                         // A decoder that derives RAW parameters from the file itself (camera RAW)
                         // publishes them so the parameters editor and later probes start from the
                         // real geometry, bit depth, and demosaic setting.
@@ -444,6 +446,10 @@ void ImageLoader::dispatch() {
         else ++it;
     }
     for (;;) {
+        // Reserve a result slot before starting work. A fast decoder must not grow
+        // pixel buffers without bound while GUI completion commits are time-sliced.
+        constexpr qsizetype resultCapacity = 64;
+        if (qsizetype(completions_.size()) + parallelRunning_ + serializedRunning_ >= resultCapacity) break;
         auto best = inFlight_.end();
         auto ownerFor = [this](const QString& path) {
             QString owner;
@@ -475,7 +481,8 @@ void ImageLoader::dispatch() {
         best->running = true;
         performance::mark(QStringLiteral("loader.dispatched"),
             {{"queueMs", best->queuedAt.elapsed()}, {"priority", best->priority},
-             {"pending", inFlight_.size()}});
+             {"pending", inFlight_.size()},
+             {"pendingResults", qint64(completions_.size()) + parallelRunning_ + serializedRunning_ + 1}});
         diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
             QStringLiteral("loader.dispatched"),
             {{"queueMs", best->queuedAt.elapsed()}, {"priority", best->priority},

@@ -805,6 +805,15 @@ void BrowseController::reportThumbnailPresentation(const QString& owner, int gen
         {{"owner", owner}, {"generation", generation}, {"visible", count}, {"elapsedMs", elapsedMs}, {"first", first}, {"firstElapsedMs", firstElapsedMs}});
 }
 
+void BrowseController::reportThumbnailObservation(const QString& state, const QString& owner,
+                                                   int generation, int count, qint64 elapsedMs) {
+    if (state != QStringLiteral("demand") && state != QStringLiteral("stopped") &&
+        state != QStringLiteral("settled") && state != QStringLiteral("retargeted")) return;
+    QJsonObject fields{{"owner", owner}, {"visible", count}, {"elapsedMs", elapsedMs}};
+    fields.insert(state == QStringLiteral("demand") ? QStringLiteral("generation") : QStringLiteral("stopId"), generation);
+    performance::mark(QStringLiteral("viewport.") + state, fields);
+}
+
 void BrowseController::setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast) {
     QHash<QString, int> priorities;
     for (const auto& entry : entries) {

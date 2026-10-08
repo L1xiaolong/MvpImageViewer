@@ -218,6 +218,22 @@ int main(int argc, char** argv) {
             proxy.setSourceModel(&model); model.appendFiles(records);
             require(proxy.index(2,0).data().toString()=="image2.png","natural sorting");
         }
+        {
+            const auto root=temp.filePath("recursive");
+            for (const auto& relative : {"branch2/leaf/image.png", "branch10/image.png", "documents/note.txt", "root.png"}) {
+                const auto name=root+"/"+relative;
+                QDir().mkpath(QFileInfo(name).absolutePath());
+                QFile file(name); require(file.open(QIODevice::WriteOnly),"recursive fixture");
+            }
+            const auto records=DirectoryScanner::scanImageFoldersRecursively(root);
+            require(records.size()==4,"recursive folders and direct images count");
+            require(records.first().fileName=="branch2" && records.last().fileName=="root.png","recursive natural order");
+            for (const auto& record : records) {
+                require(record.nameSortKey.has_value() && record.typeSortKey.has_value(),"recursive prepared keys");
+                require(!record.fileName.startsWith("documents"),"document-only branch excluded");
+            }
+            require(DirectoryScanner::scanImageFoldersRecursively(root, std::make_shared<std::atomic_bool>(true)).isEmpty(),"recursive cancellation");
+        }
         qInfo()<<"All performance regression tests passed";
         return 0;
     } catch(const std::exception& error) { qCritical()<<error.what(); return 1; }

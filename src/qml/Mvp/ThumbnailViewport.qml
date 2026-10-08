@@ -24,18 +24,30 @@ QtObject {
     property double presentationStarted: 0
     property bool presentationPending: false
     property var visibleItems: []
+    property bool wasMoving: false
+    property bool settlingPending: false
+    property int settlingGeneration: 0
+    property int stopSequence: 0
+    property double settlingStarted: 0
     property Connections presentationEvents: Connections {
         target: root.tracing ? root.view.Window.window : null
         function onFrameSwapped() {
-            if (!root.presentationPending || root.dirty || root.visibleItems.length === 0) return
+            if ((!root.presentationPending && !root.settlingPending) || root.dirty || root.visibleItems.length === 0) return
             for (const candidate of root.visibleItems) {
                 if (!candidate.item || candidate.item.path !== candidate.path || !candidate.item.thumbnailReady) return
             }
-            root.presentationPending = false
-            root.controller.reportThumbnailPresentation(root.owner, root.presentationGeneration,
-                root.visibleItems.length, Math.max(0, Date.now() - root.presentationStarted),
-                !root.firstPresented, Math.max(0, Date.now() - root.firstPresentationStarted))
-            root.firstPresented = true
+            if (root.presentationPending) {
+                root.presentationPending = false
+                root.controller.reportThumbnailPresentation(root.owner, root.presentationGeneration,
+                    root.visibleItems.length, Math.max(0, Date.now() - root.presentationStarted),
+                    !root.firstPresented, Math.max(0, Date.now() - root.firstPresentationStarted))
+                root.firstPresented = true
+            }
+            if (root.settlingPending && root.settlingGeneration === root.presentationGeneration) {
+                root.settlingPending = false
+                root.controller.reportThumbnailObservation("settled", root.owner, root.stopSequence,
+                    root.visibleItems.length, Math.max(0, Date.now() - root.settlingStarted))
+            }
         }
     }
     property string anchorPath: ""
@@ -71,6 +83,7 @@ QtObject {
             root.anchorPending = false; root.dirty = true
             root.firstPresentationStarted = 0; root.firstPresented = false
             root.presentationPending = false; root.visibleSignature = ""; root.visibleItems = []
+            root.settlingPending = false; root.wasMoving = false
         }
     }
     property real lastY: 0
@@ -81,7 +94,7 @@ QtObject {
     readonly property bool scrollBarPressed: view.ScrollBar.vertical !== null && view.ScrollBar.vertical.pressed
     property Connections scrollBarEvents: Connections {
         target: root.view.ScrollBar.vertical
-        function onPressedChanged() { root.dirty = true; if (!root.scrollBarPressed) root.report() }
+        function onPressedChanged() { root.dirty = true; if (root.scrollBarPressed) root.wasMoving = true; else root.report() }
     }
     property bool dirty: true
     property Timer ticker: Timer {
@@ -93,12 +106,12 @@ QtObject {
     property Connections events: Connections {
         target: root.view
         ignoreUnknownSignals: true
-        function onBenchmarkMovingChanged() { root.dirty = true; if (!root.view.benchmarkMoving) root.report() }
+        function onBenchmarkMovingChanged() { root.dirty = true; if (root.view.benchmarkMoving) root.wasMoving = true; else root.report() }
         function onContentYChanged() { root.dirty = true }
         function onCountChanged() { root.dirty = true }
         function onWidthChanged() { root.dirty = true }
         function onHeightChanged() { root.dirty = true }
-        function onMovingChanged() { root.dirty = true; if (!root.view.moving) root.report() }
+        function onMovingChanged() { root.dirty = true; if (root.view.moving) root.wasMoving = true; else root.report() }
         function onVisibleChanged() { root.dirty = true; root.report() }
     }
     property Connections childrenEvents: Connections {
@@ -157,8 +170,28 @@ QtObject {
                 presentationStarted = now
                 if (visible.length > 0 && firstPresentationStarted === 0) firstPresentationStarted = now
                 presentationPending = visible.length > 0
+                if (settlingPending && !moving && visible.length > 0) {
+                    // Late scan batches can move the anchor after a gesture stops.
+                    // Measure when the current viewport fills, keeping the original stop clock.
+                    settlingGeneration = presentationGeneration
+                    controller.reportThumbnailObservation("retargeted", owner, stopSequence, visible.length, 0)
+                } else settlingPending = false
+                if (visible.length > 0)
+                    controller.reportThumbnailObservation("demand", owner, presentationGeneration, visible.length, 0)
             }
             visibleItems = visible
+            if (!moving && wasMoving && visible.length > 0) {
+                ++stopSequence
+                settlingGeneration = presentationGeneration
+                settlingStarted = now
+                settlingPending = true
+                controller.reportThumbnailObservation("stopped", owner, stopSequence, visible.length, 0)
+                // Already-ready delegates need one observed swap as well; an idle window
+                // otherwise has no reason to draw after a non-visual moving-state change.
+                if (view.Window.window) view.Window.window.update()
+            }
+            if (moving) settlingPending = false
+            wasMoving = moving
         }
         candidates.sort(function(a, b) { return b.priority - a.priority })
         const limit = Math.max(visibleCount, Math.min(128, visibleCount * 3))
