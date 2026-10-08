@@ -64,7 +64,12 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
 
     void cancel() override {
         cancelled_.store(true, std::memory_order_relaxed);
-        handle_.cancel();
+        const QPointer<ThumbnailImageResponse> self(this);
+        QMetaObject::invokeMethod(loader_, [self] {
+            if (!self) return;
+            self->handle_.cancel();
+            self->finish();
+        }, Qt::QueuedConnection);
     }
 
     [[nodiscard]] QImage image() const {
@@ -74,7 +79,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
 
   private:
     void start() {
-        if (cancelled_.load(std::memory_order_relaxed)) return;
+        if (cancelled_.load(std::memory_order_relaxed)) { finish(); return; }
         const QString path = QUrl::fromPercentEncoding(
             id_.section(QLatin1Char('?'), 0, 0).toUtf8());
         std::optional<RawImageParameters> parameters = loader_->rawParameters(path);
@@ -112,11 +117,13 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                     const QMutexLocker lock(&self->mutex_);
                     self->image_ = std::move(image);
                 }
-                emit self->finished();
+                self->finish();
             },
             RequestOptions{category, 0, QStringLiteral("qml-thumbnail")});
     }
 
+    void finish() { if (!finished_) { finished_ = true; emit finished(); } }
+    bool finished_ = false;
     ImageLoader* loader_ = nullptr;
     QString id_;
     QSize requestedSize_;

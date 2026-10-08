@@ -211,7 +211,8 @@ QRect pixelRegion(const QSize& size, const QRectF& normalizedRegion) {
 }
 
 DisplayHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normalizedRegion,
-                                   qint64 maximumSamples, bool nativeRgb = false) {
+                                   qint64 maximumSamples, bool nativeRgb = false,
+                                   const std::function<bool()>& cancelled = {}) {
     DisplayHistogram result;
     const RawPlaneAccessor rawAccessor(frame);
     if (rawAccessor.isValid() && frame.rawParameters) {
@@ -233,6 +234,7 @@ DisplayHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normal
             gridSampleCounts(result.analyzedRegion.width(), result.analyzedRegion.height(),
                              maximumSamples);
         for (int rowIndex = 0; rowIndex < sampleRows; ++rowIndex) {
+        if (cancelled && cancelled()) return {};
             const int y = result.analyzedRegion.top() +
                           static_cast<int>(static_cast<qint64>(rowIndex) *
                                            result.analyzedRegion.height() / sampleRows);
@@ -311,6 +313,7 @@ DisplayHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normal
         gridSampleCounts(result.analyzedRegion.width(), result.analyzedRegion.height(),
                          maximumSamples);
     for (int rowIndex = 0; rowIndex < sampleRows; ++rowIndex) {
+        if (cancelled && cancelled()) return {};
         const int y = result.analyzedRegion.top() +
                       static_cast<int>(static_cast<qint64>(rowIndex) *
                                        result.analyzedRegion.height() / sampleRows);
@@ -360,19 +363,19 @@ DisplayHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normal
 
 } // namespace
 
-DisplayHistogram DisplayHistogramAnalyzer::analyzeNativeRgb(const ImageFrame& frame) {
-    return analyzeRegionImpl(frame, QRectF(0.0, 0.0, 1.0, 1.0), kDefaultMaximumSamples, true);
+DisplayHistogram DisplayHistogramAnalyzer::analyzeNativeRgb(const ImageFrame& frame, const std::function<bool()>& cancelled) {
+    return analyzeRegionImpl(frame, QRectF(0.0, 0.0, 1.0, 1.0), kDefaultMaximumSamples, true, cancelled);
 }
 
 DisplayHistogram DisplayHistogramAnalyzer::analyze(const ImageFrame& frame,
-                                                    qint64 maximumSamples) {
-    return analyzeRegionImpl(frame, QRectF(0.0, 0.0, 1.0, 1.0), maximumSamples);
+                                                    qint64 maximumSamples, const std::function<bool()>& cancelled) {
+    return analyzeRegionImpl(frame, QRectF(0.0, 0.0, 1.0, 1.0), maximumSamples, false, cancelled);
 }
 
 DisplayHistogram DisplayHistogramAnalyzer::analyzeRegion(const ImageFrame& frame,
                                                           const QRectF& normalizedRegion,
-                                                          qint64 maximumSamples) {
-    return analyzeRegionImpl(frame, normalizedRegion, maximumSamples);
+                                                          qint64 maximumSamples, const std::function<bool()>& cancelled) {
+    return analyzeRegionImpl(frame, normalizedRegion, maximumSamples, false, cancelled);
 }
 
 } // namespace mvpview

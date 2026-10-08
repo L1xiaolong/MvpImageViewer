@@ -53,6 +53,7 @@ qt_add_qml_module(MVPImageViewerQml
         Mvp/ProductionCompareCanvas.qml
         Mvp/ProductionFullScreenCanvas.qml
         Mvp/TopToolbar.ui.qml
+        Mvp/ThumbnailViewport.qml
         Mvp/ThumbnailTile.qml
         Pages/BrowsePage.qml
         Pages/ComparePage.qml

@@ -16,6 +16,8 @@
 #include "browser/thumbnail_model.h"
 
 #include <QClipboard>
+#include <QElapsedTimer>
+#include "core/performance_trace.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -100,9 +102,49 @@ BrowseController::BrowseController(ImageLoader* sharedLoader,
 
 void BrowseController::initialize(const QString& initialDirectory, bool startEmpty) {
     scanner_ = new DirectoryScanner(this);
+    scanner_->setBatchBackpressure(true);
     thumbnailModel_ = new ThumbnailModel(loader_, this);
     filterModel_ = new ThumbnailFilterProxyModel(this);
     directoryWatcher_ = new QFileSystemWatcher(this);
+    galleryUpgradeTimer_ = new QTimer(this);
+    galleryUpgradeTimer_->setSingleShot(true);
+    galleryUpgradeTimer_->setInterval(250);
+    connect(galleryUpgradeTimer_, &QTimer::timeout, this, [this] {
+        if (!galleryFrame_ || galleryFullRequested_ || galleryFullResolution_) return;
+        if (loader_->fastScrolling() || loader_->hasInteractiveWork()) galleryUpgradeTimer_->start();
+        else if (loader_->canAutomaticallyLoadFull({galleryFrame_})) requestGalleryFull();
+    });
+    scanBatchTimer_ = new QTimer(this);
+    scanBatchTimer_->setSingleShot(true);
+    connect(scanBatchTimer_, &QTimer::timeout, this, [this] {
+        QElapsedTimer budget; budget.start();
+        do {
+            const qsizetype count = std::min<qsizetype>(32, pendingScanFiles_.size() - pendingScanOffset_);
+            if (count <= 0) break;
+            thumbnailModel_->appendFiles(pendingScanFiles_.mid(pendingScanOffset_, count));
+            pendingScanOffset_ += count;
+            while (!pendingScanBatchEnds_.empty() && pendingScanBatchEnds_.front() <= pendingScanOffset_) {
+                pendingScanBatchEnds_.pop_front();
+                scanner_->acknowledgeBatch(scanGeneration_);
+            }
+        } while (budget.elapsed() < 4);
+        if (pendingScanOffset_ < pendingScanFiles_.size()) {
+            if (pendingScanOffset_ >= 192) {
+                pendingScanFiles_ = pendingScanFiles_.mid(pendingScanOffset_);
+                for (auto& end : pendingScanBatchEnds_) end -= pendingScanOffset_;
+                pendingScanOffset_ = 0;
+            }
+            scanBatchTimer_->start(0);
+        }
+        else { pendingScanFiles_.clear(); pendingScanOffset_ = 0; pendingScanBatchEnds_.clear(); }
+    });
+    viewportOwner_ = QString::number(reinterpret_cast<quintptr>(this));
+    filterTimer_ = new QTimer(this);
+    filterTimer_->setSingleShot(true);
+    filterTimer_->setInterval(100);
+    connect(filterTimer_, &QTimer::timeout, this, [this] {
+        filterModel_->setFilterFixedString(filterText_);
+    });
     refreshTimer_ = new QTimer(this);
     refreshDeadlineTimer_ = new QTimer(this);
     recentCandidateTimer_ = new QTimer(this);
@@ -170,7 +212,10 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                     !incrementalScan_) {
                     return;
                 }
-                thumbnailModel_->appendFiles(files);
+                pendingScanFiles_ += files;
+                pendingScanBatchEnds_.push_back(pendingScanFiles_.size());
+                if (!scanBatchTimer_->isActive()) scanBatchTimer_->start(0);
+                performance::mark(QStringLiteral("directory.batch"), {{"items", files.size()}});
                 setStatusText(QStringLiteral("Scanning %1… %2 items")
                                   .arg(QDir::toNativeSeparators(currentDirectory_))
                                   .arg(thumbnailModel_->rowCount()));
@@ -179,6 +224,12 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
             [this](const QString& directory, const QVector<ImageFileRecord>& files,
                    quint64 generation) {
                 if (generation != scanGeneration_ || directory != currentDirectory_) {
+                    return;
+                }
+                if (incrementalScan_ && pendingScanOffset_ < pendingScanFiles_.size()) {
+                    QTimer::singleShot(0, this, [this, directory, files, generation] {
+                        emit scanner_->scanFinished(directory, files, generation);
+                    });
                     return;
                 }
                 diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.scan_complete"),
@@ -726,13 +777,37 @@ void BrowseController::clearSelection() {
     updateSelection({});
 }
 
+QString BrowseController::registerThumbnailViewport() {
+    const QString owner = viewportOwner_ + QLatin1Char('/') + QString::number(viewportOwners_.size());
+    viewportOwners_.append(owner);
+    connect(this, &QObject::destroyed, loader_, [loader = loader_, owner] {
+        loader->updateViewport(owner, {}, false);
+    });
+    return owner;
+}
+
+int BrowseController::thumbnailIndexForPath(const QString& path) const {
+    const int row = thumbnailModel_->rowForPath(path);
+    return row < 0 ? -1 : filterModel_->mapFromSource(thumbnailModel_->index(row)).row();
+}
+
+void BrowseController::setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast) {
+    QHash<QString, int> priorities;
+    for (const auto& entry : entries) {
+        const auto value = entry.toMap();
+        const auto path = value.value(QStringLiteral("path")).toString();
+        if (!path.isEmpty()) priorities.insert(path, value.value(QStringLiteral("priority")).toInt());
+    }
+    loader_->updateViewport(owner, priorities, fast);
+}
+
 void BrowseController::setFilterText(const QString& text) {
     const QString normalized = text.trimmed();
     if (filterText_ == normalized) {
         return;
     }
     filterText_ = normalized;
-    filterModel_->setFilterFixedString(filterText_);
+    filterTimer_->start();
     emit filterTextChanged();
     setStatusText(QStringLiteral("%1 visible · %2 selected")
                       .arg(filterModel_->rowCount())
@@ -1088,6 +1163,7 @@ void BrowseController::setGalleryPath(const QString& path) {
     if (!normalized.isEmpty() && QFileInfo(normalized).isFile()) {
         directoryWatcher_->addPath(normalized);
     }
+    galleryUpgradeTimer_->stop();
     galleryPreviewHandle_.cancel();
     galleryFullHandle_.cancel();
     galleryFullRequested_ = false;
@@ -1139,6 +1215,8 @@ void BrowseController::requestGalleryFull() {
 void BrowseController::applyGalleryFrame(const ImageFramePtr& frame, bool fullResolution) {
     galleryFrame_ = frame;
     galleryFullResolution_ = fullResolution && frame;
+    if (frame && !fullResolution) galleryUpgradeTimer_->start();
+    else galleryUpgradeTimer_->stop();
     if (frame) {
         const RawPlaneAccessor raw(*frame);
         if (raw.isValid()) {
@@ -1248,6 +1326,7 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     // The gallery owns an asynchronous decode independently of the thumbnail model. Clear it
     // before publishing the directory change so neither the old frame nor a late completion from
     // the previous folder can remain visible while the new folder is scanned.
+    for (const auto& owner : viewportOwners_) loader_->updateViewport(owner, {}, false);
     setGalleryPath({});
     const QString previousDirectory = currentDirectory_;
     currentDirectory_ = info.absoluteFilePath();
@@ -1292,6 +1371,8 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
 #else
     directoryWatcher_->addPath(currentDirectory_);
 #endif
+    scanBatchTimer_->stop();
+    pendingScanFiles_.clear(); pendingScanOffset_ = 0; pendingScanBatchEnds_.clear();
     thumbnailModel_->setFiles({});
     incrementalScan_ = true;
     setStatusText(QStringLiteral("Scanning %1…").arg(QDir::toNativeSeparators(currentDirectory_)));

@@ -646,7 +646,7 @@ Rectangle {
             pixelProbeText = "";
             actualPixels = false;
             manualZoom = 1.0;
-            root.controller.setGalleryPath(path);
+            if (visible) root.controller.setGalleryPath(path);
         }
         function resetPreview() {
             currentPreviewPath = "";
@@ -671,6 +671,7 @@ Rectangle {
                 galleryFileContextMenu.popup(x, y);
         }
         visible: root.displayMode === 2 && root.workspaceController.paneCount === 1
+        onVisibleChanged: root.controller.setGalleryPath(visible ? currentPreviewPath : "")
         anchors.left: gutter.right
         anchors.right: parent.right
         anchors.top: toolbar.bottom
@@ -869,7 +870,7 @@ Rectangle {
                         height: galleryWorkspace.actualPixels && root.controller.galleryImageSize.height > 0
                                 ? root.controller.galleryImageSize.height * galleryWorkspace.manualZoom
                                 : Math.max(1, galleryFlick.height - 36)
-                        source: galleryWorkspace.currentPreviewUrl.toString().length > 0
+                        source: galleryWorkspace.visible && galleryWorkspace.currentPreviewUrl.toString().length > 0
                                 ? galleryWorkspace.currentPreviewUrl.toString() +
                                   (galleryWorkspace.useFullResolutionTexture
                                    ? "&purpose=gallery-full" : "&purpose=gallery")
@@ -881,11 +882,13 @@ Rectangle {
                         sourceSize: Qt.size(2048, 2048)
                         asynchronous: true
                         cache: true
-                        retainWhileLoading: true
+                        property string readyPath: ""
+                        retainWhileLoading: readyPath === galleryWorkspace.currentPreviewPath
                         smooth: root.smoothDisplay
                         mipmap: root.smoothDisplay
                         fillMode: galleryWorkspace.actualPixels ? Image.Stretch : Image.PreserveAspectFit
                         onStatusChanged: {
+                            if (status === Image.Ready) readyPath = galleryWorkspace.currentPreviewPath
                             if (status === Image.Ready && galleryProbeArea.containsMouse)
                                 galleryWorkspace.refreshPixelProbe()
                         }
@@ -1015,13 +1018,15 @@ Rectangle {
             GridView {
                 id: galleryStrip
                 objectName: "galleryStrip"
+                property bool benchmarkMoving: false
                 anchors.fill: parent
                 anchors.margins: 8
                 // Reserve a real workspace footer so users always have a dependable
                 // blank target for the workspace context menu.
                 anchors.bottomMargin: 60
                 clip: true
-                model: root.controller.thumbnails
+                model: root.displayMode === 2 && root.workspaceController.paneCount === 1
+                       ? root.controller.thumbnails : null
                 currentIndex: 0
                 // Keep the contact cards at one optical size. GridView wraps them into
                 // more/fewer columns when the divider moves instead of stretching them.
@@ -1035,7 +1040,10 @@ Rectangle {
                         cancelFlick()
                 }
 
+                cacheBuffer: Math.max(0, height)
+                ThumbnailViewport { view: galleryStrip; controller: root.controller }
                 delegate: Item {
+                    property bool thumbnailDemand: false
                     id: galleryDelegate
                     objectName: "galleryDelegate-" + galleryDelegate.index
                     readonly property alias dragHandler: galleryDragHandler
@@ -1106,7 +1114,8 @@ Rectangle {
                             anchors.top: parent.top
                             anchors.margins: 5
                             height: 72
-                            source: galleryDelegate.thumbnailUrl
+                            source: galleryDelegate.thumbnailDemand && !galleryDelegate.isDirectory
+                                    ? galleryDelegate.thumbnailUrl : ""
                             visible: !galleryDelegate.isDirectory
                             sourceSize: Qt.size(320, 240)
                             asynchronous: true
@@ -1122,7 +1131,7 @@ Rectangle {
                             anchors.topMargin: 12
                             width: 52
                             height: 52
-                            source: galleryDelegate.thumbnailUrl
+                            source: galleryDelegate.isDirectory ? galleryDelegate.thumbnailUrl : ""
                             visible: galleryDelegate.isDirectory
                             sourceSize: Qt.size(160, 160)
                             asynchronous: true

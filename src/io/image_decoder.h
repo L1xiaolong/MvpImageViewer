@@ -1,10 +1,13 @@
 #pragma once
 
 #include "core/image_types.h"
+#include "core/source_frame_cache.h"
 
 #include <QSize>
 #include <QString>
 
+#include <atomic>
+#include <memory>
 #include <optional>
 #include <utility>
 
@@ -20,6 +23,13 @@ struct DecodeRequest {
         : path(std::move(path)), purpose(purpose), maximumSize(maximumSize),
           rawParameters(std::move(rawParameters)) {}
 
+    // Shared consumer count: decoders stop only after the last consumer leaves.
+    std::shared_ptr<std::atomic_int> activeConsumers;
+    [[nodiscard]] bool isCancelled() const {
+        return activeConsumers && activeConsumers->load(std::memory_order_relaxed) <= 0;
+    }
+    std::shared_ptr<SourceFrameCache> sourceCache;
+    ImageFramePtr metadataSource;
     QString path;
     DecodePurpose purpose = DecodePurpose::Preview;
     QSize maximumSize;

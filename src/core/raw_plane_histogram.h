@@ -7,6 +7,7 @@
 #include <QSize>
 #include <QVector>
 #include <limits>
+#include <functional>
 
 namespace mvpview {
 
@@ -53,10 +54,12 @@ class RawPlaneHistogramAnalyzer final {
 
     [[nodiscard]] static RawPlaneHistogram
     analyze(const ImageFrame& frame,
-            qint64 maximumSamplesPerChannel = kDefaultMaximumSamplesPerChannel);
+            qint64 maximumSamplesPerChannel = kDefaultMaximumSamplesPerChannel,
+            const std::function<bool()>& cancelled = {});
     [[nodiscard]] static RawPlaneHistogram
     analyzeRegion(const ImageFrame& frame, const QRectF& normalizedRegion,
-                  qint64 maximumSamplesPerChannel = kDefaultMaximumSamplesPerChannel);
+                  qint64 maximumSamplesPerChannel = kDefaultMaximumSamplesPerChannel,
+            const std::function<bool()>& cancelled = {});
 };
 
 [[nodiscard]] QString rawHistogramChannelName(RawHistogramChannelId id);

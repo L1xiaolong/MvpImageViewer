@@ -8,6 +8,7 @@
 
 #include <QVector>
 #include <limits>
+#include <functional>
 
 namespace mvpview {
 
@@ -48,13 +49,15 @@ class DisplayHistogramAnalyzer final {
     static constexpr qint64 kDefaultMaximumSamples = std::numeric_limits<qint64>::max();
 
     // Decoded RGB code values, preserving 16-bit precision (before histogram normalization).
-    [[nodiscard]] static DisplayHistogram analyzeNativeRgb(const ImageFrame& frame);
+    [[nodiscard]] static DisplayHistogram analyzeNativeRgb(const ImageFrame& frame, const std::function<bool()>& cancelled = {});
 
     [[nodiscard]] static DisplayHistogram analyze(
-        const ImageFrame& frame, qint64 maximumSamples = kDefaultMaximumSamples);
+        const ImageFrame& frame, qint64 maximumSamples = kDefaultMaximumSamples,
+        const std::function<bool()>& cancelled = {});
     [[nodiscard]] static DisplayHistogram analyzeRegion(
         const ImageFrame& frame, const QRectF& normalizedRegion,
-        qint64 maximumSamples = kDefaultMaximumSamples);
+        qint64 maximumSamples = kDefaultMaximumSamples,
+        const std::function<bool()>& cancelled = {});
 };
 
 } // namespace mvpview

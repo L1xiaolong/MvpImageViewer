@@ -110,13 +110,14 @@ ChannelAccumulator makeAccumulator(RawHistogramChannelId id, int maximumValue) {
 }
 
 template <typename Callback>
-void sampleGrid(const QRect& region, qint64 maximumSamples, Callback&& callback) {
+void sampleGrid(const QRect& region, qint64 maximumSamples, const std::function<bool()>& cancelled, Callback&& callback) {
     if (region.isEmpty() || maximumSamples <= 0) {
         return;
     }
     const auto [sampleColumns, sampleRows] =
         gridSampleCounts(region.width(), region.height(), maximumSamples);
     for (int rowIndex = 0; rowIndex < sampleRows; ++rowIndex) {
+        if (cancelled && cancelled()) return;
         const int y = region.top() +
                       static_cast<int>(static_cast<qint64>(rowIndex) * region.height() /
                                        sampleRows);
@@ -151,7 +152,7 @@ struct BayerSampleGrid {
 };
 
 RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& normalizedRegion,
-                                    qint64 maximumSamplesPerChannel) {
+                                    qint64 maximumSamplesPerChannel, const std::function<bool()>& cancelled) {
     RawPlaneHistogram result;
     RawPlaneAccessor accessor(frame);
     if (!accessor.isValid() || !frame.rawParameters || maximumSamplesPerChannel <= 0) {
@@ -176,7 +177,7 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
         ChannelAccumulator v = makeAccumulator(RawHistogramChannelId::V, maximumValue);
         y.channel.availableSampleCount =
             static_cast<qint64>(result.sourceRegion.width()) * result.sourceRegion.height();
-        sampleGrid(result.sourceRegion, maximumSamplesPerChannel, [&](const QPoint& point) {
+        sampleGrid(result.sourceRegion, maximumSamplesPerChannel, cancelled, [&](const QPoint& point) {
             if (const auto sample = accessor.yuvAtSourcePixel(point)) {
                 addSample(y, sample->y);
             }
@@ -191,7 +192,7 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
         u.channel.availableSampleCount =
             static_cast<qint64>(chromaRegion.width()) * chromaRegion.height();
         v.channel.availableSampleCount = u.channel.availableSampleCount;
-        sampleGrid(chromaRegion, maximumSamplesPerChannel, [&](const QPoint& chromaPoint) {
+        sampleGrid(chromaRegion, maximumSamplesPerChannel, cancelled, [&](const QPoint& chromaPoint) {
             const QPoint sourcePoint(chromaPoint.x() * 2, chromaPoint.y() * 2);
             if (const auto sample = accessor.yuvAtSourcePixel(sourcePoint)) {
                 addSample(u, sample->u);
@@ -243,6 +244,7 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
                              : static_cast<qint64>(grids.constFirst().columns) *
                                    grids.constFirst().rows;
         for (qint64 sampleIndex = 0; sampleIndex < target; ++sampleIndex) {
+            if ((sampleIndex % 4096) == 0 && cancelled && cancelled()) return {};
             const qint64 ordinal =
                 (sampleIndex + 1) * accumulator.channel.availableSampleCount / target - 1;
             while (ordinal >= gridEnd && gridIndex + 1 < grids.size()) {
@@ -274,14 +276,14 @@ bool RawPlaneHistogram::isValid() const {
 }
 
 RawPlaneHistogram RawPlaneHistogramAnalyzer::analyze(const ImageFrame& frame,
-                                                     qint64 maximumSamplesPerChannel) {
-    return analyzeRegionImpl(frame, QRectF(0.0, 0.0, 1.0, 1.0), maximumSamplesPerChannel);
+                                                     qint64 maximumSamplesPerChannel, const std::function<bool()>& cancelled) {
+    return analyzeRegionImpl(frame, QRectF(0.0, 0.0, 1.0, 1.0), maximumSamplesPerChannel, cancelled);
 }
 
 RawPlaneHistogram RawPlaneHistogramAnalyzer::analyzeRegion(const ImageFrame& frame,
                                                            const QRectF& normalizedRegion,
-                                                           qint64 maximumSamplesPerChannel) {
-    return analyzeRegionImpl(frame, normalizedRegion, maximumSamplesPerChannel);
+                                                           qint64 maximumSamplesPerChannel, const std::function<bool()>& cancelled) {
+    return analyzeRegionImpl(frame, normalizedRegion, maximumSamplesPerChannel, cancelled);
 }
 
 QString rawHistogramChannelName(RawHistogramChannelId id) {

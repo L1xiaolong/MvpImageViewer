@@ -3,6 +3,8 @@
 #include <QImage>
 #include <QMutex>
 #include <QString>
+#include <QSet>
+#include <QThreadPool>
 
 #include <atomic>
 
@@ -23,8 +25,11 @@ class ThumbnailDiskCache final {
 
     QString rootDirectory_;
     mutable std::atomic_uint storeCount_{0};
-    mutable QMutex ioMutex_;
+    mutable QMutex writeKeysMutex_;
+    mutable QSet<QString> writingKeys_;
+    mutable std::atomic<qint64> lastTrimMs_{0};
     mutable QMutex trimMutex_;
+    mutable QThreadPool maintenancePool_;
 };
 
 } // namespace mvpview

@@ -3,6 +3,9 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
+#include <QDateTime>
+#include <QScopeGuard>
 #include <QFileInfo>
 #include <QMutexLocker>
 #include <QStandardPaths>
@@ -17,11 +20,11 @@ ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
         rootDirectory_ = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
                          QStringLiteral("/thumbnails-v2");
     }
+    maintenancePool_.setMaxThreadCount(1);
     QDir().mkpath(rootDirectory_);
 }
 
 QImage ThumbnailDiskCache::load(const QString& key) const {
-    const QMutexLocker lock(&ioMutex_);
     QImage image;
     const QString base = pathForKey(key);
     if (!image.load(base + QStringLiteral(".png"), "PNG")) {
@@ -35,7 +38,15 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     if (image.isNull()) {
         return false;
     }
-    const QMutexLocker lock(&ioMutex_);
+    {
+        const QMutexLocker lock(&writeKeysMutex_);
+        if (writingKeys_.contains(key)) return false;
+        writingKeys_.insert(key);
+    }
+    const auto releaseKey = qScopeGuard([this, &key] {
+        const QMutexLocker lock(&writeKeysMutex_);
+        writingKeys_.remove(key);
+    });
     QImage storedImage = image;
     if (sourceSize.isValid()) {
         storedImage.setText(QStringLiteral("mvpview.sourceWidth"),
@@ -65,17 +76,17 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     }
     const QString suffix = hasTransparency ? QStringLiteral(".png") : QStringLiteral(".jpg");
     const QString path = pathForKey(key) + suffix;
-    QFile file(path);
+    QSaveFile file(path);
     const char* format = hasTransparency ? "PNG" : "JPEG";
     const int quality = hasTransparency ? 20 : 85;
     if (!file.open(QIODevice::WriteOnly)) return false;
-    const bool stored = storedImage.save(&file, format, quality) && file.flush();
-    file.close();
-    if (!stored || file.error() != QFileDevice::NoError) {
-        QFile::remove(path);
-        return false;
+    if (!storedImage.save(&file, format, quality) || !file.commit()) return false;
+    if ((++storeCount_ % 64U) == 0U) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        qint64 previous = lastTrimMs_.load();
+        if (now - previous >= 60'000 && lastTrimMs_.compare_exchange_strong(previous, now))
+            maintenancePool_.start([this] { trimIfNeeded(); });
     }
-    if ((++storeCount_ % 64U) == 0U) trimIfNeeded();
     return true;
 }
 

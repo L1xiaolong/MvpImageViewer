@@ -3,6 +3,7 @@
 #include "io/supported_image_formats.h"
 
 #include <QCollator>
+#include <QElapsedTimer>
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
@@ -39,6 +40,11 @@ DirectoryScanner::~DirectoryScanner() { cancel(); }
 
 void DirectoryScanner::cancel() {
     if (currentCancel_) currentCancel_->store(true, std::memory_order_relaxed);
+    pool_.clear(); // Superseded scans must not accumulate behind a slow filesystem call.
+}
+
+void DirectoryScanner::acknowledgeBatch(quint64 generation) {
+    if (generation == generation_ && batchCredits_) batchCredits_->release();
 }
 
 quint64 DirectoryScanner::scanAsync(const QString& directory) {
@@ -46,9 +52,11 @@ quint64 DirectoryScanner::scanAsync(const QString& directory) {
     const quint64 generation = ++generation_;
     const CancelFlag cancelled = std::make_shared<std::atomic_bool>(false);
     currentCancel_ = cancelled;
+    const auto credits = batchBackpressure_ ? std::make_shared<QSemaphore>(8) : nullptr;
+    batchCredits_ = credits;
     const QPointer<DirectoryScanner> self(this);
     pool_.start(
-        [self, directory, generation, cancelled] {
+        [self, directory, generation, cancelled, credits] {
             if (self) {
                 QMetaObject::invokeMethod(
                     self,
@@ -59,8 +67,13 @@ quint64 DirectoryScanner::scanAsync(const QString& directory) {
             }
             auto files = scanBatched(
                 directory, cancelled,
-                [self, directory, generation, cancelled](QVector<ImageFileRecord> batch) {
+                [self, directory, generation, cancelled, credits](QVector<ImageFileRecord> batch) {
                     if (!self || cancelled->load(std::memory_order_relaxed)) return;
+                    if (credits) {
+                        while (!credits->tryAcquire(1, 25))
+                            if (cancelled->load(std::memory_order_relaxed)) return;
+                        if (cancelled->load(std::memory_order_relaxed)) return;
+                    }
                     QMetaObject::invokeMethod(
                         self,
                         [self, directory, generation, batch = std::move(batch), cancelled] {
@@ -95,7 +108,7 @@ quint64 DirectoryScanner::scanImageFoldersAsync(const QString& directory) {
     const QPointer<DirectoryScanner> self(this);
     pool_.start(
         [self, directory, generation, cancelled] {
-            auto files = scanImageFoldersRecursively(directory);
+            auto files = scanImageFoldersRecursively(directory, cancelled);
             if (cancelled->load(std::memory_order_relaxed)) return;
             if (!self) {
                 return;
@@ -123,6 +136,12 @@ QVector<ImageFileRecord> DirectoryScanner::scanBatched(
     QVector<ImageFileRecord> result;
     QVector<ImageFileRecord> batch;
     batch.reserve(kScanBatchSize);
+    QElapsedTimer firstBatchTimer;
+    firstBatchTimer.start();
+    bool firstBatch = true;
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
     QDirIterator iterator(directory,
                           QDir::AllEntries | QDir::Readable | QDir::NoDotAndDotDot |
                               QDir::NoSymLinks,
@@ -139,12 +158,16 @@ QVector<ImageFileRecord> DirectoryScanner::scanBatched(
                                {}};
         record.fileType = info.isDir() ? QStringLiteral("folder")
                                        : info.suffix().toCaseFolded();
+        record.nameSortKey = collator.sortKey(record.fileName);
+        record.typeSortKey = collator.sortKey(record.fileType);
         result.push_back(record);
         if (publishBatch) {
             batch.push_back(std::move(record));
             // A time-only threshold can degenerate into one queued UI update per entry on a slow
             // disk. Keep a hard lower bound so the producer cannot overwhelm the GUI event loop.
-            if (batch.size() >= kScanBatchSize) {
+            if (batch.size() >= kScanBatchSize ||
+                (firstBatch && (batch.size() >= 32 || firstBatchTimer.elapsed() >= 50))) {
+                firstBatch = false;
                 publishBatch(std::exchange(batch, {}));
                 batch.reserve(kScanBatchSize);
             }
@@ -152,19 +175,19 @@ QVector<ImageFileRecord> DirectoryScanner::scanBatched(
     }
     if (publishBatch && !batch.isEmpty()) publishBatch(std::move(batch));
 
-    QCollator collator;
-    collator.setNumericMode(true);
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
     std::sort(result.begin(), result.end(), [&collator](const auto& left, const auto& right) {
         if (left.isDirectory != right.isDirectory) {
             return left.isDirectory;
         }
-        return collator.compare(left.fileName, right.fileName) < 0;
+        return left.nameSortKey && right.nameSortKey
+            ? left.nameSortKey->compare(*right.nameSortKey) < 0
+            : collator.compare(left.fileName, right.fileName) < 0;
     });
     return result;
 }
 
-QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(const QString& directory) {
+QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
+    const QString& directory, const std::shared_ptr<std::atomic_bool>& cancelled) {
     const QDir root(directory);
     const QString rootPath = QDir::cleanPath(root.absolutePath());
     const QString normalizedRootPath = normalizedAbsolutePath(rootPath);
@@ -180,6 +203,7 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(const QSt
         supportedImageNameFilters(), QDir::Files | QDir::Readable | QDir::NoSymLinks, QDir::NoSort);
     result.reserve(directImages.size());
     for (const QFileInfo& image : directImages) {
+        if (cancelled && cancelled->load()) return {};
         if (!isBrowsableEntry(image)) continue;
         result.push_back({image.absoluteFilePath(), image.fileName(), image.size(),
                           image.lastModified(), false, image.suffix().toCaseFolded()});
@@ -190,6 +214,7 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(const QSt
                           QDir::Files | QDir::Readable | QDir::NoSymLinks,
                           QDirIterator::Subdirectories);
     while (iterator.hasNext()) {
+        if (cancelled && cancelled->load()) return {};
         const QFileInfo image(iterator.next());
         if (!isBrowsableEntry(image)) continue;
         QString folder = QDir::cleanPath(image.absolutePath());

@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QPoint>
 #include <QSize>
+#include <functional>
 #include <QString>
 
 #include <array>
@@ -82,7 +83,8 @@ struct RawImageParameters {
 // than parameters.size samples the mosaic with nearest neighbours.
 [[nodiscard]] QImage cfaMosaicImage(const QByteArray& plane,
                                     const RawImageParameters& parameters,
-                                    const QSize& outputSize = {});
+                                    const QSize& outputSize = {},
+                                     const std::function<bool()>& cancelled = {});
 [[nodiscard]] qsizetype minimumRowStride(const RawImageParameters& parameters);
 [[nodiscard]] qsizetype minimumChromaRowStride(const RawImageParameters& parameters);
 [[nodiscard]] qsizetype frameByteSize(const RawImageParameters& parameters);

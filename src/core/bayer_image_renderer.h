@@ -5,6 +5,7 @@
 #include <QByteArray>
 #include <QImage>
 #include <QSize>
+#include <functional>
 
 namespace mvpview {
 
@@ -13,6 +14,7 @@ namespace mvpview {
 // fallback for camera RAW files whose full sensor mosaic is rendered on the GPU.
 [[nodiscard]] QImage renderBayerImage(const QByteArray& bytes,
                                       const RawImageParameters& parameters,
-                                      const QSize& outputSize = {});
+                                      const QSize& outputSize = {},
+                                      const std::function<bool()>& cancelled = {});
 
 } // namespace mvpview

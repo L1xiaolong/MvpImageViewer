@@ -357,10 +357,46 @@ std::shared_ptr<PlaneBufferSet> mosaicPlanes(LibRaw& processor,
     return planes;
 }
 
+void applyProcessingParameters(RawImageParameters& parameters, const RawImageParameters& requested) {
+    parameters.demosaic = requested.demosaic;
+    parameters.bayerSampling = requested.bayerSampling;
+    parameters.blackLevel = requested.blackLevel;
+    parameters.whiteLevel = requested.whiteLevel;
+    parameters.validBitsOverride = requested.validBitsOverride;
+    parameters.whiteBalanceGains = requested.whiteBalanceGains;
+    parameters.colorCorrectionMatrix = requested.colorCorrectionMatrix;
+    parameters.displayGamma = requested.displayGamma;
+}
+
 DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
+    const QFileInfo sourceInfo(request.path);
+    const QString sourceKey = QStringLiteral("camera:%1:%2:%3")
+        .arg(sourceInfo.absoluteFilePath()).arg(sourceInfo.size()).arg(sourceInfo.lastModified().toMSecsSinceEpoch());
+    if (request.sourceCache && request.purpose != DecodePurpose::Thumbnail) {
+        if (const auto source = request.sourceCache->get(sourceKey); source && source->planes && source->parameters) {
+            auto parameters = *source->parameters;
+            if (request.rawParameters) applyProcessingParameters(parameters, *request.rawParameters);
+            const QSize maximum = request.maximumSize.isEmpty() ? QSize(960, 720) : request.maximumSize;
+            const QSize size = parameters.size.scaled(maximum, Qt::KeepAspectRatio);
+            const auto cancelled = [&request] { return request.isCancelled(); };
+            QImage image = parameters.demosaic
+                ? renderBayerImage(source->planes->storage, parameters, size, cancelled)
+                : cfaMosaicImage(source->planes->storage, parameters, size, cancelled);
+            if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
+            const bool full = request.purpose == DecodePurpose::Full;
+            auto planes = std::make_shared<PlaneBufferSet>(*source->planes);
+            planes->renderFromDisplayImage = !full || !parameters.demosaic;
+            return frameFromImage(std::move(image), source->metadata, parameters, {},
+                                  full ? planes : nullptr, !full, parameters.demosaic);
+        }
+    }
     // LibRaw is a large object (roughly 800 KiB in supported releases). Keep it
     // off the smaller platform worker-thread stack while retaining RAII cleanup.
+    if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
     auto processor = std::make_unique<LibRaw>();
+    processor->set_progress_handler([](void* context, enum LibRaw_progress, int, int) {
+        return static_cast<const DecodeRequest*>(context)->isCancelled() ? 1 : 0;
+    }, const_cast<DecodeRequest*>(&request));
     int code = openFile(*processor, request.path);
     if (code != LIBRAW_SUCCESS) {
         return {{}, QStringLiteral("LibRaw could not open %1: %2")
@@ -445,6 +481,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     processor->imgdata.params.output_bps = 16;
     processor->imgdata.params.output_color = 1;
     processor->imgdata.params.use_camera_wb = 1;
+    if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
     code = processor->unpack();
     std::shared_ptr<PlaneBufferSet> mosaic;
     if (code == LIBRAW_SUCCESS && rawParameters &&
@@ -464,12 +501,21 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
         }
     }
 
+    if (mosaic && rawParameters && request.sourceCache && !request.isCancelled()) {
+        auto source = std::make_shared<SourceFrame>();
+        source->planes = std::make_shared<PlaneBufferSet>(*mosaic);
+        source->parameters = rawParameters;
+        source->metadata = metadata;
+        request.sourceCache->put(sourceKey, std::move(source));
+    }
+
     if (code == LIBRAW_SUCCESS && mosaic && rawParameters && !rawParameters->demosaic) {
         const QSize bounded = request.maximumSize.isEmpty()
                                   ? QSize{}
                                   : rawParameters->size.scaled(request.maximumSize,
                                                                Qt::KeepAspectRatio);
-        QImage falseColour = cfaMosaicImage(mosaic->storage, *rawParameters, bounded);
+        QImage falseColour = cfaMosaicImage(mosaic->storage, *rawParameters, bounded,
+                                            [&request] { return request.isCancelled(); });
         if (!falseColour.isNull()) {
             // LibRaw's demosaic and colour conversion are skipped entirely: the mosaic is the
             // image, and the same parameter set drives the pixel probe.
@@ -486,7 +532,8 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
         const QSize maximum = request.maximumSize.isEmpty() ? QSize(960, 720)
                                                              : request.maximumSize;
         const QSize fallbackSize = rawParameters->size.scaled(maximum, Qt::KeepAspectRatio);
-        QImage developed = renderBayerImage(mosaic->storage, *rawParameters, fallbackSize);
+        QImage developed = renderBayerImage(mosaic->storage, *rawParameters, fallbackSize,
+                                             [&request] { return request.isCancelled(); });
         if (!developed.isNull()) {
             // Keep a bounded CPU fallback, but let the full-resolution GPU path consume the
             // same sensor plane and parameters. Unlike dcraw_process(), this honors edits to

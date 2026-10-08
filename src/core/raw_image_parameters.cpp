@@ -110,7 +110,7 @@ QByteArray packedMosaicPlane(const quint16* samples, qsizetype strideInSamples,
 }
 
 QImage cfaMosaicImage(const QByteArray& plane, const RawImageParameters& parameters,
-                      const QSize& outputSize) {
+                      const QSize& outputSize, const std::function<bool()>& cancelled) {
     const QSize sourceSize = parameters.size;
     const qsizetype rowBytes = static_cast<qsizetype>(sourceSize.width()) * 2;
     if (sourceSize.isEmpty() || plane.size() < rowBytes * sourceSize.height() ||
@@ -138,6 +138,7 @@ QImage cfaMosaicImage(const QByteArray& plane, const RawImageParameters& paramet
     }
     const bool fullSize = target == sourceSize;
     for (int y = 0; y < target.height(); ++y) {
+        if (cancelled && cancelled()) return {};
         auto* destination = image.scanLine(y);
         for (int x = 0; x < target.width(); ++x) {
             const int sourceX =

@@ -130,6 +130,9 @@ struct ImageFrame {
     ImageDescriptor descriptor;
     ImageMetadata metadata;
     ImageStorage storage;
+    // Immutable upload buffers are prepared on decoder workers, never during scene sync.
+    QImage uploadImage;
+    std::shared_ptr<const PlaneBufferSet> uploadPlanes;
     std::optional<RawImageParameters> rawParameters;
     // Set by decoders when the frame is a bounded proxy whose exact source samples (RAW/YUV
     // planes, camera RAW mosaic) only arrive with a full decode.
@@ -146,13 +149,15 @@ struct ImageFrame {
 
     [[nodiscard]] qsizetype byteSize() const {
         if (const auto* image = std::get_if<QImage>(&storage)) {
-            return image->sizeInBytes();
+            return image->sizeInBytes() + uploadImage.sizeInBytes() +
+                   (uploadPlanes ? uploadPlanes->storage.size() : 0);
         }
         const auto* planes = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&storage);
         if (!planes || !*planes) {
             return 0;
         }
-        return (*planes)->storage.size() + (*planes)->displayImage.sizeInBytes();
+        return (*planes)->storage.size() + (*planes)->displayImage.sizeInBytes() +
+               uploadImage.sizeInBytes() + (uploadPlanes ? uploadPlanes->storage.size() : 0);
     }
 };
 

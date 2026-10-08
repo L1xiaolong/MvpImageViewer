@@ -82,7 +82,7 @@ std::optional<quint16> packedBayerValue(const QByteArray& bytes,
 }
 
 QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameters,
-                    const QSize& outputSize) {
+                    const QSize& outputSize, const std::function<bool()>& cancelled) {
     const int width = parameters.size.width();
     const int height = parameters.size.height();
     const int maximum = parameters.whiteLevel > parameters.blackLevel
@@ -102,6 +102,7 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
     QImage image(outputSize, QImage::Format_RGBA8888);
     const bool fullSize = outputSize == parameters.size;
     for (int y = 0; y < outputSize.height(); ++y) {
+        if (cancelled && cancelled()) return {};
         auto* destination = image.scanLine(y);
         for (int x = 0; x < outputSize.width(); ++x) {
             const int centerX =
@@ -162,9 +163,9 @@ QImage convertBayer(const QByteArray& bytes, const RawImageParameters& parameter
 } // namespace
 
 QImage renderBayerImage(const QByteArray& bytes, const RawImageParameters& parameters,
-                        const QSize& outputSize) {
+                        const QSize& outputSize, const std::function<bool()>& cancelled) {
     QImage image = convertBayer(bytes, parameters,
-                                outputSize.isEmpty() ? parameters.size : outputSize);
+                                outputSize.isEmpty() ? parameters.size : outputSize, cancelled);
     // The developed mosaic keeps its documented CCM contract: sRGB/BT.709 primaries with the
     // user's display gamma. It is a user-defined transform, not the application display space,
     // and the properties panel reports it as such.

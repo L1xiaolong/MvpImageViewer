@@ -3,6 +3,7 @@
 #include "core/image_types.h"
 #include "browser/thumbnail_filter_proxy_model.h"
 #include "io/image_loader.h"
+#include "io/directory_scanner.h"
 
 #include <QFileSystemModel>
 #include <QModelIndex>
@@ -12,6 +13,7 @@
 #include <QVariantList>
 
 #include <memory>
+#include <deque>
 
 QT_BEGIN_NAMESPACE
 class QFileSystemWatcher;
@@ -124,6 +126,9 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void activateTreeItem(const QString& path);
     Q_INVOKABLE void selectPath(const QString& path, bool extend = false, bool toggle = false);
     Q_INVOKABLE void clearSelection();
+    Q_INVOKABLE QString registerThumbnailViewport();
+    Q_INVOKABLE void setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast);
+    Q_INVOKABLE int thumbnailIndexForPath(const QString& path) const;
     Q_INVOKABLE void setFilterText(const QString& text);
     Q_INVOKABLE void setSortMode(int mode);
     Q_INVOKABLE void setDisplayMode(int mode);
@@ -206,6 +211,13 @@ class BrowseController final : public QObject {
     ThumbnailFilterProxyModel* filterModel_ = nullptr;
     QFileSystemModel* fileSystemModel_ = nullptr;
     QFileSystemWatcher* directoryWatcher_ = nullptr;
+    QTimer* scanBatchTimer_ = nullptr;
+    QVector<ImageFileRecord> pendingScanFiles_;
+    std::deque<qsizetype> pendingScanBatchEnds_;
+    qsizetype pendingScanOffset_ = 0;
+    QTimer* filterTimer_ = nullptr;
+    QString viewportOwner_;
+    QStringList viewportOwners_;
     QTimer* refreshTimer_ = nullptr;
     QTimer* refreshDeadlineTimer_ = nullptr;
     QTimer* recentCandidateTimer_ = nullptr;
@@ -235,6 +247,7 @@ class BrowseController final : public QObject {
     bool pendingTransferMove_ = false;
     QSize galleryImageSize_;
     ImageFramePtr galleryFrame_;
+    QTimer* galleryUpgradeTimer_ = nullptr;
     LoadHandle galleryPreviewHandle_;
     LoadHandle galleryFullHandle_;
     bool galleryFullRequested_ = false;

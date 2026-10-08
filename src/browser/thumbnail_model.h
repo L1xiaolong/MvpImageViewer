@@ -48,6 +48,7 @@ class ThumbnailModel final : public QAbstractListModel {
     void invalidateThumbnail(const QString& path);
     void setSelectedPaths(const QStringList& paths);
     [[nodiscard]] QString pathAt(int row) const;
+    [[nodiscard]] int rowForPath(const QString& path) const { return pathToRow_.value(path, -1); }
     [[nodiscard]] const QVector<ImageFileRecord>& files() const { return files_; }
 
   private:

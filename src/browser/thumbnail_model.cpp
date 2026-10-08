@@ -257,7 +257,11 @@ void ThumbnailModel::appendFiles(const QVector<ImageFileRecord>& files) {
     const int first = static_cast<int>(files_.size());
     const int last = first + static_cast<int>(files.size()) - 1;
     beginInsertRows({}, first, last);
-    files_.reserve(files_.size() + files.size());
+    // Grow geometrically: reserving the exact next batch repeatedly copies the entire
+    // directory and becomes quadratic for 100,000 entries.
+    if (files_.capacity() < files_.size() + files.size())
+        files_.reserve(std::max<qsizetype>(files_.size() + files.size(),
+                                        std::max<qsizetype>(256, files_.capacity() * 2)));
     for (const ImageFileRecord& file : files) {
         pathToRow_.insert(file.path, static_cast<int>(files_.size()));
         files_.push_back(file);

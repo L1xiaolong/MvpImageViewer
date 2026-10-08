@@ -8,7 +8,11 @@
 #include <QReadWriteLock>
 #include <QThreadPool>
 #include <QVector>
+#include <QVariantMap>
+#include <QTimer>
+#include <QElapsedTimer>
 
+#include <deque>
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -51,10 +55,13 @@ class ImageLoader final : public QObject {
 
     explicit ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* parent = nullptr);
 
+    ~ImageLoader() override;
+
     LoadHandle request(quint64 requestId, DecodeRequest request, Callback callback,
                        int priority = 0);
     LoadHandle request(quint64 requestId, DecodeRequest request, Callback callback,
                        RequestOptions options);
+    void prefetchAdjacentImages(const QStringList& paths, int index, const QSize& previewSize);
     void prefetchAdjacentRawFrames(const QString& path, const RawImageParameters& current,
                                    const QSize& previewSize);
     void setRawParameters(const QString& path, const RawImageParameters& parameters);
@@ -65,6 +72,12 @@ class ImageLoader final : public QObject {
     void setMemoryBudget(qsizetype bytes);
     [[nodiscard]] bool
     canAutomaticallyLoadFull(const QVector<ImageFramePtr>& previewFrames) const;
+    using AnalysisWork = std::function<QVariantMap(const std::function<bool()>&)>;
+    LoadHandle requestAnalysis(AnalysisWork work, std::function<void(QVariantMap)> callback);
+    LoadHandle requestMetadata(quint64 requestId, ImageFramePtr frame, Callback callback);
+    void updateViewport(const QString& owner, const QHash<QString, int>& priorities, bool fast);
+    [[nodiscard]] bool hasInteractiveWork() const;
+    [[nodiscard]] bool fastScrolling() const;
     void clearCache();
     // Releases large preview/full-resolution frames while retaining inexpensive thumbnails.
     void clearTransientCaches();
@@ -87,6 +100,13 @@ class ImageLoader final : public QObject {
         QVector<PendingRequest> pending;
         std::shared_ptr<std::atomic_int> activeConsumers;
         quint64 generation = 0;
+        QString path;
+        int priority = 0;
+        bool serialized = false;
+        bool running = false;
+        DecodePurpose purpose = DecodePurpose::Preview;
+        QElapsedTimer queuedAt;
+        std::function<void()> work;
     };
 
     [[nodiscard]] LoadHandle requestImpl(quint64 requestId, DecodeRequest request,
@@ -96,6 +116,21 @@ class ImageLoader final : public QObject {
     void enforceMemoryBudget(DecodePurpose insertedPurpose);
     [[nodiscard]] static qsizetype estimatedFullFrameCost(const ImageFrame& preview);
 
+    void dispatch();
+    int viewportPriority(const QString& path) const;
+    struct Viewport { QHash<QString, int> priorities; bool fast = false; };
+    QHash<QString, Viewport> viewports_;
+    QHash<QString, quint64> ownerService_;
+    quint64 serviceSequence_ = 0;
+    QVector<LoadHandle> rawPrefetchHandles_;
+    QVector<LoadHandle> imagePrefetchHandles_;
+    QTimer dispatchTimer_;
+    std::deque<std::function<void()>> completions_;
+    QThreadPool writePool_;
+    std::shared_ptr<std::atomic_int> pendingWrites_ = std::make_shared<std::atomic_int>(0);
+    int parallelRunning_ = 0;
+    int serializedRunning_ = 0;
+    std::shared_ptr<SourceFrameCache> sourceCache_ = std::make_shared<SourceFrameCache>();
     std::shared_ptr<const IImageDecoder> decoder_;
     std::shared_ptr<ThumbnailDiskCache> diskCache_;
     static constexpr qsizetype kDefaultMemoryBudget = 384LL * 1024 * 1024;

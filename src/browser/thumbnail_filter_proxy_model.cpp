@@ -25,6 +25,11 @@ void ThumbnailFilterProxyModel::setSortMode(BrowserSortMode mode) {
 
 bool ThumbnailFilterProxyModel::naturalNameLessThan(const QModelIndex& left,
                                                     const QModelIndex& right) const {
+    if (const auto* model = qobject_cast<const ThumbnailModel*>(sourceModel())) {
+        const auto& a = model->files().at(left.row()).nameSortKey;
+        const auto& b = model->files().at(right.row()).nameSortKey;
+        if (a && b) return a->compare(*b) < 0;
+    }
     return collator_.compare(left.data(Qt::DisplayRole).toString(),
                              right.data(Qt::DisplayRole).toString()) < 0;
 }
@@ -53,6 +58,11 @@ bool ThumbnailFilterProxyModel::lessThan(const QModelIndex& left, const QModelIn
         break;
     }
     case BrowserSortMode::Type: {
+        if (const auto* model = qobject_cast<const ThumbnailModel*>(sourceModel())) {
+            const auto& a = model->files().at(left.row()).typeSortKey;
+            const auto& b = model->files().at(right.row()).typeSortKey;
+            if (a && b) { const int comparison = a->compare(*b); if (comparison) return comparison < 0; }
+        }
         const int typeComparison =
             collator_.compare(left.data(ThumbnailModel::TypeRole).toString(),
                               right.data(ThumbnailModel::TypeRole).toString());

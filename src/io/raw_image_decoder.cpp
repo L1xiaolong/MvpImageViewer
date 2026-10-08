@@ -1,4 +1,5 @@
 #include "io/raw_image_decoder.h"
+#include "core/performance_trace.h"
 
 #include "core/color_conversion.h"
 #include "core/raw_plane_access.h"
@@ -54,7 +55,7 @@ qsizetype chromaStride(const RawImageParameters& parameters) {
 }
 
 QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
-                  const QSize& outputSize) {
+                  const QSize& outputSize, const std::function<bool()>& cancelled) {
     const int width = parameters.size.width();
     const int height = parameters.size.height();
     const qsizetype yStride = rowStride(parameters);
@@ -149,6 +150,7 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     QImage image(outputSize, QImage::Format_RGBA8888);
     const bool fullSize = outputSize == parameters.size;
     for (int y = 0; y < outputSize.height(); ++y) {
+        if (cancelled && cancelled()) return {};
         auto* destination = image.scanLine(y);
         for (int x = 0; x < outputSize.width(); ++x) {
             if (fullSize) {
@@ -226,7 +228,26 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     if (!checkedFrameOffset(parameters, frameSize, file.size(), offset) || !file.seek(offset)) {
         return {{}, QStringLiteral("RAW/YUV parameters exceed the file bounds")};
     }
-    QByteArray bytes = file.read(frameSize);
+    const QFileInfo sourceInfo(request.path);
+    const QString sourceKey = QStringLiteral("raw:%1:%2:%3:%4:%5")
+        .arg(sourceInfo.absoluteFilePath()).arg(sourceInfo.size())
+        .arg(sourceInfo.lastModified().toMSecsSinceEpoch()).arg(offset).arg(frameSize);
+    const auto cachedSource = request.sourceCache ? request.sourceCache->get(sourceKey) : nullptr;
+    QByteArray bytes = cachedSource ? cachedSource->bytes : QByteArray{};
+    if (cachedSource) performance::mark(QStringLiteral("source.hit"));
+    if (!cachedSource) {
+    bytes.resize(frameSize);
+    for (qsizetype read = 0; read < frameSize;) {
+        if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
+        const qint64 count = file.read(bytes.data() + read, std::min<qsizetype>(1024 * 1024, frameSize - read));
+        if (count <= 0) return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
+        read += count;
+    }
+        if (request.sourceCache && !request.isCancelled()) {
+            auto source = std::make_shared<SourceFrame>(); source->bytes = bytes;
+            request.sourceCache->put(sourceKey, std::move(source));
+        }
+    }
     if (bytes.size() != frameSize) {
         return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
     }
@@ -240,8 +261,9 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
         outputSize.scale(maximumSize, Qt::KeepAspectRatio);
     }
     const QSize sourceOutputSize = orientedImageSize(outputSize, parameters.orientation);
-    QImage display = parameters.isYuv() ? convertYuv(bytes, parameters, sourceOutputSize)
-                                        : renderBayerImage(bytes, parameters, sourceOutputSize);
+    const auto cancelled = [&request] { return request.isCancelled(); };
+    QImage display = parameters.isYuv() ? convertYuv(bytes, parameters, sourceOutputSize, cancelled)
+                                        : renderBayerImage(bytes, parameters, sourceOutputSize, cancelled);
     display = orientedImage(std::move(display), parameters.orientation);
     if (display.isNull()) {
         return {{}, QStringLiteral("RAW/YUV conversion failed")};

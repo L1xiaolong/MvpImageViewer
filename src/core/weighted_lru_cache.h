@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QString>
 
+#include <algorithm>
 #include <list>
 #include <memory>
 
@@ -41,6 +42,8 @@ template <typename T> class WeightedLruCache final {
         order_.erase(it->orderIterator);
         entries_.erase(it);
     }
+
+    void setMaximumCost(qsizetype bytes) { maximumCost_ = std::max<qsizetype>(0, bytes); trim(); }
 
     void clear() {
         entries_.clear();

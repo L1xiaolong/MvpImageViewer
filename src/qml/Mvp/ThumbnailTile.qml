@@ -19,6 +19,7 @@ Item {
     property var dimensions
     property int bitDepth: 0
     property string fileSizeText
+    property bool requestThumbnail: true
     property url thumbnailUrl
     property bool directory: false
     property bool selected: false
@@ -133,6 +134,7 @@ Item {
     ToolTip.text: root.path
 
     Loader {
+        asynchronous: true
         anchors.fill: parent
         sourceComponent: root.displayMode === 1 ? listVisual : gridVisual
     }
@@ -167,7 +169,7 @@ Item {
                     // Keep both URL and requested size stable while the GridView moves. Changing
                     // either one cancels the current async response and briefly clears the texture,
                     // which appears as periodic flashing during a long scroll.
-                    source: root.thumbnailUrl
+                    source: root.requestThumbnail && !root.directory ? root.thumbnailUrl : ""
                     visible: !root.directory
                     asynchronous: true
                     cache: true
@@ -182,7 +184,7 @@ Item {
                     anchors.centerIn: parent
                     width: Math.round(Math.min(imageWell.width, imageWell.height) * 0.58)
                     height: width
-                    source: root.thumbnailUrl
+                    source: root.directory ? root.thumbnailUrl : ""
                     visible: root.directory
                     asynchronous: true
                     cache: true
@@ -249,7 +251,7 @@ Item {
                     id: listPreview
                     objectName: "listImagePreview"
                     anchors.fill: parent
-                    source: root.thumbnailUrl
+                    source: root.requestThumbnail && !root.directory ? root.thumbnailUrl : ""
                     visible: !root.directory
                     asynchronous: true
                     cache: true
@@ -264,7 +266,7 @@ Item {
                     anchors.centerIn: parent
                     width: 36
                     height: 36
-                    source: root.thumbnailUrl
+                    source: root.directory ? root.thumbnailUrl : ""
                     visible: root.directory
                     asynchronous: true
                     cache: true

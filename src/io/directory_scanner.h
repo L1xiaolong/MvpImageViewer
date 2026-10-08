@@ -1,10 +1,13 @@
 #pragma once
 
 #include <QDateTime>
+#include <QCollator>
+#include <optional>
 #include <QFileInfo>
 #include <QObject>
 #include <QString>
 #include <QThreadPool>
+#include <QSemaphore>
 #include <QVector>
 
 #include <atomic>
@@ -20,6 +23,8 @@ struct ImageFileRecord {
     QDateTime modifiedAt;
     bool isDirectory = false;
     QString fileType;
+    std::optional<QCollatorSortKey> nameSortKey{};
+    std::optional<QCollatorSortKey> typeSortKey{};
 };
 
 class DirectoryScanner final : public QObject {
@@ -32,9 +37,12 @@ class DirectoryScanner final : public QObject {
     quint64 scanAsync(const QString& directory);
     quint64 scanImageFoldersAsync(const QString& directory);
     void cancel();
+    void setBatchBackpressure(bool enabled) { batchBackpressure_ = enabled; }
+    void acknowledgeBatch(quint64 generation);
     [[nodiscard]] static QVector<ImageFileRecord> scan(const QString& directory);
     [[nodiscard]] static QVector<ImageFileRecord>
-    scanImageFoldersRecursively(const QString& directory);
+    scanImageFoldersRecursively(const QString& directory,
+                               const std::shared_ptr<std::atomic_bool>& cancelled = {});
     [[nodiscard]] static bool isSupportedImageFile(const QString& path);
     [[nodiscard]] static bool isBrowsableEntry(const QFileInfo& info);
 
@@ -55,6 +63,8 @@ class DirectoryScanner final : public QObject {
     quint64 generation_ = 0;
     CancelFlag currentCancel_;
     QThreadPool pool_;
+    bool batchBackpressure_ = false;
+    std::shared_ptr<QSemaphore> batchCredits_;
 };
 
 } // namespace mvpview

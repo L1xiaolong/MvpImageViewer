@@ -461,6 +461,7 @@ Rectangle {
     GridView {
         id: contactSheet
         objectName: "paneContactSheet-" + root.paneIndex
+        property bool benchmarkMoving: false
         visible: root.controller.currentDirectory.length > 0
         z: 1
         anchors.left: parent.left
@@ -485,7 +486,9 @@ Rectangle {
             if (!interactive)
                 cancelFlick()
         }
+        ThumbnailViewport { view: contactSheet; controller: root.controller }
         delegate: Item {
+            property bool thumbnailDemand: false
             required property string path
             required property string fileName
             required property string technicalLabel
@@ -515,6 +518,7 @@ Rectangle {
                 dimensions: parent.dimensions
                 bitDepth: parent.bitDepth
                 fileSizeText: parent.fileSizeText
+                requestThumbnail: parent.thumbnailDemand
                 thumbnailUrl: parent.thumbnailUrl
                 directory: parent.isDirectory
                 selected: parent.isSelected

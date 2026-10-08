@@ -107,6 +107,7 @@ bool QtImageDecoder::canDecode(const QString& path) const {
 }
 
 DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
+    if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
     if (!canDecode(request.path)) {
         return {{}, QStringLiteral("Unsupported image format")};
     }
@@ -146,6 +147,7 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
         fileFormat = QString::fromLatin1(QImageReader::imageFormat(request.path)).toUpper();
     }
 
+    if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
     const bool sourceHighBitDepth = image.depth() > 32;
     const bool highBitDepth = sourceHighBitDepth && preserveHighBitDepth();
     if (highBitDepth) {
@@ -192,11 +194,7 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
             frame->descriptor.displayColor = frame->descriptor.sourceColor;
         }
     }
-    // Metadata is not needed for browser tiles. Skipping it preserves parallel thumbnail
-    // throughput; Preview/Full share the bounded metadata cache in MetadataReader.
-    if (request.purpose != DecodePurpose::Thumbnail) {
-        MetadataReader::enrich(request.path, frame->metadata);
-    }
+    // Descriptive metadata is requested separately; ICC and orientation remain on this path.
     frame->storage = std::move(image);
     return {std::move(frame), {}};
 }
