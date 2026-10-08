@@ -299,7 +299,7 @@ Service::Service(Options options) : impl_(std::make_unique<Impl>(std::move(optio
         if (!d.mapped) d.fail(QStringLiteral("Cannot initialize crash breadcrumbs"));
     }
     d.worker = std::thread([&d] { d.run(); });
-    maintain();
+    // DiagnosticsController schedules maintenance on its owned background worker.
     std::unique_lock lock(globalMutex);
     current = this;
     oldHandler = qInstallMessageHandler(messageHandler);

@@ -2,6 +2,7 @@
 #include "qml/qml_image_canvas.h"
 
 #include "core/comparison_pixel_probe.h"
+#include "core/performance_trace.h"
 #include "render/bayer_render_parameters.h"
 #include "render/yuv_render_parameters.h"
 
@@ -236,6 +237,7 @@ class Renderer final : public QQuickRhiItemRenderer {
     bool smoothDisplay_ = true;
     bool samplerDirty_ = true;
     bool resourcesDirty_ = true;
+    std::array<bool, kMaximumImages> slotDirty_{true, true, true, true};
     std::unique_ptr<QRhiBuffer> vertices_;
     std::unique_ptr<QRhiBuffer> compareUniform_;
     std::unique_ptr<QRhiSampler> sampler_;
@@ -286,6 +288,14 @@ class Renderer final : public QQuickRhiItemRenderer {
             rebuildBindings();
     }
 
+    bool ensureTexture(std::unique_ptr<QRhiTexture>& texture, QRhiTexture::Format format, QSize size) {
+        if (texture && texture->format() == format && texture->pixelSize() == size) return true;
+        texture.reset(rhi_->newTexture(format, size, 1));
+        if (texture->create()) return true;
+        texture.reset();
+        return false;
+    }
+
     bool uploadYuv(const ImageFramePtr& frame, SlotResources& slot,
                    QRhiResourceUpdateBatch* updates) {
         if (!supportsGpuYuv(frame))
@@ -296,19 +306,11 @@ class Renderer final : public QQuickRhiItemRenderer {
         const bool highBitDepth = parameters.format == RawPixelFormat::P010;
         const bool planar = parameters.format == RawPixelFormat::I420;
         const QSize chroma((parameters.size.width() + 1) / 2, (parameters.size.height() + 1) / 2);
-        slot.y.reset(rhi_->newTexture(highBitDepth ? QRhiTexture::R16 : QRhiTexture::R8,
-                                      parameters.size, 1));
-        slot.u.reset(rhi_->newTexture(
-            planar ? QRhiTexture::R8 : (highBitDepth ? QRhiTexture::RG16 : QRhiTexture::RG8),
-            chroma, 1));
-        slot.v.reset(rhi_->newTexture(QRhiTexture::R8, planar ? chroma : QSize(1, 1), 1));
-        if (!slot.y->create() || !slot.u->create() || !slot.v->create()) {
-            slot.y.reset();
-            slot.u.reset();
-            slot.v.reset();
-            return false;
-        }
-        const auto plane = [&storage, &parameters, highBitDepth](int index, const QSize& size) {
+        if (!ensureTexture(slot.y, highBitDepth ? QRhiTexture::R16 : QRhiTexture::R8, parameters.size) ||
+            !ensureTexture(slot.u, planar ? QRhiTexture::R8 : (highBitDepth ? QRhiTexture::RG16 : QRhiTexture::RG8), chroma) ||
+            !ensureTexture(slot.v, QRhiTexture::R8, planar ? chroma : QSize(1, 1))) return false;
+        const auto plane = [&storage, &parameters, highBitDepth, &frame](int index, const QSize& size) {
+            if (frame->uploadPlanes) return planeUpload(*frame->uploadPlanes, index, size);
             return highBitDepth ? p010PlaneUpload(storage, index, size, parameters.littleEndian)
                                 : planeUpload(storage, index, size);
         };
@@ -332,11 +334,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         const PlaneBufferSet& storage = **source;
         const int stride = static_cast<int>(storage.planes.constFirst().stride);
         const QSize storageSize(stride, frame->rawParameters->size.height());
-        slot.raw.reset(rhi_->newTexture(QRhiTexture::R8, storageSize, 1));
-        if (!slot.raw->create()) {
-            slot.raw.reset();
-            return false;
-        }
+        if (!ensureTexture(slot.raw, QRhiTexture::R8, storageSize)) return false;
         updates->uploadTexture(slot.raw.get(), QRhiTextureUploadDescription(QRhiTextureUploadEntry(
                                                    0, 0, planeUpload(storage, 0, storageSize))));
         return true;
@@ -433,11 +431,10 @@ class Renderer final : public QQuickRhiItemRenderer {
     }
 
     void rebuildResources(QRhiCommandBuffer* commandBuffer) {
-        for (auto& slot : slots_)
-            slot.resetTextures();
         auto* updates = rhi_->nextResourceUpdateBatch();
         const bool compositeRequested = presentationMode_ != 0 && frames_.size() == 2;
         for (int index = 0; index < kMaximumImages; ++index) {
+            if (!slotDirty_[static_cast<std::size_t>(index)]) continue;
             SlotResources& slot = slots_[static_cast<std::size_t>(index)];
             const ImageFramePtr frame = frames_.value(index);
             slot.gpuYuv = uploadYuv(frame, slot, updates);
@@ -449,8 +446,7 @@ class Renderer final : public QQuickRhiItemRenderer {
                 encoded.fill(Qt::transparent);
             }
             const EncodedTextureUpload upload = encodedTextureUpload(encoded);
-            slot.encoded.reset(rhi_->newTexture(upload.format, encoded.size(), 1));
-            if (!slot.encoded->create()) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.encoded"}}, true);
+            if (!ensureTexture(slot.encoded, upload.format, encoded.size())) diagnostics::event(diagnostics::Level::Error, diagnostics::render(), QStringLiteral("rhi.resource_failed"), {{"resource", "slot.encoded"}}, true);
             updates->uploadTexture(
                 slot.encoded.get(),
                 QRhiTextureUploadDescription(QRhiTextureUploadEntry(0, 0, upload.description)));
@@ -459,10 +455,32 @@ class Renderer final : public QQuickRhiItemRenderer {
             ensurePlaceholder(slot.u, QRhiTexture::RG8);
             ensurePlaceholder(slot.v, QRhiTexture::R8);
             ensurePlaceholder(slot.raw, QRhiTexture::R8);
+            slotDirty_[static_cast<std::size_t>(index)] = false;
+            performance::mark(QStringLiteral("render.upload"),
+                {{"slot", index}, {"bytes", frame ? qint64(frame->byteSize()) : 0}});
+        }
+        if (performance::enabled()) {
+            qint64 activeBytes = 0, gpuBytes = 0;
+            for (const auto& frame : frames_) if (frame) activeBytes += frame->byteSize();
+            const auto bytesFor = [](const std::unique_ptr<QRhiTexture>& texture) -> qint64 {
+                if (!texture) return 0;
+                int channels = 4;
+                switch (texture->format()) {
+                case QRhiTexture::R8: channels = 1; break;
+                case QRhiTexture::R16: case QRhiTexture::RG8: channels = 2; break;
+                case QRhiTexture::RGBA16F: channels = 8; break;
+                case QRhiTexture::RGBA32F: channels = 16; break;
+                default: break;
+                }
+                return qint64(texture->pixelSize().width()) * texture->pixelSize().height() * channels;
+            };
+            for (const auto& slot : slots_)
+                gpuBytes += bytesFor(slot.encoded) + bytesFor(slot.y) + bytesFor(slot.u) + bytesFor(slot.v) + bytesFor(slot.raw);
+            performance::mark(QStringLiteral("render.resources"), {{"activeBytes", activeBytes}, {"gpuBytes", gpuBytes}});
         }
         commandBuffer->resourceUpdate(updates);
         rebuildBindings();
-        resetPipelines();
+        // Binding layouts stay compatible across texture content/size changes.
         resourcesDirty_ = false;
     }
 
@@ -554,6 +572,7 @@ class Renderer final : public QQuickRhiItemRenderer {
             if (rhi_) diagnostics::event(diagnostics::Level::Info, diagnostics::render(), QStringLiteral("rhi.initialized"),
                 {{"backend", static_cast<int>(rhi_->backend())}, {"device", QString::fromUtf8(rhi_->driverInfo().deviceName)}}, true);
             resourcesDirty_ = true;
+            slotDirty_.fill(true);
         }
         if (!vertices_) {
             vertices_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer,
@@ -595,11 +614,15 @@ class Renderer final : public QQuickRhiItemRenderer {
         notifyImageFrame_ = notifyImageFrame_ || frames_ != incoming || itemSize_ != incomingSize;
         const int incomingMode = canvas->presentationMode();
         if (frames_ != incoming || ((presentationMode_ == 0) != (incomingMode == 0))) {
+            const bool modeChanged = ((presentationMode_ == 0) != (incomingMode == 0));
+            for (int index = 0; index < kMaximumImages; ++index)
+                slotDirty_[static_cast<std::size_t>(index)] = slotDirty_[static_cast<std::size_t>(index)] ||
+                    modeChanged || frames_.value(index) != incoming.value(index);
             frames_ = incoming;
             displayImages_.clear();
             displayImages_.reserve(frames_.size());
             for (const auto& frame : frames_)
-                displayImages_.append(displayImage(frame).copy());
+                displayImages_.append(frame && !frame->uploadImage.isNull() ? frame->uploadImage : displayImage(frame));
             resourcesDirty_ = true;
         }
         presentationMode_ = incomingMode;
@@ -717,7 +740,18 @@ class Renderer final : public QQuickRhiItemRenderer {
             QMetaObject::invokeMethod(canvas, [canvas, frames, size] {
                 if (canvas && canvas->frames() == frames &&
                     QSize(qRound(canvas->width()), qRound(canvas->height())) == size)
-                    emit canvas->imageFrameRendered();
+                    {
+                        if (performance::enabled() && canvas->window()) {
+                            auto connection = std::make_shared<QMetaObject::Connection>();
+                            *connection = QObject::connect(canvas->window(), &QQuickWindow::frameSwapped, canvas,
+                                [connection] {
+                                    QObject::disconnect(*connection);
+                                    performance::mark(QStringLiteral("image.presented"));
+                                }, Qt::QueuedConnection);
+                        }
+                        performance::mark(QStringLiteral("image.submitted"));
+                        emit canvas->imageFrameRendered();
+                    }
             }, Qt::QueuedConnection);
         }
     }
@@ -737,7 +771,10 @@ QmlImageCanvas::QmlImageCanvas(QQuickItem* parent) : QQuickRhiItem(parent) {
     hoverProbeTimer_.setTimerType(Qt::PreciseTimer);
     connect(&hoverProbeTimer_, &QTimer::timeout, this,
             &QmlImageCanvas::pollCursorForPixelProbe);
-    hoverProbeTimer_.start();
+    connect(this, &QQuickItem::visibleChanged, this, [this] {
+        if (isVisible() && !frames_.isEmpty()) hoverProbeTimer_.start();
+        else hoverProbeTimer_.stop();
+    });
     // Window-level pointer events are also observed directly: full-display presentation
     // rebuilds the native window, and that can leave item-level hover tracking stale until a
     // button press hands the item the mouse grab. Watching the window keeps hovering live.
@@ -908,6 +945,8 @@ void QmlImageCanvas::setFrames(const QVector<ImageFramePtr>& frames, int changed
                                bool resetChangedView) {
     const int oldCount = static_cast<int>(frames_.size());
     frames_ = frames.mid(0, kMaximumImages);
+    if (isVisible() && !frames_.isEmpty()) hoverProbeTimer_.start();
+    else hoverProbeTimer_.stop();
     viewStates_.resize(frames_.size());
     probeFullResolutionRequested_.resize(frames_.size());
     if (resetChangedView && changedSlot >= 0 && changedSlot < viewStates_.size()) {

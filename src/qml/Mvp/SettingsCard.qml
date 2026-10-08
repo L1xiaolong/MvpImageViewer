@@ -351,6 +351,8 @@ Popup {
 
             Loader {
                 id: pageLoader
+                active: root.visible
+                asynchronous: true
                 x: 34
                 y: 30
                 width: parent.width - 68

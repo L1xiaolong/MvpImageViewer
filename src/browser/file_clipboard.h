@@ -14,6 +14,7 @@ struct FileClipboardContents {
 // application copies or moves on paste.
 class FileClipboard final {
   public:
+    static void initialize();
     static void setPaths(const QStringList& paths, bool cut);
     [[nodiscard]] static FileClipboardContents contents();
     [[nodiscard]] static bool hasFiles();

@@ -2,6 +2,8 @@
 #include "diagnostics/diagnostics_controller.h"
 #include <QStandardPaths>
 #include "io/default_image_decoder.h"
+#include "core/performance_trace.h"
+#include "browser/file_clipboard.h"
 #include "platform/full_screen_presentation_controller.h"
 #include "qml/app_settings.h"
 #include "qml/browse_controller.h"
@@ -13,6 +15,7 @@
 #include "qml/thumbnail_image_provider.h"
 
 #include <QCoreApplication>
+#include <algorithm>
 #include <QDir>
 #include <QFileInfo>
 #include <QFontDatabase>
@@ -29,6 +32,7 @@
 
 static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service& diagnosticService) {
     QGuiApplication app(argc, argv);
+    mvpview::FileClipboard::initialize();
 #ifdef Q_OS_WIN
     // Qt defaults to D3D11 on Windows. Some Intel drivers crash while Qt Quick creates
     // or migrates RHI resources during full-screen and cross-monitor transitions.
@@ -61,13 +65,16 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     QStringList initialComparePaths;
     QString displayMode;
     int initialFileManagerCount = 1;
+    QString performanceScenario;
     bool nativeScreenshot = false;
     bool showSettings = false;
     int settingsStartupSection = 0;
     int screenshotDelay = 1800;
     const QStringList arguments = app.arguments();
     for (int i = 1; i < arguments.size(); ++i) {
-        if (arguments.at(i) == QStringLiteral("--screenshot") && i + 1 < arguments.size()) {
+        if (arguments.at(i) == QStringLiteral("--perf-scenario") && i + 1 < arguments.size()) {
+            performanceScenario = arguments.at(++i);
+        } else if (arguments.at(i) == QStringLiteral("--screenshot") && i + 1 < arguments.size()) {
             screenshotPath = arguments.at(++i);
         } else if (arguments.at(i) == QStringLiteral("--screenshot-native")) {
             nativeScreenshot = true;
@@ -254,8 +261,37 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                          QSettings().setValue(QStringLiteral("window/maximized"),
                                               lastMainWindowStateWasMaximized);
                      });
-    QTimer::singleShot(250, &browseController,
-                       [&browseController] { browseController.startDeferredInitialDirectory(); });
+    auto firstFrameConnection = std::make_shared<QMetaObject::Connection>();
+    *firstFrameConnection = QObject::connect(mainWindow, &QQuickWindow::frameSwapped, &browseController,
+        [&browseController, firstFrameConnection, initialDirectory, performanceScenario, displayMode] {
+            QObject::disconnect(*firstFrameConnection);
+            mvpview::performance::mark(QStringLiteral("startup.first_frame"));
+            browseController.startDeferredInitialDirectory();
+            if (mvpview::performance::enabled() && performanceScenario == QStringLiteral("scroll")) {
+                const auto panes = browseController.panes();
+                for (int index = 0; index < panes.size(); ++index) {
+                    auto* pane = qobject_cast<mvpview::BrowseController*>(panes.at(index).value<QObject*>());
+                    if (!pane) continue;
+                    if (index > 0) pane->openDirectory(initialDirectory);
+                    pane->setDisplayMode(displayMode == QStringLiteral("list") ? 1 :
+                                         displayMode == QStringLiteral("gallery") && panes.size() == 1 ? 2 : 0);
+                }
+            }
+        }, Qt::QueuedConnection);
+    if (mvpview::performance::enabled()) {
+        auto* heartbeat = new QTimer(&app);
+        heartbeat->setInterval(16);
+        auto lastTick = std::make_shared<QElapsedTimer>(); lastTick->start();
+        QObject::connect(heartbeat, &QTimer::timeout, &app, [lastTick] {
+            const qint64 gap = lastTick->restart();
+            if (gap > 50) mvpview::performance::mark(QStringLiteral("ui.stall"), {{"gapMs", gap}});
+        });
+        heartbeat->start();
+        auto lastFrame = std::make_shared<QElapsedTimer>(); lastFrame->start();
+        QObject::connect(mainWindow, &QQuickWindow::frameSwapped, &app, [lastFrame] {
+            mvpview::performance::mark(QStringLiteral("ui.frame"), {{"intervalMs", lastFrame->restart()}});
+        }, Qt::QueuedConnection);
+    }
 
     if (!displayMode.isEmpty()) {
         const int mode = displayMode == QStringLiteral("list")
@@ -270,6 +306,44 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                                if (auto* pane = browseController.activeBrowsePane())
                                    pane->selectPath(selectedPath);
                            });
+    }
+
+    if (mvpview::performance::enabled() && !performanceScenario.isEmpty()) {
+        QTimer::singleShot(1000, mainWindow, [mainWindow, performanceScenario, selectedPath] {
+            if (performanceScenario == QStringLiteral("fullscreen") && !selectedPath.isEmpty()) {
+                QMetaObject::invokeMethod(mainWindow, "openFullScreen",
+                    Q_ARG(QVariant, QVariant(QStringList{selectedPath})), Q_ARG(QVariant, QVariant(0)));
+                return;
+            }
+            auto* scrollTimer = new QTimer(mainWindow);
+            scrollTimer->setInterval(16);
+            auto step = std::make_shared<int>(0);
+            QObject::connect(scrollTimer, &QTimer::timeout, mainWindow, [mainWindow, step, scrollTimer] {
+                ++*step;
+                if (*step == 1 || *step == 91 || *step == 151 || *step == 241)
+                    mvpview::performance::mark(QStringLiteral("scenario.motion"),
+                        {{"active", *step == 1 || *step == 151}});
+                const auto sheets = mainWindow->findChildren<QObject*>();
+                for (auto* sheet : sheets) {
+                    if (!sheet->objectName().startsWith(QStringLiteral("paneContactSheet-")) &&
+                        sheet->objectName() != QStringLiteral("galleryStrip")) continue;
+                    sheet->setProperty("benchmarkMoving", *step <= 90 || (*step > 150 && *step <= 240));
+                    const qreal height = sheet->property("height").toDouble();
+                    const qreal contentHeight = sheet->property("contentHeight").toDouble();
+                    const qreal maximum = std::max<qreal>(0, contentHeight - height);
+                    qreal y = sheet->property("contentY").toDouble();
+                    if (*step <= 90) y += height * 0.08;
+                    else if (*step == 120) y = maximum * 0.8;
+                    else if (*step > 150 && *step <= 240) y -= height * 0.08;
+                    sheet->setProperty("contentY", std::clamp(y, qreal(0), maximum));
+                }
+                if (*step >= 270) {
+                    scrollTimer->stop();
+                    mvpview::performance::mark(QStringLiteral("scenario.complete"));
+                }
+            });
+            scrollTimer->start();
+        });
     }
 
     if (!screenshotPath.isEmpty()) {
@@ -288,6 +362,8 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
 }
 
 int main(int argc, char* argv[]) {
+    (void)mvpview::performance::clock();
+    mvpview::performance::mark(QStringLiteral("startup.process"));
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("MvpView"));
     QCoreApplication::setApplicationVersion(QStringLiteral(MVPVIEW_PROJECT_VERSION));

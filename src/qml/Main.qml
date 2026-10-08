@@ -29,6 +29,22 @@ ApplicationWindow {
     palette.toolTipBase: Theme.raisedSurface
     palette.toolTipText: Theme.graphiteInk
     palette.link: Theme.probeBlue
+    property var comparePage: compareLoader.item
+    property var fullScreenPage: fullScreenLoader.item
+    property var settingsCard: settingsLoader.item
+    property var pendingComparePaths: []
+    property int pendingSettingsSection: 0
+    function openCompare(paths) {
+        pendingComparePaths = paths
+        showingCompare = true
+        compareLoader.active = true
+        if (comparePage) { comparePage.open(paths); pendingComparePaths = [] }
+    }
+    function openSettings(section) {
+        pendingSettingsSection = section === undefined ? 0 : section
+        settingsLoader.active = true
+        if (settingsCard) { settingsCard.currentSection = pendingSettingsSection; settingsCard.open() }
+    }
     property bool showingCompare: false
     property bool showingFullScreen: false
     property bool fullScreenTransitioning: false
@@ -70,7 +86,7 @@ ApplicationWindow {
 
     function completeFullScreenOpen() {
         if (!fullScreenTransitioning || !enteringFullScreen
-                || showingFullScreen
+                || showingFullScreen || !fullScreenPage
                 || (instantFullScreenActive
                     ? !fullScreenPresentationController.active
                     : visibility !== Window.FullScreen))
@@ -90,6 +106,7 @@ ApplicationWindow {
         if (!paths || paths.length === 0 || showingFullScreen || fullScreenTransitioning)
             return
         showingCompare = false
+        fullScreenLoader.active = true
         const targetScreen = screenAtWindowCenter()
         visibilityBeforeFullScreen = visibility
         // Native full screen can add a long system transition. Turn the existing Cocoa window or
@@ -217,19 +234,16 @@ ApplicationWindow {
     Component.onCompleted: {
         appSettings.startAutomaticUpdateCheck()
         if (initialComparePaths.length >= 2) {
-            showingCompare = true
-            comparePage.open(initialComparePaths)
+            window.openCompare(initialComparePaths)
         }
         if (showSettingsOnStartup) {
-            settingsCard.currentSection = settingsStartupSection
-            settingsCard.open()
+            window.openSettings(settingsStartupSection)
         }
     }
     Connections {
         target: browseController
         function onCompareRequested(paths) {
-            window.showingCompare = true
-            comparePage.open(paths)
+            window.openCompare(paths)
         }
     }
 
@@ -242,37 +256,55 @@ ApplicationWindow {
         rawController: rawParametersController
         settingsController: appSettings
         visible: !window.showingCompare && !window.showingFullScreen
-        externalModalVisible: settingsCard.visible
+        externalModalVisible: settingsCard ? settingsCard.visible : false
         onFullScreenRequested: function(paths, initialIndex) {
             window.openFullScreen(paths, initialIndex)
         }
-        onSettingsRequested: settingsCard.open()
+        onSettingsRequested: window.openSettings()
     }
+    Loader {
+        id: compareLoader
+        anchors.fill: parent
+        active: false
+        asynchronous: true
+        visible: window.showingCompare && !window.showingFullScreen
+        onLoaded: {
+            if (window.pendingComparePaths.length >= 2) {
+                item.open(window.pendingComparePaths)
+                window.pendingComparePaths = []
+            }
+        }
+        sourceComponent: Component {
     ComparePage {
-        id: comparePage
-        objectName: "comparePage"
         controller: compareController
         settingsController: appSettings
-        anchors.fill: parent
-        visible: window.showingCompare && !window.showingFullScreen
         onCloseRequested: window.closeCompare()
     }
 
+        }
+    }
+    Loader {
+        id: fullScreenLoader
+        parent: window.contentItem
+        anchors.fill: parent
+        active: false
+        asynchronous: true
+        visible: window.showingFullScreen
+        onLoaded: Qt.callLater(function() { window.completeFullScreenOpen() })
+        sourceComponent: Component {
     FullScreenPage {
-        id: fullScreenPage
         controller: fullScreenController
         propertiesController: imagePropertiesController
         settingsController: appSettings
         messageParent: window.contentItem
-        parent: window.contentItem
-        anchors.fill: parent
-        visible: window.showingFullScreen
         onCloseRequested: window.closeFullScreen()
         onImageFrameReady: {
             if (window.enteringFullScreen && window.showingFullScreen) {
                 window.enteringFullScreen = false
                 window.fullScreenTransitioning = false
             }
+        }
+    }
         }
     }
     Rectangle {
@@ -317,18 +349,25 @@ ApplicationWindow {
                 spacing: 8
                 Button {
                     text: qsTr("Diagnostics / Export")
-                    onClicked: { settingsCard.currentSection = 6; settingsCard.open(); diagnosticNotice.dismissed = true }
+                    onClicked: { window.openSettings(6); diagnosticNotice.dismissed = true }
                 }
                 Button { text: qsTr("Dismiss"); onClicked: diagnosticNotice.dismissed = true }
             }
         }
     }
 
-    SettingsCard {
-        id: settingsCard
-        parent: Overlay.overlay
-        settingsController: appSettings
-        diagnostics: typeof diagnosticsController !== "undefined" ? diagnosticsController : null
+    Loader {
+        id: settingsLoader
+        active: false
+        asynchronous: true
+        onLoaded: { item.currentSection = window.pendingSettingsSection; item.open() }
+        sourceComponent: Component {
+            SettingsCard {
+                parent: Overlay.overlay
+                settingsController: appSettings
+                diagnostics: typeof diagnosticsController !== "undefined" ? diagnosticsController : null
+            }
+        }
     }
 
     Shortcut {
@@ -336,6 +375,6 @@ ApplicationWindow {
             const revision = appSettings.shortcutsRevision
             return appSettings.shortcutFor("settings")
         }
-        onActivated: settingsCard.open()
+        onActivated: window.openSettings()
     }
 }

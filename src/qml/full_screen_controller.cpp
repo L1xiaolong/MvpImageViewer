@@ -24,9 +24,13 @@ FullScreenController::FullScreenController(ImageLoader* loader, QObject* parent)
     : QObject(parent), loader_(loader) {
     Q_ASSERT(loader_);
     fullLoadTimer_.setSingleShot(true);
-    fullLoadTimer_.setInterval(220);
+    fullLoadTimer_.setInterval(250);
     connect(&fullLoadTimer_, &QTimer::timeout, this, [this] {
         if (!frame_ || fullRequested_ || currentPath().isEmpty()) {
+            return;
+        }
+        if (loader_->fastScrolling() || loader_->hasInteractiveWork()) {
+            fullLoadTimer_.start();
             return;
         }
         if (loader_->canAutomaticallyLoadFull({frame_})) {
@@ -110,8 +114,7 @@ void FullScreenController::closeSession() {
     errorText_.clear();
     frame_.reset();
     refreshCanvas(true);
-    if (loader_) loader_->clearTransientCaches();
-    QTimer::singleShot(500, this, [] { PlatformServices::releaseUnusedMemory(); });
+    // Shared caches survive session transitions; the loader enforces their budget.
     emit stateChanged();
 }
 
@@ -252,6 +255,8 @@ void FullScreenController::showIndex(int index) {
             self->requestFullFrame(path, generation);
         } else {
             self->scheduleFullFrame(path, generation);
+            self->loader_->prefetchAdjacentImages(self->paths_, self->currentIndex_,
+                                                 self->frame_->descriptor.size);
         }
     }, RequestOptions{LoadCategory::Interactive, 20, QStringLiteral("fullscreen-preview")});
 }
