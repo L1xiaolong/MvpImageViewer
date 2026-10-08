@@ -124,6 +124,11 @@ class AppSettings final : public QObject {
     Q_INVOKABLE void openReleasePage() const;
     Q_INVOKABLE void openUserGuide() const;
     Q_INVOKABLE void restoreDefaults();
+    // A full local reset is finalized only after the application and diagnostics service have
+    // stopped, so active log files and cache handles cannot survive the deletion.
+    Q_INVOKABLE QString deleteSoftwareCache();
+    [[nodiscard]] static bool softwareCacheDeletionRequested();
+    [[nodiscard]] static QString finishSoftwareCacheDeletion();
 
   signals:
     void diagnosticsChanged();

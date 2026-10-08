@@ -62,9 +62,14 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
     // The system navigation pane represents folders only, matching Explorer and Finder.
     // Image filtering belongs to ThumbnailModel; putting files into the navigation model both
     // diverges from native sidebars and needlessly expands large directory trees.
+    // FolderNavigator draws its own directory/drive artwork. Asking the native icon provider for
+    // custom folder icons is wasted work and can stall drive discovery on Windows when removable
+    // or network-backed locations are present.
+    fileSystemModel_->setOption(QFileSystemModel::DontUseCustomDirectoryIcons, true);
     fileSystemModel_->setFilter(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Drives);
 #ifdef Q_OS_WIN
-    // Invalid root index exposes all native drive roots on Windows.
+    // Keep this root fixed for the model's lifetime. An invalid view root then exposes every
+    // native drive instead of whichever folder happened to be opened most recently.
     fileSystemModel_->setRootPath(QString{});
 #else
     // On macOS/Linux, hide the synthetic "/" row and expose its native children directly.
@@ -260,10 +265,12 @@ QModelIndex BrowseController::currentFolderTreeIndex() const {
 
 void BrowseController::loadFolderTreeChildren(const QString& path) {
     if (path.trimmed().isEmpty()) return;
-    // QFileSystemModel does not begin asynchronously populating an uncached branch merely
-    // because TreeView marks its row expanded. setRootPath() starts the gatherer for this path;
-    // per Qt's contract it does not change the model structure or the root shown by the view.
-    const QModelIndex directoryIndex = fileSystemModel_->setRootPath(QDir::cleanPath(path));
+    // setRootPath() controls which directory the QFileSystemModel watches and initially
+    // populates. Changing it here used to move that anchor away from the Windows drive root, so
+    // restoring E:\\some-folder could leave only that cached branch available to the view.
+    // The delegate already represents a model node; fetch that node's children without changing
+    // the model root.
+    const QModelIndex directoryIndex = fileSystemModel_->index(QDir::cleanPath(path));
     if (!directoryIndex.isValid()) return;
     if (fileSystemModel_->canFetchMore(directoryIndex)) {
         fileSystemModel_->fetchMore(directoryIndex);

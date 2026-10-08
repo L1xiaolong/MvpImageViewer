@@ -20,6 +20,7 @@ const translations = new Map(Object.entries({
   "Browse": "浏览",
   "CONFIGURATION": "配置",
   "Cancel": "取消",
+  "Cold start": "冷启动",
   "Check for a newer published version of MVP Image Viewer.": "检查是否有更新的 MVP Image Viewer 正式版本。",
   "Check now": "立即检查",
   "Checking GitHub Releases…": "正在检查 GitHub Releases…",
@@ -53,6 +54,10 @@ const translations = new Map(Object.entries({
   "Dark gray": "深灰色",
   "Default shortcuts restored.": "已恢复默认快捷键。",
   "Delete preset": "删除预设",
+  "Delete software cache…": "删除软件缓存…",
+  "Delete all local app data?": "删除所有本机应用数据？",
+  "Delete and quit": "删除并退出",
+  "Delete thumbnails, update downloads, logs, crash reports, presets, history, and all settings stored by this app on this device. Your image files are not changed.": "删除此应用存储在当前设备上的缩略图、更新下载、日志、崩溃报告、预设、历史记录和全部设置。不会改动您的图片文件。",
   "Demo image": "示例图片",
   "Demosaic": "去马赛克",
   "Display": "显示",
@@ -81,6 +86,7 @@ const translations = new Map(Object.entries({
   "Hold B to inspect the candidate": "按住 B 检查候选图",
   "MVP": "MVP",
   "MVP Image Viewer": "MVP Image Viewer",
+  "MVP Image Viewer will close. All settings, presets, history, logs, crash reports, and cached files on this device will be deleted. Your image files will not be changed.": "MVP Image Viewer 将关闭。当前设备上的全部设置、预设、历史记录、日志、崩溃报告和缓存文件都将被删除。不会改动您的图片文件。",
   "Image presentation": "图片呈现",
   "Inspect": "检查",
   "Installed version %1": "已安装版本 %1",
@@ -177,6 +183,7 @@ const translations = new Map(Object.entries({
   "Size": "大小",
   "Side by side · Hold Ctrl while zooming or panning to adjust one image": "并排显示 · 缩放或平移时按住 Ctrl 可单独调整一张图片",
   "Smooth display": "平滑显示",
+  "Some local application data could not be removed: %1": "无法删除部分本机应用数据：%1",
   "Sort by": "排序方式",
   "Sort by file size": "按文件大小排序",
   "Sort by file type": "按文件类型排序",
@@ -186,11 +193,14 @@ const translations = new Map(Object.entries({
   "System": "跟随系统",
   "This shortcut is already assigned to “%1”.": "此快捷键已分配给“%1”。",
   "The current image will be moved to the system Trash.": "当前图片将被移入系统回收站。",
+  "The application cannot be closed automatically.": "无法自动关闭应用程序。",
+  "The application settings could not be cleared.": "无法清除应用程序设置。",
   "The selected item will be moved to the system Trash.": "所选项目将被移入系统回收站。",
   "The verified installer will open and MVP Image Viewer will close.": "即将打开已验证的安装器，MVP Image Viewer 将关闭。",
   "The preview uses the same surfaces and signals as the image workspace.": "预览使用与图片工作区相同的界面层级和状态信号。",
   "Embedded RGB profiles are converted to the app’s fixed sRGB display space.": "嵌入的 RGB 配置文件会转换到应用固定的 sRGB 显示空间。",
   "Theme": "主题",
+  "Thumbnail": "缩略图",
   "Tune the workspace for bright studios or low-light inspection.": "为明亮工作室或低照度检查调整工作区。",
   "Use system language": "跟随系统语言",
   "Type": "类型",
@@ -246,6 +256,9 @@ xml = xml.replace(
   (match, encodedSource) => {
     const source = decodeXml(encodedSource);
     if (!translations.has(source)) {
+      // Keep translations maintained directly in Linguist/Qt tools, while still rejecting every
+      // newly extracted string until it has an explicit Simplified Chinese translation here.
+      if (!match.includes('type="unfinished"')) return match;
       throw new Error(`Missing Simplified Chinese translation: ${source}`);
     }
     return `<source>${encodedSource}</source>\n        <translation>${encodeXml(translations.get(source))}</translation>`;

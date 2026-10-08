@@ -86,6 +86,50 @@ Column {
     Text { width: parent.width; wrapMode: Text.Wrap; color: Theme.danger; text: root.diagnostics ? root.diagnostics.error : ""; visible: text.length > 0 }
     Text { width: parent.width; wrapMode: Text.Wrap; color: Theme.mutedInk; text: root.diagnostics ? root.diagnostics.exportedPath : ""; visible: text.length > 0 }
     Button { text: qsTr("Show exported file"); visible: root.diagnostics && root.diagnostics.exportedPath.length > 0; onClicked: root.diagnostics.openExportDirectory() }
+
+    Item { width: 1; height: 12 }
+    Rectangle { width: parent.width; height: 1; color: Theme.opticalGray }
+    Text {
+        topPadding: 12
+        text: qsTr("Cold start")
+        color: Theme.graphiteInk
+        font.family: Theme.uiFont
+        font.pixelSize: 13
+        font.weight: Font.DemiBold
+    }
+    Text {
+        width: parent.width
+        wrapMode: Text.Wrap
+        color: Theme.mutedInk
+        font.family: Theme.uiFont
+        font.pixelSize: 12
+        lineHeight: 1.25
+        text: qsTr("Delete thumbnails, update downloads, logs, crash reports, presets, history, and all settings stored by this app on this device. Your image files are not changed.")
+    }
+    Button {
+        id: deleteSoftwareCacheButton
+        objectName: "deleteSoftwareCacheButton"
+        text: qsTr("Delete software cache…")
+        enabled: !!root.settingsController && (!root.diagnostics || !root.diagnostics.busy)
+        onClicked: deleteSoftwareCacheDialog.showConfirmation()
+        contentItem: Text {
+            text: deleteSoftwareCacheButton.text
+            color: deleteSoftwareCacheButton.enabled ? Theme.danger : Theme.faintInk
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            font.family: Theme.uiFont
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+        }
+        background: Rectangle {
+            radius: 6
+            color: deleteSoftwareCacheButton.down ? Theme.pressedSurface
+                  : deleteSoftwareCacheButton.hovered ? Theme.softHover : Theme.raisedSurface
+            border.width: deleteSoftwareCacheButton.activeFocus ? 2 : 1
+            border.color: deleteSoftwareCacheButton.activeFocus ? Theme.probeBlue : Theme.danger
+            opacity: deleteSoftwareCacheButton.enabled ? 1 : Theme.disabledOpacity
+        }
+    }
     FileDialog {
         id: exportDialog
         title: qsTr("Export diagnostics")
@@ -101,5 +145,14 @@ Column {
         message: qsTr("This removes completed session logs and crash reports. Running sessions are kept.")
         destructive: true
         onConfirmed: clearDialog.complete(root.diagnostics.clearHistory())
+    }
+    AppConfirmDialog {
+        id: deleteSoftwareCacheDialog
+        parent: Overlay.overlay
+        dialogTitle: qsTr("Delete all local app data?")
+        message: qsTr("MVP Image Viewer will close. All settings, presets, history, logs, crash reports, and cached files on this device will be deleted. Your image files will not be changed.")
+        confirmText: qsTr("Delete and quit")
+        destructive: true
+        onConfirmed: deleteSoftwareCacheDialog.complete(root.settingsController.deleteSoftwareCache())
     }
 }

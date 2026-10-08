@@ -249,6 +249,8 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     });
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &app,
                      [&lastMainWindowStateWasMaximized] {
+                         if (mvpview::AppSettings::softwareCacheDeletionRequested())
+                             return;
                          QSettings().setValue(QStringLiteral("window/maximized"),
                                               lastMainWindowStateWasMaximized);
                      });
@@ -289,17 +291,25 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
     QCoreApplication::setOrganizationName(QStringLiteral("MvpView"));
     QCoreApplication::setApplicationVersion(QStringLiteral(MVPVIEW_PROJECT_VERSION));
-    const QSettings diagnosticSettings;
-    mvpview::diagnostics::Options diagnosticOptions;
-    diagnosticOptions.root = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
-                             + QStringLiteral("/diagnostics");
-    diagnosticOptions.loggingEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/loggingEnabled"), true).toBool();
-    diagnosticOptions.crashEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/crashReportingEnabled"), true).toBool();
-    diagnosticOptions.level = mvpview::diagnostics::parseLevel(diagnosticSettings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString());
-    mvpview::diagnostics::Service diagnosticService(diagnosticOptions);
-    diagnosticService.startCrashCapture({});
-    mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::startup(), QStringLiteral("application.start"), {}, true);
-    const int result = runApplication(argc, argv, diagnosticService);
-    diagnosticService.markCleanExit();
+    int result = 0;
+    {
+        const QSettings diagnosticSettings;
+        mvpview::diagnostics::Options diagnosticOptions;
+        diagnosticOptions.root = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
+                                 + QStringLiteral("/diagnostics");
+        diagnosticOptions.loggingEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/loggingEnabled"), true).toBool();
+        diagnosticOptions.crashEnabled = diagnosticSettings.value(QStringLiteral("diagnostics/crashReportingEnabled"), true).toBool();
+        diagnosticOptions.level = mvpview::diagnostics::parseLevel(diagnosticSettings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString());
+        mvpview::diagnostics::Service diagnosticService(diagnosticOptions);
+        diagnosticService.startCrashCapture({});
+        mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::startup(), QStringLiteral("application.start"), {}, true);
+        result = runApplication(argc, argv, diagnosticService);
+        diagnosticService.markCleanExit();
+    }
+    // Active diagnostics and QML cache handles are closed at this point. Removing their parent
+    // directories earlier would leave a partial reset on platforms that lock open files.
+    const QString deletionError = mvpview::AppSettings::finishSoftwareCacheDeletion();
+    if (!deletionError.isEmpty())
+        qWarning().noquote() << deletionError;
     return result;
 }

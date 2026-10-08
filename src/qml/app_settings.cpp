@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QJsonArray>
@@ -29,6 +30,8 @@
 #include <QTimer>
 #include <QVersionNumber>
 
+#include <utility>
+
 #ifndef MVPVIEW_GITHUB_REPOSITORY
 #define MVPVIEW_GITHUB_REPOSITORY ""
 #endif
@@ -48,6 +51,25 @@ constexpr auto kHonorExifOrientationKey = "display/honorExifOrientation";
 constexpr auto kCanvasBackgroundKey = "display/canvasBackground";
 constexpr auto kSmoothDisplayKey = "display/smoothDisplay";
 constexpr auto kLastUpdateCheckKey = "updates/lastCheckUtc";
+
+bool gSoftwareCacheDeletionRequested = false;
+QString settingsFileToDelete;
+QStringList appDirectoriesToDelete;
+
+QStringList localAppDirectories() {
+    QStringList paths;
+    const auto append = [&paths](QStandardPaths::StandardLocation location) {
+        const QString path = QDir::cleanPath(QStandardPaths::writableLocation(location));
+        if (!path.isEmpty() && QDir::isAbsolutePath(path) && path != QDir::rootPath()
+            && path != QDir::homePath() && !paths.contains(path)) {
+            paths.append(path);
+        }
+    };
+    append(QStandardPaths::CacheLocation);
+    append(QStandardPaths::AppDataLocation);
+    append(QStandardPaths::AppLocalDataLocation);
+    return paths;
+}
 
 QString platformInstallerSuffix() {
 #if defined(Q_OS_MACOS)
@@ -710,6 +732,55 @@ void AppSettings::restoreDefaults() {
     setCanvasBackground(QStringLiteral("neutral"));
     setSmoothDisplay(true);
     resetShortcuts();
+}
+
+QString AppSettings::deleteSoftwareCache() {
+    if (!application_)
+        return tr("The application cannot be closed automatically.");
+
+    QSettings settings;
+    settingsFileToDelete = settings.fileName();
+    settings.clear();
+    settings.sync();
+    if (settings.status() != QSettings::NoError)
+        return tr("The application settings could not be cleared.");
+
+    appDirectoriesToDelete = localAppDirectories();
+    gSoftwareCacheDeletionRequested = true;
+    // Let the confirmation dialog finish the current event before shutdown begins.
+    QTimer::singleShot(0, application_, &QCoreApplication::quit);
+    return {};
+}
+
+bool AppSettings::softwareCacheDeletionRequested() {
+    return gSoftwareCacheDeletionRequested;
+}
+
+QString AppSettings::finishSoftwareCacheDeletion() {
+    if (!softwareCacheDeletionRequested())
+        return {};
+
+    QStringList failures;
+    for (const QString& path : std::as_const(appDirectoriesToDelete)) {
+        QDir directory(path);
+        if (directory.exists() && !directory.removeRecursively())
+            failures.append(path);
+    }
+
+    // Native settings may live outside the app data directories (for example, a macOS plist).
+    // Registry settings are cleared above and do not present an absolute filesystem path here.
+    if (!settingsFileToDelete.isEmpty() && QFileInfo(settingsFileToDelete).isAbsolute()) {
+        if (QFileInfo::exists(settingsFileToDelete) && !QFile::remove(settingsFileToDelete))
+            failures.append(settingsFileToDelete);
+        const QString lockFile = settingsFileToDelete + QStringLiteral(".lock");
+        if (QFileInfo::exists(lockFile) && !QFile::remove(lockFile))
+            failures.append(lockFile);
+    }
+
+    if (failures.isEmpty())
+        return {};
+    return tr("Some local application data could not be removed: %1")
+        .arg(failures.join(QStringLiteral(", ")));
 }
 
 void AppSettings::applyLanguage() {
