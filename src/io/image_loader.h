@@ -117,6 +117,7 @@ class ImageLoader final : public QObject {
     [[nodiscard]] static qsizetype estimatedFullFrameCost(const ImageFrame& preview);
 
     void dispatch();
+    void scheduleDispatch();
     int viewportPriority(const QString& path) const;
     struct Viewport { QHash<QString, int> priorities; bool fast = false; };
     QHash<QString, Viewport> viewports_;
@@ -125,6 +126,8 @@ class ImageLoader final : public QObject {
     QVector<LoadHandle> rawPrefetchHandles_;
     QVector<LoadHandle> imagePrefetchHandles_;
     QTimer dispatchTimer_;
+    QTimer dispatchWake_;
+    QElapsedTimer completionClock_;
     std::deque<std::function<void()>> completions_;
     QThreadPool writePool_;
     std::shared_ptr<std::atomic_int> pendingWrites_ = std::make_shared<std::atomic_int>(0);

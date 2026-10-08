@@ -9,6 +9,8 @@
 #include "qml/browse_controller.h"
 #include "qml/browse_workspace_controller.h"
 #include "qml/compare_controller.h"
+#include "qml/qml_image_canvas.h"
+#include <QPointer>
 #include "qml/image_properties_controller.h"
 #include "qml/full_screen_controller.h"
 #include "qml/raw_parameters_controller.h"
@@ -310,6 +312,24 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
 
     if (mvpview::performance::enabled() && !performanceScenario.isEmpty()) {
         QTimer::singleShot(1000, mainWindow, [mainWindow, performanceScenario, selectedPath, &browseController] {
+            if (performanceScenario == QStringLiteral("slot-update")) {
+                QTimer::singleShot(1500, mainWindow, [mainWindow] {
+                    for (auto* canvas : mainWindow->findChildren<mvpview::QmlImageCanvas*>()) {
+                        if (canvas->frames().size() < 2 || !canvas->frameAt(0)) continue;
+                        mvpview::performance::mark(QStringLiteral("scenario.slot_update"));
+                        canvas->setFrameAt(0, std::make_shared<mvpview::ImageFrame>(*canvas->frameAt(0)));
+                        const QPointer<mvpview::QmlImageCanvas> alive(canvas);
+                        QTimer::singleShot(250, mainWindow, [alive] {
+                            if (!alive) return;
+                            mvpview::performance::mark(QStringLiteral("scenario.view_change"));
+                            alive->actualPixelsAll();
+                        });
+                        QTimer::singleShot(500, mainWindow, [alive] { if (alive) alive->fitAll(); });
+                        break;
+                    }
+                });
+                return;
+            }
             if (performanceScenario == QStringLiteral("refresh")) {
                 browseController.refreshAll();
                 mvpview::performance::mark(QStringLiteral("scenario.refresh"));
@@ -323,15 +343,25 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
             auto* scrollTimer = new QTimer(mainWindow);
             scrollTimer->setInterval(16);
             auto step = std::make_shared<int>(0);
-            QObject::connect(scrollTimer, &QTimer::timeout, mainWindow, [mainWindow, step, scrollTimer] {
+            auto sheets = std::make_shared<QList<QPointer<QObject>>>();
+            QObject::connect(scrollTimer, &QTimer::timeout, mainWindow, [mainWindow, step, scrollTimer, sheets] {
                 ++*step;
                 if (*step == 1 || *step == 91 || *step == 151 || *step == 241)
                     mvpview::performance::mark(QStringLiteral("scenario.motion"),
                         {{"active", *step == 1 || *step == 151}});
-                const auto sheets = mainWindow->findChildren<QObject*>();
-                for (auto* sheet : sheets) {
-                    if (!sheet->objectName().startsWith(QStringLiteral("paneContactSheet-")) &&
-                        sheet->objectName() != QStringLiteral("galleryStrip")) continue;
+                sheets->erase(std::remove_if(sheets->begin(), sheets->end(),
+                    [](const QPointer<QObject>& sheet) { return !sheet; }), sheets->end());
+                if (sheets->isEmpty()) {
+                    for (auto* item : mainWindow->findChildren<QObject*>()) {
+                        if ((item->objectName().startsWith(QStringLiteral("paneContactSheet-")) ||
+                             item->objectName() == QStringLiteral("galleryStrip")) && item->property("visible").toBool())
+                            sheets->append(item);
+                    }
+                }
+                if (*step == 120) mvpview::performance::mark(QStringLiteral("scenario.jump"));
+                QElapsedTimer movementWork; movementWork.start();
+                for (const auto& sheet : *sheets) {
+                    if (!sheet || !sheet->property("visible").toBool()) continue;
                     sheet->setProperty("benchmarkMoving", *step <= 90 || (*step > 150 && *step <= 240));
                     const qreal height = sheet->property("height").toDouble();
                     const qreal contentHeight = sheet->property("contentHeight").toDouble();
@@ -342,6 +372,8 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                     else if (*step > 150 && *step <= 240) y -= height * 0.08;
                     sheet->setProperty("contentY", std::clamp(y, qreal(0), maximum));
                 }
+                if (movementWork.elapsed() > 4)
+                    mvpview::performance::mark(QStringLiteral("scenario.step_work"), {{"elapsedMs", movementWork.elapsed()}});
                 if (*step >= 270) {
                     scrollTimer->stop();
                     mvpview::performance::mark(QStringLiteral("scenario.complete"));

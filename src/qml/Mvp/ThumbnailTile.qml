@@ -20,6 +20,7 @@ Item {
     property int bitDepth: 0
     property string fileSizeText
     property bool requestThumbnail: true
+    readonly property bool thumbnailReady: visualLoader.item !== null && visualLoader.item.thumbnailReady
     property url thumbnailUrl
     property bool directory: false
     property bool selected: false
@@ -134,6 +135,7 @@ Item {
     ToolTip.text: root.path
 
     Loader {
+        id: visualLoader
         asynchronous: true
         anchors.fill: parent
         sourceComponent: root.displayMode === 1 ? listVisual : gridVisual
@@ -142,6 +144,7 @@ Item {
     Component {
         id: gridVisual
         Item {
+            readonly property bool thumbnailReady: gridPreview.status === Image.Ready
             Rectangle {
                 anchors.fill: parent
                 color: tileMouse.containsMouse ? Theme.paperWhite : "transparent"
@@ -229,6 +232,7 @@ Item {
     Component {
         id: listVisual
         Item {
+            readonly property bool thumbnailReady: listPreview.status === Image.Ready
             Rectangle {
                 anchors.fill: parent
                 color: tileMouse.containsMouse ? Theme.paperWhite : "transparent"

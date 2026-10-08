@@ -121,7 +121,9 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
         do {
             const qsizetype count = std::min<qsizetype>(32, pendingScanFiles_.size() - pendingScanOffset_);
             if (count <= 0) break;
+            QElapsedTimer chunk; chunk.start();
             thumbnailModel_->appendFiles(pendingScanFiles_.mid(pendingScanOffset_, count));
+            performance::mark(QStringLiteral("directory.model_chunk"), {{"elapsedMs", chunk.elapsed()}, {"items", count}});
             pendingScanOffset_ += count;
             while (!pendingScanBatchEnds_.empty() && pendingScanBatchEnds_.front() <= pendingScanOffset_) {
                 pendingScanBatchEnds_.pop_front();
@@ -793,6 +795,14 @@ QString BrowseController::registerThumbnailViewport() {
 int BrowseController::thumbnailIndexForPath(const QString& path) const {
     const int row = thumbnailModel_->rowForPath(path);
     return row < 0 ? -1 : filterModel_->mapFromSource(thumbnailModel_->index(row)).row();
+}
+
+bool BrowseController::performanceTracing() const { return performance::enabled(); }
+
+void BrowseController::reportThumbnailPresentation(const QString& owner, int generation,
+                                                    int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs) {
+    performance::mark(QStringLiteral("viewport.presented"),
+        {{"owner", owner}, {"generation", generation}, {"visible", count}, {"elapsedMs", elapsedMs}, {"first", first}, {"firstElapsedMs", firstElapsedMs}});
 }
 
 void BrowseController::setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast) {

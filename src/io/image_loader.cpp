@@ -60,10 +60,14 @@ ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* 
     writePool_.setMaxThreadCount(1);
     dispatchTimer_.setInterval(16);
     connect(&dispatchTimer_, &QTimer::timeout, this, &ImageLoader::dispatch);
+    dispatchWake_.setSingleShot(true);
+    dispatchWake_.setInterval(0);
+    connect(&dispatchWake_, &QTimer::timeout, this, &ImageLoader::dispatch);
 }
 
 ImageLoader::~ImageLoader() {
     dispatchTimer_.stop();
+    dispatchWake_.stop();
     for (auto& job : inFlight_) job.activeConsumers->store(-1);
     pool_.waitForDone();
     serializedPool_.waitForDone();
@@ -95,16 +99,17 @@ LoadHandle ImageLoader::requestAnalysis(AnalysisWork work, std::function<void(QV
         if (!self) return;
         QMetaObject::invokeMethod(self, [self, consumers, key, result = std::move(result), callback] {
             if (!self) return;
+            --self->parallelRunning_;
             self->completions_.push_back([self, consumers, key, result, callback] {
                 if (!self) return;
-                --self->parallelRunning_;
                 self->inFlight_.remove(key);
                 if (consumers->load() > 0) callback(result);
             });
+            self->scheduleDispatch();
         }, Qt::QueuedConnection);
     };
     inFlight_.insert(key, std::move(job));
-    if (!dispatchTimer_.isActive()) dispatchTimer_.start();
+    scheduleDispatch();
     return LoadHandle(state);
 }
 
@@ -182,7 +187,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 state->activeConsumers = found->activeConsumers;
                 found->pending.push_back({requestId, std::move(callback), state});
                 found->priority = std::max(found->priority, priority);
-                if (!dispatchTimer_.isActive()) dispatchTimer_.start();
+                scheduleDispatch();
                 return LoadHandle(state);
             }
         }
@@ -317,16 +322,13 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 self,
                 [self, completion = [self, result = std::move(result), key, purpose = request.purpose,
                  sourcePath = request.path, generation, activeConsumers, diskHit, metadataOnly = bool(request.metadataSource),
-                 elapsedMs = decodeTimer.elapsed(),
-                 serialized = !request.metadataSource && decoder->executionMode(request.path) == DecodeExecutionMode::Serialized]() {
+                 elapsedMs = decodeTimer.elapsed()]() {
                     if (!self) {
                         return;
                     }
-                    if (serialized) --self->serializedRunning_;
-                    else --self->parallelRunning_;
                     performance::mark(QStringLiteral("loader.completed"),
                         {{"elapsedMs", elapsedMs}, {"diskHit", diskHit}, {"purpose", int(purpose)},
-                         {"cancelled", activeConsumers->load() <= 0},
+                         {"cancelled", activeConsumers->load() <= 0}, {"failed", !result.frame && activeConsumers->load() > 0},
                          {"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
                     diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
                         QStringLiteral("loader.completed"),
@@ -368,12 +370,16 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                             break;
                         }
                     }
-                }]() mutable {
-                    if (self) self->completions_.push_back(std::move(completion));
+                }, serialized = !request.metadataSource && decoder->executionMode(request.path) == DecodeExecutionMode::Serialized]() mutable {
+                    if (!self) return;
+                    if (serialized) --self->serializedRunning_;
+                    else --self->parallelRunning_;
+                    self->completions_.push_back(std::move(completion));
+                    self->scheduleDispatch();
                 },
                 Qt::QueuedConnection);
         };
-    if (!dispatchTimer_.isActive()) dispatchTimer_.start();
+    scheduleDispatch();
     return LoadHandle(state);
 }
 
@@ -402,7 +408,7 @@ void ImageLoader::updateViewport(const QString& owner, const QHash<QString, int>
     for (auto it = inFlight_.begin(); it != inFlight_.end(); ++it)
         if (it->purpose == DecodePurpose::Thumbnail)
             it->priority = viewportPriority(it->path);
-    if (!dispatchTimer_.isActive()) dispatchTimer_.start();
+    scheduleDispatch();
 }
 
 bool ImageLoader::fastScrolling() const {
@@ -416,10 +422,18 @@ bool ImageLoader::hasInteractiveWork() const {
     return false;
 }
 
+void ImageLoader::scheduleDispatch() {
+    if (!dispatchTimer_.isActive()) dispatchTimer_.start();
+    // New demand preempts a pending completion deadline without waiting a frame.
+    if (!dispatchWake_.isActive() || dispatchWake_.remainingTime() > 0) dispatchWake_.start(0);
+}
+
 void ImageLoader::dispatch() {
     const QPointer<ImageLoader> alive(this);
+    const bool commitNow = !completionClock_.isValid() || completionClock_.elapsed() >= 16;
+    if (commitNow && !completions_.empty()) completionClock_.start();
     QElapsedTimer completionBudget; completionBudget.start();
-    while (!completions_.empty() && completionBudget.elapsed() < 4) {
+    while (commitNow && !completions_.empty() && completionBudget.elapsed() < 4) {
         auto completion = std::move(completions_.front()); completions_.pop_front();
         completion();
         if (!alive) return;
@@ -469,7 +483,9 @@ void ImageLoader::dispatch() {
         if (best->serialized) { ++serializedRunning_; serializedPool_.start(std::move(best->work)); }
         else { ++parallelRunning_; pool_.start(std::move(best->work)); }
     }
-    if (inFlight_.isEmpty()) dispatchTimer_.stop();
+    if (!completions_.empty() && !dispatchWake_.isActive())
+        dispatchWake_.start(std::max(1, 16 - int(completionClock_.elapsed())));
+    if (inFlight_.isEmpty() && completions_.empty()) dispatchTimer_.stop();
 }
 
 void ImageLoader::prefetchAdjacentImages(const QStringList& paths, int index, const QSize& size) {

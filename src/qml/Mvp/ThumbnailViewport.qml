@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 
 // Geometry and scheduling are independent of the image URL and cache identity.
 QtObject {
@@ -14,6 +15,28 @@ QtObject {
         owner = controller && controller.registerThumbnailViewport !== undefined
                 ? controller.registerThumbnailViewport() : "preview"
         dirty = true
+    }
+    readonly property bool tracing: controller && controller.performanceTracing === true
+    property string visibleSignature: ""
+    property int presentationGeneration: 0
+    property double firstPresentationStarted: 0
+    property bool firstPresented: false
+    property double presentationStarted: 0
+    property bool presentationPending: false
+    property var visibleItems: []
+    property Connections presentationEvents: Connections {
+        target: root.tracing ? root.view.Window.window : null
+        function onFrameSwapped() {
+            if (!root.presentationPending || root.dirty || root.visibleItems.length === 0) return
+            for (const candidate of root.visibleItems) {
+                if (!candidate.item || candidate.item.path !== candidate.path || !candidate.item.thumbnailReady) return
+            }
+            root.presentationPending = false
+            root.controller.reportThumbnailPresentation(root.owner, root.presentationGeneration,
+                root.visibleItems.length, Math.max(0, Date.now() - root.presentationStarted),
+                !root.firstPresented, Math.max(0, Date.now() - root.firstPresentationStarted))
+            root.firstPresented = true
+        }
     }
     property string anchorPath: ""
     property real anchorOffset: 0
@@ -44,20 +67,33 @@ QtObject {
                     Math.min(y, root.view.originY + Math.max(0, root.view.contentHeight - root.view.height)))
             })
         }
-        function onModelReset() { root.anchorPending = false; root.dirty = true }
+        function onModelReset() {
+            root.anchorPending = false; root.dirty = true
+            root.firstPresentationStarted = 0; root.firstPresented = false
+            root.presentationPending = false; root.visibleSignature = ""; root.visibleItems = []
+        }
     }
     property real lastY: 0
     property double lastTime: 0
     property int direction: 1
+    property real lastSpeed: 0
+    property bool fastScrolling: false
+    readonly property bool scrollBarPressed: view.ScrollBar.vertical !== null && view.ScrollBar.vertical.pressed
+    property Connections scrollBarEvents: Connections {
+        target: root.view.ScrollBar.vertical
+        function onPressedChanged() { root.dirty = true; if (!root.scrollBarPressed) root.report() }
+    }
     property bool dirty: true
     property Timer ticker: Timer {
         interval: 16
         repeat: true
         running: root.view.visible
-        onTriggered: { if (root.dirty || root.view.moving || root.view.benchmarkMoving) root.report() }
+        onTriggered: { if (root.dirty || root.view.moving || root.view.benchmarkMoving || root.scrollBarPressed || root.fastScrolling) root.report() }
     }
     property Connections events: Connections {
         target: root.view
+        ignoreUnknownSignals: true
+        function onBenchmarkMovingChanged() { root.dirty = true; if (!root.view.benchmarkMoving) root.report() }
         function onContentYChanged() { root.dirty = true }
         function onCountChanged() { root.dirty = true }
         function onWidthChanged() { root.dirty = true }
@@ -75,8 +111,15 @@ QtObject {
         const now = Date.now()
         const delta = view.contentY - lastY
         if (Math.abs(delta) > 0.5) direction = delta > 0 ? 1 : -1
-        const speed = lastTime > 0 ? Math.abs(delta) * 1000 / Math.max(1, now - lastTime) : 0
-        const fast = (view.moving || view.benchmarkMoving) && speed >= view.height * 2
+        const moving = view.moving || view.benchmarkMoving || scrollBarPressed
+        const speed = Math.abs(delta) > 0.5 && lastTime > 0
+                      ? Math.abs(delta) * 1000 / Math.max(1, now - lastTime)
+                      : moving ? lastSpeed : 0
+        lastSpeed = speed
+        // Scrollbar jumps and programmatic positioning need cancellation even when
+        // Flickable.moving is false; clear the transient jump state on the next tick.
+        const fast = speed >= view.height * 2 || Math.abs(delta) >= view.height
+        fastScrolling = fast
         lastY = view.contentY
         lastTime = now
         const top = view.contentY
@@ -104,6 +147,18 @@ QtObject {
                                   priority: (intersects ? 80 : aheadOfView ? 35 : 20)
                                             - Math.min(15, Math.floor(distance / Math.max(1, view.height) * 10)) })
             } else item.thumbnailDemand = false
+        }
+        if (tracing) {
+            const visible = candidates.filter(function(candidate) { return candidate.visible })
+            const signature = visible.map(function(candidate) { return candidate.path }).sort().join("\n")
+            if (signature !== visibleSignature) {
+                visibleSignature = signature
+                ++presentationGeneration
+                presentationStarted = now
+                if (visible.length > 0 && firstPresentationStarted === 0) firstPresentationStarted = now
+                presentationPending = visible.length > 0
+            }
+            visibleItems = visible
         }
         candidates.sort(function(a, b) { return b.priority - a.priority })
         const limit = Math.max(visibleCount, Math.min(128, visibleCount * 3))

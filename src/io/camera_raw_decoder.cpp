@@ -372,7 +372,10 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     const QFileInfo sourceInfo(request.path);
     const QString sourceKey = QStringLiteral("camera:%1:%2:%3")
         .arg(sourceInfo.absoluteFilePath()).arg(sourceInfo.size()).arg(sourceInfo.lastModified().toMSecsSinceEpoch());
-    if (request.sourceCache && request.purpose != DecodePurpose::Thumbnail) {
+    // Reuse only routes that already develop the sensor plane. A plain preview
+    // still uses the camera's embedded rendering, as it did before source caching.
+    if (request.sourceCache && (request.purpose == DecodePurpose::Full ||
+                               (request.purpose == DecodePurpose::Preview && request.rawParameters))) {
         if (const auto source = request.sourceCache->get(sourceKey); source && source->planes && source->parameters) {
             auto parameters = *source->parameters;
             if (request.rawParameters) applyProcessingParameters(parameters, *request.rawParameters);
@@ -383,11 +386,15 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                 ? renderBayerImage(source->planes->storage, parameters, size, cancelled)
                 : cfaMosaicImage(source->planes->storage, parameters, size, cancelled);
             if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
-            const bool full = request.purpose == DecodePurpose::Full;
-            auto planes = std::make_shared<PlaneBufferSet>(*source->planes);
-            planes->renderFromDisplayImage = !full || !parameters.demosaic;
-            return frameFromImage(std::move(image), source->metadata, parameters, {},
-                                  full ? planes : nullptr, !full, parameters.demosaic);
+            if (!image.isNull()) {
+                const bool full = request.purpose == DecodePurpose::Full;
+                auto planes = std::make_shared<PlaneBufferSet>(*source->planes);
+                planes->renderFromDisplayImage = !full || !parameters.demosaic;
+                return frameFromImage(std::move(image), source->metadata, parameters, {},
+                                      full ? planes : nullptr, !full, parameters.demosaic);
+            }
+            // Preserve LibRaw's fallback if this sensor/parameter combination
+            // cannot be developed by the application's Bayer renderer.
         }
     }
     // LibRaw is a large object (roughly 800 KiB in supported releases). Keep it
@@ -404,6 +411,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     }
     ImageMetadata metadata = metadataFor(request.path, *processor);
     std::optional<RawImageParameters> rawParameters = rawParametersFor(*processor);
+    const std::optional<RawImageParameters> nativeProcessing = rawParameters;
     // The RAW parameters editor owns processing values and the optional Quad Bayer sampling
     // override; the file owns dimensions and the base CFA phase.
     if (rawParameters && request.rawParameters) {
@@ -505,6 +513,10 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
         auto source = std::make_shared<SourceFrame>();
         source->planes = std::make_shared<PlaneBufferSet>(*mosaic);
         source->parameters = rawParameters;
+        // Cache the file's defaults, not the display overrides of the request
+        // that happened to populate the cache. Keep the cropped geometry/CFA.
+        if (source->parameters && nativeProcessing)
+            applyProcessingParameters(*source->parameters, *nativeProcessing);
         source->metadata = metadata;
         request.sourceCache->put(sourceKey, std::move(source));
     }

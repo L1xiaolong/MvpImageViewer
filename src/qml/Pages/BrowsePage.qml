@@ -1044,6 +1044,7 @@ Rectangle {
                 ThumbnailViewport { view: galleryStrip; controller: root.controller }
                 delegate: Item {
                     property bool thumbnailDemand: false
+                    readonly property bool thumbnailReady: galleryPreview.status === Image.Ready
                     id: galleryDelegate
                     objectName: "galleryDelegate-" + galleryDelegate.index
                     readonly property alias dragHandler: galleryDragHandler

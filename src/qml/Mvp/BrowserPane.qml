@@ -489,6 +489,7 @@ Rectangle {
         ThumbnailViewport { view: contactSheet; controller: root.controller }
         delegate: Item {
             property bool thumbnailDemand: false
+            readonly property bool thumbnailReady: thumbnailTile.thumbnailReady
             required property string path
             required property string fileName
             required property string technicalLabel
@@ -503,6 +504,7 @@ Rectangle {
             width: contactSheet.cellWidth
             height: contactSheet.cellHeight
             ThumbnailTile {
+                id: thumbnailTile
                 width: root.displayMode === 1 ? Math.min(parent.width - 12, 760)
                                               : contactSheet.visualCellWidth
                 height: root.displayMode === 1 ? 68 : parent.height - 6

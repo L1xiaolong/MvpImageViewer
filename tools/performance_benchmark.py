@@ -5,7 +5,7 @@ parser.add_argument('--exe',type=pathlib.Path,required=True)
 parser.add_argument('--images',type=pathlib.Path,required=True)
 parser.add_argument('--output',type=pathlib.Path,required=True)
 parser.add_argument('--runs',type=int,default=20)
-parser.add_argument('--scenario',choices=['startup','scroll','fullscreen','compare','refresh'],default='startup')
+parser.add_argument('--scenario',choices=['startup','scroll','fullscreen','compare','refresh','slot-update'],default='startup')
 parser.add_argument('--mode',choices=['grid','list','gallery'],default='grid')
 parser.add_argument('--cache-state',choices=['existing','cold','disk'],default='existing')
 parser.add_argument('--panes',type=int,choices=[1,2,3,4],default=1)
@@ -19,12 +19,12 @@ for run in range(args.runs):
         cache=args.output/('disk-cache' if args.cache_state=='disk' else f'cold-cache-{cold_generation}-{run}')
         env['MVPVIEW_THUMBNAIL_CACHE_DIR']=str(cache.resolve())
     capture=args.output/f'{run:02}.png'
-    command=[str(args.exe.resolve()),str(args.images.resolve()),'--display-mode',args.mode,'--file-managers',str(args.panes),'--screenshot-native','--screenshot',str(capture.resolve()),'--screenshot-delay','10000' if args.scenario=='scroll' else '6000' if args.scenario=='refresh' else '2500']
-    if args.scenario in {'scroll','fullscreen','refresh'}: command+=['--perf-scenario',args.scenario]
+    command=[str(args.exe.resolve()),str(args.images.resolve()),'--display-mode',args.mode,'--file-managers',str(args.panes),'--screenshot-native','--screenshot',str(capture.resolve()),'--screenshot-delay','10000' if args.scenario=='scroll' else '6000' if args.scenario=='refresh' else '5000' if args.scenario=='slot-update' else '2500']
+    if args.scenario in {'scroll','fullscreen','refresh','slot-update'}: command+=['--perf-scenario',args.scenario]
     if args.scenario=='fullscreen':
         if not images: raise SystemExit('fullscreen requires images')
         command+=['--select',str(images[0].resolve())]
-    if args.scenario=='compare':
+    if args.scenario in {'compare','slot-update'}:
         if len(images)<2: raise SystemExit('compare requires at least two images')
         command+=['--qml-compare']+[str(p.resolve()) for p in images[:4]]
     start=time.perf_counter()
@@ -47,7 +47,15 @@ for run in range(args.runs):
                 motion.append((start_motion,e['sinceStartMs'])); start_motion=None
     motion_frames=[e.get('intervalMs',e.get('gapMs')) for e in events if e['event']=='ui.frame' and any(a+100<e['sinceStartMs']<b for a,b in motion)]
     motion_frames=[v for v in motion_frames if v is not None]
-    summary.append({'motionFrameP50':statistics.median(motion_frames) if motion_frames else None,'motionFrameP95':sorted(motion_frames)[max(0,math.ceil(len(motion_frames)*.95)-1)] if motion_frames else None,'run':run,'exit':result.returncode,'processMs':round((time.perf_counter()-start)*1000),'firstFrameMs':first[0] if first else None,'completed':len(completed),'maxCachedBytes':max([e.get('cachedBytes',0) for e in completed],default=0)})
+    presented=[e for e in events if e['event']=='viewport.presented']
+    first_fill=[e['firstElapsedMs'] for e in presented if e.get('first')]
+    fills=[e['elapsedMs'] for e in presented]
+    slot_markers=[e['sinceStartMs'] for e in events if e['event']=='scenario.slot_update']
+    view_markers=[e['sinceStartMs'] for e in events if e['event']=='scenario.view_change']
+    slot_uploads=[e['slot'] for e in events if e['event']=='render.upload' and slot_markers and view_markers and slot_markers[0]<=e['sinceStartMs']<view_markers[0]]
+    view_uploads=[e for e in events if e['event']=='render.upload' and view_markers and e['sinceStartMs']>=view_markers[0]]
+    if args.scenario=='slot-update' and (slot_uploads!=[0] or view_uploads): raise SystemExit(f'GPU slot isolation failed: {slot_uploads}, view uploads {len(view_uploads)}; see trace')
+    summary.append({'firstScreenFillMs':max(first_fill) if first_fill else None,'viewportFillP95':sorted(fills)[max(0,math.ceil(len(fills)*.95)-1)] if fills else None,'presentedViewports':len(presented),'slotUploads':slot_uploads,'viewUploads':len(view_uploads),'motionFrameP50' :statistics.median(motion_frames) if motion_frames else None,'motionFrameP95':sorted(motion_frames)[max(0,math.ceil(len(motion_frames)*.95)-1)] if motion_frames else None,'run':run,'exit':result.returncode,'processMs':round((time.perf_counter()-start)*1000),'firstFrameMs':first[0] if first else None,'completed':len(completed),'decodeFailures':sum(bool(e.get('failed')) for e in completed),'maxCachedBytes':max([e.get('cachedBytes',0) for e in completed],default=0)})
     if result.returncode or not capture.exists(): raise SystemExit(f'Run {run} failed; see {args.output}/{run:02}.log')
 valid=[r['firstFrameMs'] for r in summary if r['firstFrameMs'] is not None]
 def percentile(values,p):

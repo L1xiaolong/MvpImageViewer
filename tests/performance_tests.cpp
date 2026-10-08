@@ -45,6 +45,25 @@ public:
     }
     QStringList order() const { std::lock_guard lock(mutex); return started; }
 };
+class ParallelProbeDecoder final : public IImageDecoder {
+public:
+    mutable std::atomic_int active{0}, peak{0};
+    mutable std::atomic_bool interactiveStarted{false};
+    std::atomic_bool release{false};
+    bool canDecode(const QString&) const override { return true; }
+    DecodeResult decode(const DecodeRequest& request) const override {
+        const int count = ++active;
+        int previous = peak.load();
+        while (previous < count && !peak.compare_exchange_weak(previous, count)) {}
+        if (QFileInfo(request.path).fileName() == "interactive.png") interactiveStarted = true;
+        for (int i=0; i<500 && !release && !request.isCancelled(); ++i) QThread::msleep(2);
+        --active;
+        if (request.isCancelled()) return {{}, "Cancelled"};
+        auto frame = std::make_shared<ImageFrame>();
+        QImage image(4,4,QImage::Format_RGBA8888); image.fill(Qt::blue);
+        frame->storage=image; frame->descriptor.size=image.size(); return {frame,{}};
+    }
+};
 int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
     try {
@@ -52,6 +71,24 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            auto parallel=std::make_shared<ParallelProbeDecoder>(); ImageLoader loader(parallel);
+            QVector<LoadHandle> background; bool backgroundDelivered=false;
+            for (int i=0;i<20;++i) background.append(loader.request(i,
+                {path(QString("background%1.png").arg(i)),DecodePurpose::Preview,{32,32}},
+                [&](auto,const auto&){backgroundDelivered=true;}, RequestOptions{LoadCategory::Background}));
+            pump([&]{return parallel->active.load()>0;});
+            bool foregroundDelivered=false;
+            loader.request(100,{path("interactive.png"),DecodePurpose::Preview,{32,32}},
+                [&](auto,const auto& result){require(bool(result.frame),"reserved slot result");foregroundDelivered=true;},
+                RequestOptions{LoadCategory::Interactive});
+            pump([&]{return parallel->interactiveStarted.load();},800);
+            require(parallel->peak.load()<=6,"parallel decode cap");
+            for (const auto& handle : background) handle.cancel();
+            parallel->release=true;
+            pump([&]{return foregroundDelivered && parallel->active.load()==0;});
+            require(!backgroundDelivered,"cancelled background callback");
+        }
         {
             ImageLoader loader(decoder); int completed=0;
             auto first=loader.request(1,{a,DecodePurpose::Preview,{32,32}},[&](auto,const auto& r){require(bool(r.frame),"first frame");++completed;},100);

@@ -32,6 +32,7 @@ class FolderTreeBranchModel;
 // visual layer never reimplements scanning, RAW inference, clipboard operations, or Trash logic.
 class BrowseController final : public QObject {
     Q_OBJECT
+    Q_PROPERTY(bool performanceTracing READ performanceTracing CONSTANT)
     Q_PROPERTY(QAbstractItemModel* thumbnails READ thumbnails CONSTANT)
     Q_PROPERTY(QAbstractItemModel* folderTree READ folderTree CONSTANT)
     Q_PROPERTY(QModelIndex folderRootIndex READ folderRootIndex NOTIFY currentDirectoryChanged)
@@ -127,6 +128,9 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void selectPath(const QString& path, bool extend = false, bool toggle = false);
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE QString registerThumbnailViewport();
+    bool performanceTracing() const;
+    Q_INVOKABLE void reportThumbnailPresentation(const QString& owner, int generation,
+                                                  int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs);
     Q_INVOKABLE void setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast);
     Q_INVOKABLE int thumbnailIndexForPath(const QString& path) const;
     Q_INVOKABLE void setFilterText(const QString& text);

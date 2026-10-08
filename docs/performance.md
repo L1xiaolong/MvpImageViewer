@@ -4,7 +4,7 @@
 
 - Grid/List/Gallery 使用单元格与视口的矩形相交来建立需求；每个视图有独立 owner，图像 URL 不包含视口状态。拖拽图像在实际拖拽时请求，避免 Drag.imageSource 绕过视口产生额外加载；更大的已缓存缩略图可直接复用。每轮可见项先于预取，按中心距离排序，同类请求跨面板轮转。合并请求可以提升队列优先级。
 - 正常前向一屏、后向半屏；超过两屏/秒时前向半屏、不预取后方。快速滚动不暂停可见缩略图，仅暂停新的低优先级分析、元数据和全图预取。每视图最多 128 个候选（可见项超过时保留全部可见项），至多四面板合计 512 个普通候选，且不超过可见数量的三倍。
-- 解码任务保留在可重排的应用队列，线程池内不积压任务。普通并发保持原有 2～6 上限，后台任务保留一个交互名额，LibRaw 串行。后台队列上限 512，磁盘写入上限 64，结果提交每轮 4ms。
+- 解码任务保留在可重排的应用队列，线程池内不积压任务。普通并发保持原有 2～6 上限，后台任务保留一个交互名额，LibRaw 串行。任务入队、优先级改变和工作线程结束后合并唤醒调度器，不等待16ms定时轮询；GUI结果提交仍限制为每16ms最多4ms，释放解码通道与发布结果分开。后台队列上限 512，磁盘写入上限 64，结果提交每轮 4ms。
 - 共享消费者计数提供取消上下文；最后一个消费者离开后任务取消。RAW 分块读取、YUV/Bayer 转换、LibRaw 进度回调检查取消，Qt 图片插件调用前后检查。不可中断的第三方调用及操作系统 I/O 仍可能延迟退出。
 - 缓存读取不持有压缩/写入的大锁。写入独立单线程、同键去重、QSaveFile 原子提交，清理独立执行；磁盘目录为 thumbnails-v2，清理阈值 512MiB（维护前可能短暂超过阈值）。
 - 目录首批 32 条或 50ms、后续 192 条，GUI 以 32 条子批处理、每轮 4ms。生产者最多有 8 个未消费批次，已消费缓冲及时丢弃，旧扫描取消时清除排队扫描。模型按倍数扩容，避免精确 reserve 导致的二次复杂度。自然排序键在线程中准备，按路径恢复滚动锚点；搜索防抖 100ms。
@@ -23,11 +23,11 @@ ctest --test-dir build/windows-msys2-release --output-on-failure
 python tools/performance_benchmark.py --exe build/windows-msys2-release/MVPImageViewer.exe --images E:/images --output build/perf-results/local --runs 20 --scenario scroll --mode grid --panes 4
 ```
 
-`--scenario` 支持 startup、scroll、fullscreen、compare、refresh；`--mode` 支持 grid、list、gallery。`--cache-state cold` 为每次运行创建新的独立缩略图缓存目录；`disk` 使用输出目录下同一个缓存目录（第一轮预热、后续测磁盘命中）；默认 `existing` 沿用用户缓存。内存命中通过同进程反向滚动和 loader.memory_hit 验证，重新启动进程不能保留解码内存缓存。可用 MVPVIEW_THUMBNAIL_CACHE_DIR 指定实验磁盘目录。滚动场景会填充指定数量的面板并执行下滑、停止、跨距跳转和反向滚动。对比场景取目录前四张图。截图、完整日志、JSON 事件和 summary.json 留在输出目录。性能专用 CLI 动作仅在 MVPVIEW_PERF=1 时执行，不影响正常启动。
+`--scenario` 支持 startup、scroll、fullscreen、compare、refresh、slot-update；`--mode` 支持 grid、list、gallery。`--cache-state cold` 为每次运行创建新的独立缩略图缓存目录；`disk` 使用输出目录下同一个缓存目录（第一轮预热、后续测磁盘命中）；默认 `existing` 沿用用户缓存。内存命中通过同进程反向滚动和 loader.memory_hit 验证，重新启动进程不能保留解码内存缓存。可用 MVPVIEW_THUMBNAIL_CACHE_DIR 指定实验磁盘目录。滚动场景会填充指定数量的面板并执行下滑、停止、跨距跳转和反向滚动。对比场景取目录前四张图。截图、完整日志、JSON 事件和 summary.json 留在输出目录。性能专用 CLI 动作仅在 MVPVIEW_PERF=1 时执行，不影响正常启动。
 
-性能事件包括 startup.first_frame、viewport.updated、directory.batch/directory.finished、loader.dispatched、loader.completed、loader.memory_hit、render.upload、render.resources、image.submitted/image.presented、ui.frame/ui.stall 和 scenario.motion。image.presented 在上传后下一次 frameSwapped 记录；目录项和文件名不代表图像已呈现。ui.stall 是 16ms 心跳间隔超过 50ms，包含截图抓取、平台调用和测试进程压力，不能仅凭心跳把原因归于某一函数。帧间隔统计只取滚动运动区间，排除开始后的 100ms，静止时期没有持续绘制，不能纳入 FPS。
+性能事件包括 startup.first_frame、viewport.updated、directory.batch/directory.finished、loader.dispatched、loader.completed、loader.memory_hit、render.upload、render.resources、image.submitted/image.presented、viewport.presented、directory.model_chunk、ui.frame/ui.stall 和 scenario.motion。image.presented 在上传后下一次 frameSwapped 记录；viewport.presented 只有在当前几何可见项的Image均为Ready且路径仍匹配时，在frameSwapped记录。firstElapsedMs从首次非空可见需求计时，elapsedMs从本次可见路径集合变化计时；运动期间过期而未补齐的视口不产生完成事件，因此完成事件P95不能代替全部视口或滚动停止后的P95。目录项和文件名不代表图像已呈现。ui.stall 是 16ms 心跳间隔超过 50ms，包含截图抓取、平台调用和测试进程压力，不能仅凭心跳把原因归于某一函数。帧间隔统计只取滚动运动区间，排除开始后的 100ms，静止时期没有持续绘制，不能纳入 FPS。
 
-回归测试覆盖：请求合并/提升/取消及重新请求、后台分析在快速滚动期间暂停、磁盘透明度与尺寸以及并发读写、源帧复用、NV12/NV21/I420/P010/MIPI RAW10/12/RAW16 大小端、方向与精确样本访问、PNG/JPEG/BMP、16-bit Display-P3 和上传准备、1万条目渐进发布/自然排序、扫描背压与等待期间取消。Release 测试通过，最终一轮7.02秒；一万条目刷新场景重新扫描完成，未因批次背压挂起。
+回归测试覆盖：请求合并/提升/取消及重新请求、后台分析在快速滚动期间暂停、磁盘透明度与尺寸以及并发读写、源帧复用、NV12/NV21/I420/P010/MIPI RAW10/12/RAW16 大小端、方向与精确样本访问、PNG/JPEG/BMP、16-bit Display-P3 和上传准备、1万条目渐进发布/自然排序、扫描背压与等待期间取消。新增并行压力测试验证后台占用时交互请求可使用保留通道、并发不超过6、取消后不提交旧结果。Release 测试通过，最新一轮10.54秒（相机缓存审计修复后）；一万条目刷新场景重新扫描完成，未因批次背压挂起。
 
 ## 当前本机数据（2026-10-09）
 
@@ -40,8 +40,21 @@ Windows Release，默认 OpenGL，2160×1350 截图。目录为人工生成的�
 | 十万条目，单面板滚动，最终版本 | 1235ms | 16ms / 18ms | 拖拽请求按需后，仅547个解码完成，约10秒观测 |
 | 一万条目，四面板同时滚动，重复两次 | 1243ms / 1135ms | P95 19ms / 32ms | 四面板可见图补齐，共享任务合并；尚不稳定 |
 | 一万条目，Gallery滚动，最终版本 | 1125ms | 16ms / 19ms | 单次 |
-| 四图对比 | 1311ms | 不适用 | 初始空槽0字节；每槽预览与原图各一次上传 |
+| 四图对比 | 1311ms | 不适用 | 初始空槽为4字节占位；每槽预览与原图各一次上传（旧记录bytes字段为帧内存，已改正为提交数据量） |
 
-原始数据位于本工作区 build/perf-results；不提交生成的十万文件或日志。启动的早期20次记录 P95 2151ms，剪贴板探测和隐藏 Gallery 请求修复后为1150ms；这是本轮实现内部前后对照。另从原始3a6d623独立构建Release，仅增加process/first_frame记录，5次首帧P50为4408ms；原始首轮与一轮冷缓存测试有短暂进程重叠，后四轮单独运行，首帧为4369～4417ms。不能据此推断所有格式首屏性能。
+原始数据位于本工作区 build/perf-results；不提交生成的十万文件或日志。启动的早期20次记录 P95 2151ms，剪贴板探测和隐藏 Gallery 请求修复后为1150ms；这是本轮实现内部前后对照。另从原始3a6d623独立构建Release，首次仅增加process/first_frame记录，5次首帧P50为4408ms；原始首轮与一轮冷缓存测试有短暂进程重叠，后四轮单独运行，首帧为4369～4417ms。不能据此推断所有格式首屏性能。
 
-**尚未满足或尚未证明的验收项：**单面板最终单次滚动达到 P95≤20ms，但尚未重复或覆盖全部场景，四面板两次P95为19ms和32ms，未稳定达标；Gallery单次P95为19ms；观察仍有超过50ms心跳间隔；原始版本仅完成启动对照，尚无真实全格式和严格冷/磁盘/内存缓存矩阵，不能宣称首屏改善30%、磁盘一屏200ms、内存命中两帧或其他指标回退≤5%。没有真实相机 RAW/HEIF fixture、慢盘和其他平台的性能验收；这些需使用真实数据继续测量。截图抓取导致的停顿也应在正式计时窗口之外。当前结果可复现，不能把实现完成等同于所有性能目标已达标。
+**尚未满足或尚未证明的验收项：**单面板最终单次滚动达到 P95≤20ms，但尚未重复或覆盖全部场景，四面板两次P95为19ms和32ms，未稳定达标；Gallery单次P95为19ms；观察仍有超过50ms心跳间隔；原始版本已完成启动和100张PNG冷缓存首屏对照，尚无真实全格式和严格冷/磁盘/内存缓存矩阵，不能宣称首屏改善30%、磁盘一屏200ms、内存命中两帧或其他指标回退≤5%。没有真实相机 RAW/HEIF fixture、慢盘和其他平台的性能验收；这些需使用真实数据继续测量。截图抓取导致的停顿也应在正式计时窗口之外。当前结果可复现，不能把实现完成等同于所有性能目标已达标。
+
+## 补充验收（本轮）
+
+- `slot-update` 场景在稳定的四图对比中只替换槽位0的不可变帧引用，然后执行100%缩放和适应窗口；两次自动断言均得到 slotUploads=[0]、viewUploads=0。它验证槽位更新和视图参数隔离，不替代各格式GPU像素正确性测试。
+- 原始版本额外加入只读的Image-ready/帧交换观测和独立缓存目录入口，未改变图片URL、解码调度或模型行为。100张1800×1200 PNG，3次独立冷缓存首屏补齐168/170/173ms；早期优化版本152/152/152ms；合并唤醒调度器后130/131/131ms；进一步按提交期限唤醒后125/128/133ms（首屏P50约25%改善，P95约23%），仍未达到30%目标。
+- 同一100张目录的磁盘实验首轮预热156ms，后两轮119/90ms。只有这组简单PNG、当前SSD与窗口大小的证据，不能宣称全格式磁盘一屏P95≤200ms。
+- 一万条目、四个可见面板同时滚动，最新3轮运动帧间隔P95为17/18/17ms。测试脚本已缓存视图对象列表，不再每16ms遍历全部QObject，也不操作隐藏视图。Windows/Qt运行环境为Qt6.11.0；源代码仍以Qt6.9最低要求配置，尚未进行独立Qt6.9二进制构建验收。帧间隔是frameSwapped的本机观测，未强制更改显示器刷新率。
+- 快速滚动策略现在考虑滚动条pressed状态和不触发Flickable.moving的跨距跳转。四面板脚本的跳转在11ms后均报告fast=true，停止时撤销快速状态。测试中单个模型32条插入最高1ms；仍观察到启动/首屏和截图附近超过50ms的心跳间隔，未证明应用全程无长停顿。
+- 所有本轮脚本日志无QML TypeError/ReferenceError/Cannot assign。解码完成事件新增failed计数，避免将“预览不可用”占位误当成成功解码。
+
+未完成项仍包括真实全格式、超大PNG/相机RAW/慢盘压力、1～4个不同目录的联合负载、全部缓存状态的重复矩阵、滚动停止后的严格补图P95、精确像素与GPU对照、实际峰值进程资源、Qt6.9独立构建和所有关键指标≤5%回退检查。当前正在等待真实验收图片目录，同时继续完善可用样本覆盖的验证。
+
+源缓存正确性审计还修正了相机RAW两个边界：无处理参数的普通预览继续走嵌入预览路线；缓存保存文件的原生处理默认值和裁剪后几何，不保存创建缓存那次请求的显示参数，避免取消/重置参数后继承旧的黑白电平、白平衡或CCM。真实相机RAW的像素对照仍需样本验证。

@@ -297,7 +297,7 @@ class Renderer final : public QQuickRhiItemRenderer {
     }
 
     bool uploadYuv(const ImageFramePtr& frame, SlotResources& slot,
-                   QRhiResourceUpdateBatch* updates) {
+                   QRhiResourceUpdateBatch* updates, qint64& uploadedBytes) {
         if (!supportsGpuYuv(frame))
             return false;
         const auto* source = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&frame->storage);
@@ -323,11 +323,13 @@ class Renderer final : public QQuickRhiItemRenderer {
                 slot.v.get(), QRhiTextureUploadDescription(
                                   QRhiTextureUploadEntry(0, 0, planeUpload(storage, 2, chroma))));
         }
+        uploadedBytes += storage.planes.at(0).byteSize + storage.planes.at(1).byteSize;
+        if (planar) uploadedBytes += storage.planes.at(2).byteSize;
         return true;
     }
 
     bool uploadBayer(const ImageFramePtr& frame, SlotResources& slot,
-                     QRhiResourceUpdateBatch* updates) {
+                     QRhiResourceUpdateBatch* updates, qint64& uploadedBytes) {
         if (!supportsGpuBayer(frame))
             return false;
         const auto* source = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&frame->storage);
@@ -337,6 +339,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         if (!ensureTexture(slot.raw, QRhiTexture::R8, storageSize)) return false;
         updates->uploadTexture(slot.raw.get(), QRhiTextureUploadDescription(QRhiTextureUploadEntry(
                                                    0, 0, planeUpload(storage, 0, storageSize))));
+        uploadedBytes += storage.planes.constFirst().byteSize;
         return true;
     }
 
@@ -437,8 +440,9 @@ class Renderer final : public QQuickRhiItemRenderer {
             if (!slotDirty_[static_cast<std::size_t>(index)]) continue;
             SlotResources& slot = slots_[static_cast<std::size_t>(index)];
             const ImageFramePtr frame = frames_.value(index);
-            slot.gpuYuv = uploadYuv(frame, slot, updates);
-            slot.gpuBayer = uploadBayer(frame, slot, updates);
+            qint64 uploadedBytes = 0;
+            slot.gpuYuv = uploadYuv(frame, slot, updates, uploadedBytes);
+            slot.gpuBayer = uploadBayer(frame, slot, updates, uploadedBytes);
 
             QImage encoded = displayImages_.value(index);
             if (encoded.isNull() || ((slot.gpuYuv || slot.gpuBayer) && !compositeRequested)) {
@@ -455,9 +459,10 @@ class Renderer final : public QQuickRhiItemRenderer {
             ensurePlaceholder(slot.u, QRhiTexture::RG8);
             ensurePlaceholder(slot.v, QRhiTexture::R8);
             ensurePlaceholder(slot.raw, QRhiTexture::R8);
+            uploadedBytes += encoded.sizeInBytes();
             slotDirty_[static_cast<std::size_t>(index)] = false;
             performance::mark(QStringLiteral("render.upload"),
-                {{"slot", index}, {"bytes", frame ? qint64(frame->byteSize()) : 0}});
+                {{"slot", index}, {"bytes", uploadedBytes}, {"frameBytes", frame ? qint64(frame->byteSize()) : 0}});
         }
         if (performance::enabled()) {
             qint64 activeBytes = 0, gpuBytes = 0;
