@@ -325,7 +325,10 @@ ComparisonPixelSample ComparisonPixelProbe::sampleAtLogicalPixel(const ImageFram
     const RawPlaneAccessor rawAccessor(frame);
     const QSize samplingSize =
         rawAccessor.isValid() ? rawAccessor.displaySize() : frame.descriptor.size;
-    if (samplingSize.isEmpty() || logicalSize.isEmpty()) {
+    // Reject coordinates outside the caller's image before scaling a proxy.
+    // Clamping below only handles rounding for valid pixel centres.
+    if (samplingSize.isEmpty() || logicalSize.isEmpty() ||
+        !QRect(QPoint{}, logicalSize).contains(logicalPixel)) {
         return {};
     }
     if (samplingSize == logicalSize) {

@@ -9,6 +9,7 @@
 #include "io/camera_raw_decoder.h"
 #include "dng_fixture.h"
 #include "core/display_histogram.h"
+#include "core/comparison_pixel_probe.h"
 #include "core/raw_plane_histogram.h"
 #include "core/raw_plane_access.h"
 #include <QColorSpace>
@@ -129,6 +130,44 @@ public:
 private:
     std::shared_ptr<const IImageDecoder> decoder_;
 };
+static void verifyNativeProbeAndHistogram() {
+    ImageFrame full;
+    QImage image(2,2,QImage::Format_RGBA64);
+    const std::array<QRgba64,4> pixels={QRgba64::fromRgba64(1234,2345,3456,4000),
+        QRgba64::fromRgba64(4567,5678,6789,65535), QRgba64::fromRgba64(1234,7890,8901,0),
+        QRgba64::fromRgba64(65535,1,2,32768)};
+    for(int y=0;y<2;++y)for(int x=0;x<2;++x)
+        reinterpret_cast<QRgba64*>(image.scanLine(y))[x]=pixels[y*2+x];
+    full.storage=image;full.descriptor.size=image.size();full.metadata.sourceSize=image.size();
+    for(int y=0;y<2;++y)for(int x=0;x<2;++x){
+        const auto sample=ComparisonPixelProbe::sampleAtLogicalPixel(full,{x,y},image.size());
+        const auto pixel=pixels[y*2+x];
+        require(sample.valid && !sample.sourceSamplesPending && sample.sourcePixel==QPoint(x,y) &&
+            sample.sourceValueText()==QStringLiteral("RGB(%1,%2,%3)").arg(pixel.red()).arg(pixel.green()).arg(pixel.blue()),
+            "native 16-bit pixel probe lost coordinates or precision");
+    }
+    const auto histogram=DisplayHistogramAnalyzer::analyzeNativeRgb(full);
+    require(histogram.isValid() && histogram.sampledPixelCount==4 && histogram.maximumValue==65535 &&
+        !histogram.isSubsampled() && histogram.red.bins[1234]==2 && histogram.red.bins[4567]==1 &&
+        histogram.red.bins[65535]==1 && histogram.green.bins[1]==1 && histogram.blue.bins[2]==1 &&
+        histogram.red.minimum==1234 && histogram.red.maximum==65535 && histogram.red.mean==18142.5,
+        "native 16-bit histogram changed engineering bins or skipped transparent pixels");
+    ImageFrame preview=full;preview.storage=image.scaled(1,1);preview.descriptor.size={1,1};
+    preview.sourceSamplesPending=true;
+    const auto proxy=ComparisonPixelProbe::sampleAtLogicalPixel(preview,{1,1},{2,2});
+    require(proxy.valid && proxy.sourceSamplesPending && proxy.displayPixel==QPoint(1,1) &&
+        proxy.sourceValueText()==QStringLiteral("Loading pixel data…"),
+        "bounded proxy pretended to provide exact source pixel values");
+    for(const QPoint outside : {QPoint(-1,0),QPoint(0,-1),QPoint(2,0),QPoint(0,2)}) {
+        require(!ComparisonPixelProbe::sampleAtLogicalPixel(preview,outside,{2,2}).valid,
+                "proxy probe clamped out-of-image logical coordinate to edge pixel");
+        require(!ComparisonPixelProbe::sampleAtLogicalPixel(full,outside,{2,2}).valid,
+                "full probe accepted out-of-image coordinate");
+    }
+    require(!DisplayHistogramAnalyzer::analyzeNativeRgb(full,[]{return true;}).isValid(),
+            "cancelled exact histogram returned a completed result");
+}
+
 int main(int argc, char** argv) {
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
     const bool notifyProbe = argc == 2 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--gui-notify-probe");
@@ -183,6 +222,7 @@ int main(int argc, char** argv) {
         return rows ? 0 : 1;
     }
     try {
+        verifyNativeProbeAndHistogram();
         QTemporaryDir temp(QDir::currentPath() + "/performance-test-XXXXXX"); require(temp.isValid(), "temporary directory");
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
@@ -801,6 +841,46 @@ int main(int argc, char** argv) {
             writer.get();
         }
         {
+            const auto path=temp.filePath("oriented-known.yuv");
+            QByteArray bytes;for(int i=0;i<8;++i)bytes.append(char(10+i));
+            for(int value:{40,50,60,70})bytes.append(char(value));
+            QFile file(path);require(file.open(QIODevice::WriteOnly) && file.write(bytes)==12,"known NV12 fixture");file.close();
+            for(auto orientation:{ImageOrientation::Normal,ImageOrientation::Rotate90Clockwise,
+                                  ImageOrientation::Rotate180,ImageOrientation::Rotate270Clockwise}) {
+                RawImageParameters parameters;parameters.size={4,2};parameters.orientation=orientation;
+                auto result=RawImageDecoder{}.decode({path,DecodePurpose::Full,{},parameters});
+                require(bool(result.frame),"oriented NV12 full decode");
+                const bool quarter=orientation==ImageOrientation::Rotate90Clockwise ||
+                                   orientation==ImageOrientation::Rotate270Clockwise;
+                const QSize logical=quarter ? QSize(2,4) : QSize(4,2);
+                require(ComparisonPixelProbe::logicalFrameSize(*result.frame)==logical,"probe oriented logical size");
+                for(int y=0;y<logical.height();++y)for(int x=0;x<logical.width();++x) {
+                    QPoint source(x,y);
+                    if(orientation==ImageOrientation::Rotate90Clockwise)source={y,1-x};
+                    if(orientation==ImageOrientation::Rotate180)source={3-x,1-y};
+                    if(orientation==ImageOrientation::Rotate270Clockwise)source={3-y,x};
+                    const auto sample=ComparisonPixelProbe::sampleAtLogicalPixel(*result.frame,{x,y},logical);
+                    require(sample.valid && sample.yuv && sample.sourcePixel==source &&
+                        sample.yuv->y==10+source.y()*4+source.x() &&
+                        sample.yuv->u==(source.x()<2 ? 40 : 60) && sample.yuv->v==(source.x()<2 ? 50 : 70),
+                        "oriented probe mismatched display coordinate and original YUV samples");
+                }
+                const auto histogram=RawPlaneHistogramAnalyzer::analyze(*result.frame);
+                require(histogram.isValid() && histogram.logicalSize==logical && histogram.channels.size()==3,
+                        "oriented source histogram geometry");
+                for(int value=10;value<18;++value)require(histogram.channels[0].bins[value]==1,"Y histogram lost original sample");
+                require(histogram.channels[1].bins[40]==1 && histogram.channels[1].bins[60]==1 &&
+                        histogram.channels[2].bins[50]==1 && histogram.channels[2].bins[70]==1,
+                        "rotation changed chroma histogram sample distribution");
+                auto preview=RawImageDecoder{}.decode({path,DecodePurpose::Preview,{2,2},parameters});
+                require(bool(preview.frame),"oriented NV12 preview decode");
+                const auto pending=ComparisonPixelProbe::sampleAtLogicalPixel(*preview.frame,{logical.width()-1,logical.height()-1},logical);
+                require(pending.valid && pending.sourceSamplesPending && !pending.yuv &&
+                        pending.sourceValueText()==QStringLiteral("Loading pixel data…"),
+                        "oriented YUV preview supplied proxy pixels as source values");
+            }
+        }
+        {
             auto raw=temp.filePath("frame.yuv"); QFile file(raw); require(file.open(QIODevice::WriteOnly),"raw create");
             QByteArray bytes(24, char(128)); bytes.append(QByteArray(24,char(200)));
             require(file.write(bytes)==bytes.size(),"raw write"); file.close();
@@ -833,7 +913,20 @@ int main(int argc, char** argv) {
             }
             require(DisplayHistogramAnalyzer::analyze(*result.frame).isValid(),"display histogram");
             require(!DisplayHistogramAnalyzer::analyze(*result.frame, 10000, []{return true;}).isValid(),"display analysis cancellation");
-            require(RawPlaneHistogramAnalyzer::analyze(*result.frame).isValid(),"source histogram");
+            const auto rawHistogram=RawPlaneHistogramAnalyzer::analyze(*result.frame);
+            require(rawHistogram.isValid() && rawHistogram.maximumValue==255 && rawHistogram.channels.size()==3,
+                    "source histogram domain");
+            const std::array<qint64,3> counts={16,4,4};
+            for(int channel=0;channel<3;++channel) {
+                const auto& values=rawHistogram.channels[channel];
+                require(values.sampledSampleCount==counts[channel] && values.bins[128]==quint64(counts[channel]) &&
+                        values.minimum==128 && values.maximum==128 && values.mean==128 && !values.isSubsampled(),
+                        "NV12 native histogram changed Y/chroma counts or values");
+            }
+            const auto nv12Sample=ComparisonPixelProbe::sampleAtLogicalPixel(*result.frame,{3,3},{4,4});
+            require(nv12Sample.valid && !nv12Sample.sourceSamplesPending && nv12Sample.yuv && nv12Sample.yuv->y==128 &&
+                nv12Sample.yuv->u==128 && nv12Sample.yuv->v==128 && nv12Sample.sourcePixel==QPoint(3,3),
+                "NV12 full probe sampled a display proxy instead of source planes");
             const auto firstPlane=std::get<std::shared_ptr<const PlaneBufferSet>>(result.frame->storage);
             {
                 auto probe=std::make_shared<CountingDecoder>(std::make_shared<RawImageDecoder>());ImageLoader loader(probe);
