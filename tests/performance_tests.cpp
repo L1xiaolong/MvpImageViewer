@@ -56,12 +56,17 @@ public:
 class ParallelProbeDecoder final : public IImageDecoder {
 public:
     mutable std::atomic_int active{0}, peak{0};
+    mutable std::atomic_int entered{0};
     mutable std::atomic_bool interactiveStarted{false};
     std::atomic_bool release{false};
     qsizetype workingBytes = 0;
+    qsizetype interactiveWorkingBytes = -1;
     bool canDecode(const QString&) const override { return true; }
     DecodeResult decode(const DecodeRequest& request) const override {
-        if (!request.prepareAllocation(workingBytes)) return {{}, "Cancelled"};
+        ++entered;
+        const bool interactive=QFileInfo(request.path).fileName()=="interactive.png";
+        if (!request.prepareAllocation(interactive && interactiveWorkingBytes>=0
+                ? interactiveWorkingBytes : workingBytes)) return {{}, "Cancelled"};
         const int count = ++active;
         int previous = peak.load();
         while (previous < count && !peak.compare_exchange_weak(previous, count)) {}
@@ -103,6 +108,27 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            auto pressured=std::make_shared<ParallelProbeDecoder>();
+            pressured->workingBytes=400LL*1024*1024;
+            pressured->interactiveWorkingBytes=32LL*1024*1024;
+            ImageLoader loader(pressured); QVector<LoadHandle> visible;
+            for (int i=0;i<20;++i) visible.append(loader.request(i,
+                {path(QString("visible-pressure%1.png").arg(i)),DecodePurpose::Preview},
+                [](auto,const auto&){},RequestOptions{LoadCategory::VisibleThumbnail}));
+            pump([&]{return pressured->entered.load()>=qBound(2,QThread::idealThreadCount(),6)-1;});
+            bool delivered=false;
+            QElapsedTimer interactionDelay; interactionDelay.start();
+            loader.request(100,{path("interactive.png"),DecodePurpose::Preview},
+                [&](auto,const auto& result){require(bool(result.frame),"pressured interactive result");delivered=true;},
+                RequestOptions{LoadCategory::Interactive});
+            pump([&]{return pressured->interactiveStarted.load();},800);
+            qInfo()<<"Budget pressure interactive start:"<<interactionDelay.elapsed()<<"ms";
+            for (const auto& handle:visible) handle.cancel();
+            pressured->release=true;
+            pump([&]{return delivered && pressured->active.load()==0;});
+            require(pressured->peak.load()<=6,"pressure bypassed decode concurrency");
+        }
         {
             auto constrained=std::make_shared<ParallelProbeDecoder>();
             constrained->workingBytes=400LL*1024*1024;

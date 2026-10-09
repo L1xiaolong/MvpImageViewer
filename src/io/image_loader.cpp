@@ -529,7 +529,10 @@ void ImageLoader::dispatch() {
             if (it->serialized ? serializedRunning_ >= 1
                                : parallelRunning_ >= pool_.maxThreadCount()) continue;
             if (fastScrolling() && it->priority < 60) continue;
-            if (!it->serialized && it->priority < 60 &&
+            // Visible thumbnail workers can also wait for byte credits. Keep one
+            // existing channel available for the current image/exact inspection,
+            // so budget waiters cannot occupy the entire ordinary pool.
+            if (!it->serialized && it->priority < 100 &&
                 parallelRunning_ >= pool_.maxThreadCount() - 1) continue;
             const int category = it->priority >= 100 ? 3 : it->priority >= 60 ? 2 : it->priority >= 20 ? 1 : 0;
             const int bestCategory = best == inFlight_.end() ? -1 :
