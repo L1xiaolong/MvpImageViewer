@@ -409,7 +409,7 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     }
 
     if (mvpview::performance::enabled() && !performanceScenario.isEmpty()) {
-        QTimer::singleShot(1000, mainWindow, [mainWindow, performanceScenario, selectedPath, &browseController] {
+        QTimer::singleShot(1000, mainWindow, [mainWindow, performanceScenario, selectedPath, &browseController, &fullScreenController] {
             if (performanceScenario == QStringLiteral("slot-update")) {
                 QTimer::singleShot(1500, mainWindow, [mainWindow] {
                     for (auto* canvas : mainWindow->findChildren<mvpview::QmlImageCanvas*>()) {
@@ -434,9 +434,16 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                 return;
             }
             if ((performanceScenario == QStringLiteral("fullscreen") ||
+                 performanceScenario == QStringLiteral("fullscreen-exact") ||
                  performanceScenario == QStringLiteral("fullscreen-clear")) && !selectedPath.isEmpty()) {
                 QMetaObject::invokeMethod(mainWindow, "openFullScreen",
                     Q_ARG(QVariant, QVariant(QStringList{selectedPath})), Q_ARG(QVariant, QVariant(0)));
+                if (performanceScenario == QStringLiteral("fullscreen-exact")) {
+                    QTimer::singleShot(2000, mainWindow, [&fullScreenController] {
+                        mvpview::performance::mark(QStringLiteral("scenario.exact_resolution"));
+                        fullScreenController.actualPixels();
+                    });
+                }
                 if (performanceScenario == QStringLiteral("fullscreen-clear")) {
                     QTimer::singleShot(2000, mainWindow, [&browseController] {
                         QElapsedTimer timer; timer.start();

@@ -3,6 +3,7 @@
 #include "io/directory_scanner.h"
 #include "diagnostics/diagnostics.h"
 #include "core/performance_trace.h"
+#include "core/nominal_gpu_bytes.h"
 #include "io/metadata_reader.h"
 #include "io/thumbnail_disk_cache.h"
 
@@ -846,28 +847,69 @@ void ImageLoader::setMemoryBudget(qsizetype bytes) {
 }
 
 qsizetype ImageLoader::estimatedFullFrameCost(const ImageFrame& preview) {
-    if (preview.rawParameters) {
-        return estimatedFullFrameBytes(*preview.rawParameters);
-    }
-    const QSize sourceSize = preview.metadata.sourceSize.isValid()
+    const QSize sourceSize = preview.rawParameters ? preview.rawParameters->size
+                             : preview.metadata.sourceSize.isValid()
                                  ? preview.metadata.sourceSize
                                  : preview.descriptor.size;
     if (sourceSize.isEmpty()) {
         return 0;
     }
     // RGBA64 retains native samples plus its prepared half-float upload buffer.
-    const qsizetype bytesPerPixel = preview.descriptor.storageBits > 8 ? 16 : 4;
+    qsizetype bytesPerPixel = preview.descriptor.storageBits > 8 ? 16 : 4;
+    if (const auto* image = preview.qImage()) {
+        switch (image->format()) {
+        case QImage::Format_RGBA64: case QImage::Format_RGBX64: bytesPerPixel = 16; break;
+        case QImage::Format_RGBA32FPx4: case QImage::Format_RGBX32FPx4: bytesPerPixel = 16; break;
+        case QImage::Format_RGBA16FPx4: case QImage::Format_RGBX16FPx4: bytesPerPixel = 8; break;
+        default: bytesPerPixel = 4; break;
+        }
+    } else if (preview.rawParameters) bytesPerPixel = 4;
     const qint64 pixels = static_cast<qint64>(sourceSize.width()) * sourceSize.height();
     if (pixels <= 0 || pixels > std::numeric_limits<qsizetype>::max() / bytesPerPixel) {
         return std::numeric_limits<qsizetype>::max();
     }
-    return static_cast<qsizetype>(pixels) * bytesPerPixel;
+    qsizetype cost = static_cast<qsizetype>(pixels) * bytesPerPixel;
+    if (preview.rawParameters) {
+        const auto source = frameByteSize(*preview.rawParameters);
+        if (source <= 0 || source > std::numeric_limits<qsizetype>::max() - cost)
+            return std::numeric_limits<qsizetype>::max();
+        cost += source;
+        // Big-endian P010 retains a separate normalized upload plane allocation.
+        if (preview.rawParameters->format == RawPixelFormat::P010 && !preview.rawParameters->littleEndian) {
+            if (source > std::numeric_limits<qsizetype>::max() - cost)
+                return std::numeric_limits<qsizetype>::max();
+            cost += source;
+        }
+    }
+    return cost;
+}
+
+qsizetype ImageLoader::estimatedFullTextureCost(const ImageFrame& preview) {
+    const QSize size = preview.rawParameters ? preview.rawParameters->size
+                       : preview.metadata.sourceSize.isValid() ? preview.metadata.sourceSize : preview.descriptor.size;
+    int bytesPerPixel = preview.descriptor.storageBits > 8 ? 8 : 4;
+    if (preview.descriptor.sampleType == SampleType::Float && preview.descriptor.storageBits > 16)
+        bytesPerPixel = 16;
+    if (const auto* image = preview.qImage()) {
+        switch (image->format()) {
+        case QImage::Format_RGBA64: case QImage::Format_RGBX64:
+        case QImage::Format_RGBA16FPx4: case QImage::Format_RGBX16FPx4: bytesPerPixel = 8; break;
+        case QImage::Format_RGBA32FPx4: case QImage::Format_RGBX32FPx4: bytesPerPixel = 16; break;
+        default: bytesPerPixel = 4; break;
+        }
+    } else if (preview.rawParameters) bytesPerPixel = 4;
+    auto cost = nominalGpuBytes(size, bytesPerPixel);
+    if (preview.rawParameters) cost = std::max(cost, frameByteSize(*preview.rawParameters));
+    constexpr qsizetype dummyTextures = 64;
+    return cost > std::numeric_limits<qsizetype>::max() - dummyTextures
+        ? std::numeric_limits<qsizetype>::max() : cost + dummyTextures;
 }
 
 bool ImageLoader::canAutomaticallyLoadFull(
     const QVector<ImageFramePtr>& previewFrames) const {
-    if (fastScrolling() || hasInteractiveWork() || residentResourceBytes() > memoryBudget_) return false;
-    qsizetype total = 0;
+    const auto resident = residentResourceBytes();
+    if (previewFrames.isEmpty() || fastScrolling() || hasInteractiveWork() || resident > memoryBudget_) return false;
+    qsizetype total = 0, prospective = resident;
     for (const ImageFramePtr& frame : previewFrames) {
         if (!frame) {
             return false;
@@ -877,6 +919,15 @@ bool ImageLoader::canAutomaticallyLoadFull(
             return false;
         }
         total += cost;
+        const auto gpu = estimatedFullTextureCost(*frame);
+        // Preserve old preview pixels/textures until the new upload is complete.
+        if (cost > memoryBudget_ - prospective || gpu > memoryBudget_ - prospective - cost) {
+            performance::mark(QStringLiteral("loader.automatic_full_denied"),
+                {{"residentResourceBytes", qint64(resident)}, {"cpuEstimate", qint64(cost)},
+                 {"gpuEstimate", qint64(gpu)}, {"budget", qint64(memoryBudget_)}});
+            return false;
+        }
+        prospective += cost + gpu;
     }
     return total <= automaticFullLoadBudget_;
 }

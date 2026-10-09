@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
                     "GPU ownership failed to deduplicate resource identities or mixed CPU/GPU");
             first.reset();require(ledger->gpuResources()->bytes()==12,"destroyed GPU resource remained charged");
             second.reset();require(ledger->gpuResources()->bytes()==0,"GPU resource owners leaked");
-            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);loader.setMemoryBudget(100);
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);loader.setMemoryBudget(256);
             loader.prefetchAdjacentImages({a,b,c},1,{32,32}); // Queued before GPU pressure exists.
             auto registration=loader.accountImagePixels({});
             auto texture=std::make_unique<SizedTexture>(QSize(100,1));
@@ -359,6 +359,49 @@ int main(int argc, char** argv) {
             require(probe->order().isEmpty(),"GPU pressure started new or already queued image prefetch");
             texture.reset();require(loader.residentResourceBytes()==0 && loader.canAutomaticallyLoadFull({preview}),
                     "GPU pressure persisted after resource destruction");
+        }
+        {
+            ImageLoader loader(std::make_shared<SlowDecoder>());
+            auto frame=std::make_shared<ImageFrame>();frame->metadata.sourceSize={1024,1024};
+            frame->storage=QImage(4,4,QImage::Format_RGBA8888);
+            loader.setMemoryBudget(8*1024*1024+64);
+            require(loader.canAutomaticallyLoadFull({frame}),"automatic admission rejected exact CPU+GPU fit");
+            auto ownership=loader.accountImagePixels({});auto texture=std::make_unique<SizedTexture>(QSize(1,1));
+            AccountedTextureFactory::trackTexture(texture.get(),ownership.ledger());
+            require(!loader.canAutomaticallyLoadFull({frame}),"automatic admission ignored old GPU resources during upload overlap");
+            texture.reset();loader.setMemoryBudget(16*1024*1024+128);
+            require(loader.canAutomaticallyLoadFull({frame,frame}),"automatic admission rejected fitting comparison slots");
+            loader.setMemoryBudget(16*1024*1024+127);
+            require(!loader.canAutomaticallyLoadFull({frame,frame}),"automatic admission did not sum comparison texture estimates");
+            frame->storage=QImage(4,4,QImage::Format_RGBA64);frame->descriptor.storageBits=16;
+            loader.setMemoryBudget(24*1024*1024+64);
+            require(loader.canAutomaticallyLoadFull({frame}),"RGBA64 native/upload/GPU estimate rejected exact fit");
+            loader.setMemoryBudget(24*1024*1024+63);
+            require(!loader.canAutomaticallyLoadFull({frame}),"RGBA64 admission omitted upload pixels or GPU half-float texture");
+            frame->storage=QImage(4,4,QImage::Format_RGBA32FPx4);
+            frame->descriptor.storageBits=32;frame->descriptor.sampleType=SampleType::Float;
+            loader.setMemoryBudget(32*1024*1024+64);
+            require(loader.canAutomaticallyLoadFull({frame}),"float32 CPU/GPU estimate rejected exact fit");
+            loader.setMemoryBudget(32*1024*1024+63);
+            require(!loader.canAutomaticallyLoadFull({frame}),"float32 GPU texture estimate used half-float size");
+            frame->descriptor.storageBits=16;frame->descriptor.sampleType=SampleType::UInt;
+            frame->rawParameters=RawImageParameters{};frame->rawParameters->size={1024,1024};
+            frame->rawParameters->format=RawPixelFormat::P010;frame->rawParameters->littleEndian=false;
+            frame->storage=QImage(4,4,QImage::Format_RGBA8888);
+            const auto source=frameByteSize(*frame->rawParameters);
+            const auto expected=4*1024*1024+source*2+4*1024*1024+64;
+            loader.setMemoryBudget(expected);
+            require(loader.canAutomaticallyLoadFull({frame}),"big-endian P010 estimate rejected exact source/upload/texture fit");
+            loader.setMemoryBudget(expected-1);
+            require(!loader.canAutomaticallyLoadFull({frame}),"big-endian P010 admission omitted normalized upload planes");
+            frame->rawParameters->format=RawPixelFormat::Raw16;
+            frame->storage=QImage(4,4,QImage::Format_RGBA64);
+            loader.setMemoryBudget(26*1024*1024+64);
+            require(loader.canAutomaticallyLoadFull({frame}),"high-bit-depth RAW source/native/upload/texture exact fit");
+            loader.setMemoryBudget(26*1024*1024+63);
+            require(!loader.canAutomaticallyLoadFull({frame}),"RAW estimate assumed an 8-bit display despite retained RGBA64");
+            frame->rawParameters.reset();frame->metadata.sourceSize={INT_MAX,INT_MAX};
+            require(!loader.canAutomaticallyLoadFull({frame}),"automatic resource estimate overflow admitted unbounded image");
         }
         {
             auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);loader.setMemoryBudget(100);

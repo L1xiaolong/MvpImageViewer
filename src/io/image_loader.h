@@ -134,6 +134,7 @@ class ImageLoader final : public QObject {
     [[nodiscard]] const WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose) const;
     void enforceMemoryBudget(DecodePurpose insertedPurpose);
     [[nodiscard]] static qsizetype estimatedFullFrameCost(const ImageFrame& preview);
+    [[nodiscard]] static qsizetype estimatedFullTextureCost(const ImageFrame& preview);
 
     void dispatch();
     void scheduleDispatch();
