@@ -31,6 +31,7 @@
 #include <QStandardItemModel>
 #include <QQmlEngine>
 #include <QQmlComponent>
+#include <QJSValue>
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <future>
@@ -300,6 +301,73 @@ int main(int argc, char** argv) {
             pump([&]{return bool(thumbnail);});
             require(probe->order().size()==1 && !cancelledCallback && thumbnail->qImage()->size()==QSize(2,2),
                     "cancelled derived consumer lost visible replacement or reopened serialized source");
+        }
+        {
+            QQmlEngine engine;
+            auto controller=engine.evaluate(R"JS(({
+                canCompare:true, canRestoreSelected:false, selectionCount:1,
+                canEditRaw:true, canPaste:true, selectedUriList:"",
+                copies:[], compared:0, edited:0, pasted:"",
+                copySelected:function(cut){this.copies.push(cut)},
+                compareSelected:function(){this.compared++},
+                editSelectedRawParameters:function(){this.edited++},
+                pasteItemsInto:function(path){this.pasted=path}
+            }))JS");
+            QQmlComponent component(&engine,QUrl::fromLocalFile(
+                QStringLiteral(MVPVIEW_SOURCE_DIR "/src/qml/Mvp/ThumbnailTile.qml")));
+            require(component.isReady(),qPrintable(component.errorString()));
+            std::unique_ptr<QObject> object(component.createWithInitialProperties({
+                {"controller",QVariant::fromValue(controller)}, {"path",a},
+                {"fileName","test.png"}, {"requestThumbnail",false}}));
+            auto* tile=qobject_cast<QQuickItem*>(object.get());require(tile,"tile component creation");
+            QQuickWindow window;tile->setParentItem(window.contentItem());window.show();
+            auto* menuLoader=tile->findChild<QObject*>("thumbnailContextMenuLoader");
+            require(menuLoader && !menuLoader->property("item").value<QObject*>(),"offscreen tile created hidden context menu");
+            require(!tile->findChild<QObject*>("gridImagePreview"),"cache-region tile created full visuals before demand");
+            tile->setProperty("requestThumbnail",true);
+            pump([&]{return tile->findChild<QObject*>("gridImagePreview")!=nullptr;});
+            auto* preview=tile->findChild<QObject*>("gridImagePreview");
+            tile->setProperty("requestThumbnail",false);tile->setProperty("path",b);
+            require(tile->findChild<QObject*>("gridImagePreview")==preview,"delegate reuse discarded prepared visuals");
+            const auto popup=[&]{
+                require(QMetaObject::invokeMethod(tile,"popupContextMenu"),"context popup method");
+                auto* menu=menuLoader->property("item").value<QObject*>();
+                require(menu && menu->property("visible").toBool(),"lazy menu failed to open");
+                require(menu->property("parent").value<QObject*>()==tile,"lazy popup lost visual parent");
+                return menu;
+            };
+            const auto trigger=[&](QObject* menu,const QString& text){
+                auto jsMenu=engine.newQObject(menu);
+                const auto count=menu->property("count").toInt();
+                for(int i=0;i<count;++i){
+                    auto item=jsMenu.property("itemAt").callWithInstance(jsMenu,{QJSValue(i)});
+                    if(item.property("text").toString()==text){
+                        require(item.property("enabled").toBool(),"menu action unexpectedly disabled");
+                        require(QMetaObject::invokeMethod(item.toQObject(),"triggered"),"menu action trigger");return;
+                    }
+                }
+                require(false,"expected menu action missing");
+            };
+            auto* menu=popup();require(menu->objectName()=="imageContextMenu","image menu kind");
+            trigger(menu,"Cut");trigger(menu,"Copy");trigger(menu,"Compare selected");
+            require(controller.property("copies").property(0).toBool() &&
+                    !controller.property("copies").property(1).toBool() &&
+                    controller.property("compared").toInt()==1,"lazy menu lost action callbacks");
+            tile->setProperty("path",QStringLiteral("sample.RAW"));
+            require(!menuLoader->property("item").value<QObject*>()->property("visible").toBool(),"reused tile retained open menu");
+            menu=popup();require(menu->objectName()=="rawContextMenu","RAW menu kind");
+            trigger(menu,"RAW/YUV parameters…");require(controller.property("edited").toInt()==1,"RAW menu callback");
+            tile->setProperty("directory",true);tile->setProperty("path",QStringLiteral("target-folder"));
+            menu=popup();require(menu->objectName()=="folderContextMenu","folder menu kind");
+            trigger(menu,"Paste into folder");require(controller.property("pasted").toString()=="target-folder","folder paste target");
+            tile->setVisible(false);
+            require(!menu->property("visible").toBool(),"hidden delegate retained popup");
+            tile->setVisible(true);menu=popup();
+            tile->setProperty("path",QStringLiteral("different-folder"));
+            require(!menu->property("visible").toBool(),"folder reuse left stale popup open");
+            tile->setProperty("displayMode",1);
+            pump([&]{return tile->findChild<QObject*>("listImagePreview")!=nullptr;});
+            window.hide();
         }
         {
             auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);QQmlEngine engine;

@@ -138,7 +138,10 @@ QtObject {
         if (index < 0) return
         // Flush the frame's model changes once, then read real delegate geometry.
         // GridView origins can shift when sorted insertions precede the viewport.
+        const layoutStarted = tracing ? Date.now() : 0
         view.forceLayout()
+        if (tracing) controller.reportThumbnailObservation("anchor_layout", owner, frameSequence,
+            view.count, Math.max(0, Date.now() - layoutStarted))
         const item = view.itemAtIndex(index)
         const columns = Math.max(1, Math.floor(view.width / view.cellWidth))
         const itemY = item && item.path === anchorPath ? item.y
