@@ -86,6 +86,16 @@ public:
     bool canDecode(const QString&) const override { return true; }
     DecodeResult decode(const DecodeRequest&) const override { return {{}, "Unavailable"}; }
 };
+class SizedTexture final : public QSGTexture {
+public:
+    explicit SizedTexture(QSize size) : size_(size) {}
+    qint64 comparisonKey() const override { return qint64(quintptr(this)); }
+    QSize textureSize() const override { return size_; }
+    bool hasAlphaChannel() const override { return true; }
+    bool hasMipmaps() const override { return false; }
+private:
+    QSize size_;
+};
 int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--export-dng"))
@@ -115,6 +125,55 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            require(nominalGpuBytes({3,2},4,4)==96 && nominalGpuBytes({},4)==0,
+                    "GPU dimensions/sample count estimate");
+            require(nominalGpuBytes({INT_MAX,INT_MAX},16,4)==std::numeric_limits<qsizetype>::max(),
+                    "GPU size estimate overflowed");
+            auto ledger=std::make_shared<PixelMemoryLedger>();
+            auto first=std::make_unique<SizedTexture>(QSize(2,2));
+            auto second=std::make_unique<SizedTexture>(QSize(3,1));
+            AccountedTextureFactory::trackTexture(first.get(),ledger);
+            AccountedTextureFactory::trackTexture(first.get(),ledger);
+            AccountedTextureFactory::trackTexture(second.get(),ledger);
+            require(ledger->bytes()==0 && ledger->gpuResources()->bytes()==28,
+                    "GPU ownership failed to deduplicate resource identities or mixed CPU/GPU");
+            first.reset();require(ledger->gpuResources()->bytes()==12,"destroyed GPU resource remained charged");
+            second.reset();require(ledger->gpuResources()->bytes()==0,"GPU resource owners leaked");
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);loader.setMemoryBudget(100);
+            loader.prefetchAdjacentImages({a,b,c},1,{32,32}); // Queued before GPU pressure exists.
+            auto registration=loader.accountImagePixels({});
+            auto texture=std::make_unique<SizedTexture>(QSize(100,1));
+            AccountedTextureFactory::trackTexture(texture.get(),registration.ledger());
+            auto preview=std::make_shared<ImageFrame>();preview->metadata.sourceSize={4,4};
+            require(loader.residentPixelBytes()==0 && loader.nominalGpuPixelBytes()==400 &&
+                    loader.residentResourceBytes()==400 && !loader.canAutomaticallyLoadFull({preview}),
+                    "GPU pressure did not pause automatic full loading");
+            loader.prefetchAdjacentImages({a,b,c},1,{32,32});
+            QElapsedTimer interval;interval.start();
+            while(interval.elapsed()<50){QCoreApplication::processEvents();QThread::msleep(1);}
+            require(probe->order().isEmpty(),"GPU pressure started new or already queued image prefetch");
+            texture.reset();require(loader.residentResourceBytes()==0 && loader.canAutomaticallyLoadFull({preview}),
+                    "GPU pressure persisted after resource destruction");
+        }
+        {
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);loader.setMemoryBudget(100);
+            auto registration=loader.accountImagePixels({});
+            auto texture=std::make_unique<SizedTexture>(QSize(100,1));
+            AccountedTextureFactory::trackTexture(texture.get(),registration.ledger());
+            loader.updateViewport("pressure",{{a,20},{b,80}},false);
+            bool nearby=false,visible=false;
+            loader.request(1,{a,DecodePurpose::Thumbnail,{32,32}},[&](auto,const auto& result){nearby=bool(result.frame);},
+                RequestOptions{LoadCategory::NearViewport});
+            loader.request(2,{b,DecodePurpose::Thumbnail,{32,32}},[&](auto,const auto& result){visible=bool(result.frame);},
+                RequestOptions{LoadCategory::VisibleThumbnail});
+            pump([&]{return visible;});
+            require(!nearby && probe->order()==QStringList{QFileInfo(b).fileName()},
+                    "GPU pressure paused visible thumbnails or decoded nearby candidates");
+            loader.updateViewport("pressure",{{a,80}},false);
+            pump([&]{return nearby;});
+            require(probe->order().size()==2,"visible promotion failed under GPU pressure");
+        }
         for (const bool unavailable : {false,true}) {
             std::shared_ptr<const IImageDecoder> providerDecoder = unavailable
                 ? std::shared_ptr<const IImageDecoder>(std::make_shared<UnavailableDecoder>())

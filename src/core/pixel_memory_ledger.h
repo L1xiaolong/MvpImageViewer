@@ -15,6 +15,8 @@ class PixelStorageFootprint final {
 public:
     void add(const QImage& image) { add(image.constBits(), image.sizeInBytes()); }
     void add(const QByteArray& bytes) { add(bytes.constData(), bytes.size()); }
+    // Identity of a live GPU resource; bytes describe nominal storage, not driver allocation.
+    void addResource(const void* identity, qsizetype bytes) { add(identity, bytes); }
     const QHash<const void*, qsizetype>& allocations() const { return allocations_; }
     qsizetype bytes() const {
         qsizetype total = 0;
@@ -77,12 +79,18 @@ public:
     }
     qsizetype bytes() const { QMutexLocker lock(&mutex_); return bytes_; }
     qsizetype peakBytes() const { QMutexLocker lock(&mutex_); return peakBytes_; }
+    std::shared_ptr<PixelMemoryLedger> gpuResources() {
+        QMutexLocker lock(&mutex_);
+        if (!gpuResources_) gpuResources_ = std::make_shared<PixelMemoryLedger>();
+        return gpuResources_;
+    }
 private:
     struct Allocation { QHash<qsizetype, int> sizes; qsizetype maximum = 0; };
     mutable QMutex mutex_;
     QHash<const void*, Allocation> allocations_;
     qsizetype bytes_ = 0;
     qsizetype peakBytes_ = 0;
+    std::shared_ptr<PixelMemoryLedger> gpuResources_;
 };
 
 // A copied frame may replace its pixel representation. Register that new frame

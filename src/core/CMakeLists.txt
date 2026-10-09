@@ -11,6 +11,7 @@ qt_add_library(mvpview_core STATIC
     comparison_pixel_probe.cpp
     image_types.h
     pixel_memory_ledger.h
+    nominal_gpu_bytes.h
     raw_image_parameters.h
     raw_image_parameters.cpp
     raw_plane_access.h

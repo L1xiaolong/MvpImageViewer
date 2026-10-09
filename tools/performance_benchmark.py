@@ -93,7 +93,8 @@ for run in range(args.runs):
     working=[e for e in events if e['event']=='loader.decode_working']
     summary[-1].update({'maxDecodeWorkingBytes':max([e['peakBytes'] for e in working],default=None),
                        'maxDecodeWorkingWaitMs':max([e['workingWaitMs'] for e in completed if 'workingWaitMs' in e],default=None),
-                       'maxResidentPixelBytes':max([e.get('peakResidentPixelBytes',e['residentPixelBytes']) for e in events if 'residentPixelBytes' in e],default=None)})
+                       'maxResidentPixelBytes':max([e.get('peakResidentPixelBytes',e['residentPixelBytes']) for e in events if 'residentPixelBytes' in e],default=None),
+                       'maxNominalGpuPixelBytes':max([e.get('peakNominalGpuPixelBytes',e['nominalGpuPixelBytes']) for e in events if 'nominalGpuPixelBytes' in e],default=None)})
     if process.returncode or not capture.exists(): raise SystemExit(f'Run {run} failed; see {args.output}/{run:02}.log')
 valid=[r['firstFrameMs'] for r in summary if r['firstFrameMs'] is not None]
 def percentile(values,p):

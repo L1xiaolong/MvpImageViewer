@@ -3,6 +3,7 @@
 
 #include "core/comparison_pixel_probe.h"
 #include "core/performance_trace.h"
+#include "core/nominal_gpu_bytes.h"
 #include "render/bayer_render_parameters.h"
 #include "render/yuv_render_parameters.h"
 
@@ -249,6 +250,49 @@ class Renderer final : public QQuickRhiItemRenderer {
     std::unique_ptr<QRhiGraphicsPipeline> encodedComparePipeline_;
     std::unique_ptr<QRhiGraphicsPipeline> yuvComparePipeline_;
     std::unique_ptr<QRhiGraphicsPipeline> bayerComparePipeline_;
+    std::shared_ptr<PixelMemoryLedger> gpuLedger_;
+    PixelMemoryOwnership gpuOwnership_;
+
+    static qsizetype textureBytes(const QRhiTexture* texture) {
+        if (!texture) return 0;
+        int channels = 4;
+        switch (texture->format()) {
+        case QRhiTexture::R8: channels = 1; break;
+        case QRhiTexture::R16: case QRhiTexture::RG8: channels = 2; break;
+        case QRhiTexture::RG16: channels = 4; break;
+        case QRhiTexture::RGBA16F: channels = 8; break;
+        case QRhiTexture::RGBA32F: channels = 16; break;
+        default: break;
+        }
+        return nominalGpuBytes(texture->pixelSize(), channels, texture->sampleCount());
+    }
+
+    // Called only in initialize/render, where Qt permits querying target resources.
+    void accountGpuResources() {
+        if (!gpuLedger_) return;
+        PixelStorageFootprint footprint;
+        for (const auto& slot : slots_) {
+            for (const auto* texture : {slot.encoded.get(), slot.y.get(), slot.u.get(), slot.v.get(), slot.raw.get()})
+                footprint.addResource(texture, textureBytes(texture));
+        }
+        const auto slotBytes = footprint.bytes();
+        footprint.addResource(colorTexture(), textureBytes(colorTexture()));
+        footprint.addResource(resolveTexture(), textureBytes(resolveTexture()));
+        for (const auto* buffer : {msaaColorBuffer(), depthStencilBuffer()}) {
+            if (buffer) footprint.addResource(buffer,
+                nominalGpuBytes(buffer->pixelSize(), 4, buffer->sampleCount()));
+        }
+        const auto canvasBytes = footprint.bytes();
+        gpuOwnership_.attach(gpuLedger_, std::move(footprint));
+        if (performance::enabled()) {
+            PixelStorageFootprint activeStorage;
+            for (const auto& frame : frames_) if (frame) frame->appendPixelStorage(activeStorage);
+            performance::mark(QStringLiteral("render.resources"),
+                {{"activeBytes", qint64(activeStorage.bytes())}, {"gpuBytes", qint64(canvasBytes)},
+                 {"slotGpuBytes", qint64(slotBytes)}, {"nominalGpuPixelBytes", qint64(gpuLedger_->bytes())},
+                 {"peakNominalGpuPixelBytes", qint64(gpuLedger_->peakBytes())}});
+        }
+    }
 
     void resetPipelines() {
         for (auto& pipeline : sidePipelines_)
@@ -268,6 +312,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         sampler_.reset();
         compareUniform_.reset();
         vertices_.reset();
+        gpuOwnership_ = {};
         samplerDirty_ = true;
     }
 
@@ -464,27 +509,6 @@ class Renderer final : public QQuickRhiItemRenderer {
             performance::mark(QStringLiteral("render.upload"),
                 {{"slot", index}, {"bytes", uploadedBytes}, {"frameBytes", frame ? qint64(frame->byteSize()) : 0}});
         }
-        if (performance::enabled()) {
-            qint64 activeBytes = 0, gpuBytes = 0;
-            PixelStorageFootprint activeStorage;
-            for (const auto& frame : frames_) if (frame) frame->appendPixelStorage(activeStorage);
-            activeBytes = activeStorage.bytes();
-            const auto bytesFor = [](const std::unique_ptr<QRhiTexture>& texture) -> qint64 {
-                if (!texture) return 0;
-                int channels = 4;
-                switch (texture->format()) {
-                case QRhiTexture::R8: channels = 1; break;
-                case QRhiTexture::R16: case QRhiTexture::RG8: channels = 2; break;
-                case QRhiTexture::RGBA16F: channels = 8; break;
-                case QRhiTexture::RGBA32F: channels = 16; break;
-                default: break;
-                }
-                return qint64(texture->pixelSize().width()) * texture->pixelSize().height() * channels;
-            };
-            for (const auto& slot : slots_)
-                gpuBytes += bytesFor(slot.encoded) + bytesFor(slot.y) + bytesFor(slot.u) + bytesFor(slot.v) + bytesFor(slot.raw);
-            performance::mark(QStringLiteral("render.resources"), {{"activeBytes", activeBytes}, {"gpuBytes", gpuBytes}});
-        }
         commandBuffer->resourceUpdate(updates);
         rebuildBindings();
         // Binding layouts stay compatible across texture content/size changes.
@@ -611,6 +635,7 @@ class Renderer final : public QQuickRhiItemRenderer {
         if (resourcesDirty_ || !slots_[0].encoded)
             rebuildResources(commandBuffer);
         createPipelines();
+        accountGpuResources();
     }
 
     void synchronize(QQuickRhiItem* item) override {
@@ -626,6 +651,13 @@ class Renderer final : public QQuickRhiItemRenderer {
                 slotDirty_[static_cast<std::size_t>(index)] = slotDirty_[static_cast<std::size_t>(index)] ||
                     modeChanged || frames_.value(index) != incoming.value(index);
             frames_ = incoming;
+            for (const auto& frame : frames_) {
+                if (!frame) continue;
+                if (const auto ledger = frame->pixelOwnership.ledger()) {
+                    gpuLedger_ = ledger->gpuResources();
+                    break;
+                }
+            }
             displayImages_.clear();
             displayImages_.reserve(frames_.size());
             for (const auto& frame : frames_)
@@ -648,11 +680,14 @@ class Renderer final : public QQuickRhiItemRenderer {
     }
 
     void render(QRhiCommandBuffer* commandBuffer) override {
+        const bool resourcesChanged = resourcesDirty_;
         if (samplerDirty_ || !sampler_)
             rebuildSampler();
         if (resourcesDirty_)
             rebuildResources(commandBuffer);
         createPipelines();
+
+        if (resourcesChanged) accountGpuResources();
 
         auto* updates = rhi_->nextResourceUpdateBatch();
         for (int slot = 0; slot < kMaximumImages; ++slot) {

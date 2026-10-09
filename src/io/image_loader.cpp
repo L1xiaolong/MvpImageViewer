@@ -424,6 +424,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                         performance::mark(QStringLiteral("loader.cache_state"),
                             {{"cachedBytes", qint64(self->cachedBytes())}, {"residentPixelBytes", qint64(self->residentPixelBytes())},
                              {"peakResidentPixelBytes", qint64(self->residentAccounting_->peakBytes())},
+                             {"nominalGpuPixelBytes", qint64(self->nominalGpuPixelBytes())},
+                             {"peakNominalGpuPixelBytes", qint64(self->residentAccounting_->gpuResources()->peakBytes())},
                              {"sourceBytes", qint64(self->sourceCache_->cost())}});
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
@@ -521,6 +523,11 @@ void ImageLoader::dispatch() {
         if (!alive) return;
     }
     // Keep QThreadPool's own queue empty: queued jobs remain mutable and cancellable here.
+    const bool resourcePressure = residentResourceBytes() > memoryBudget_ * 3 / 4;
+    if (resourcePressure) {
+        for (const auto& handle : imagePrefetchHandles_) handle.cancel();
+        for (const auto& handle : rawPrefetchHandles_) handle.cancel();
+    }
     for (auto it = inFlight_.begin(); it != inFlight_.end();) {
         if (!it->running && it->activeConsumers->load() <= 0) it = inFlight_.erase(it);
         else ++it;
@@ -545,6 +552,7 @@ void ImageLoader::dispatch() {
             if (it->serialized ? serializedRunning_ >= 1
                                : parallelRunning_ >= pool_.maxThreadCount()) continue;
             if (fastScrolling() && it->priority < 60) continue;
+            if (resourcePressure && it->purpose == DecodePurpose::Thumbnail && it->priority < 60) continue;
             // Visible thumbnail workers can also wait for byte credits. Keep one
             // existing channel available for the current image/exact inspection,
             // so budget waiters cannot occupy the entire ordinary pool.
@@ -581,7 +589,7 @@ void ImageLoader::dispatch() {
 void ImageLoader::prefetchAdjacentImages(const QStringList& paths, int index, const QSize& size) {
     for (const auto& handle : imagePrefetchHandles_) handle.cancel();
     imagePrefetchHandles_.clear();
-    if (fastScrolling() || hasInteractiveWork() || residentPixelBytes() > memoryBudget_ * 3 / 4) return;
+    if (fastScrolling() || hasInteractiveWork() || residentResourceBytes() > memoryBudget_ * 3 / 4) return;
     for (const int delta : {1, -1}) {
         if (index + delta < 0 || index + delta >= paths.size()) continue;
         imagePrefetchHandles_.append(request(0, {paths.at(index + delta), DecodePurpose::Preview, size},
@@ -594,7 +602,7 @@ void ImageLoader::prefetchAdjacentRawFrames(const QString& path, const RawImageP
                                             const QSize& previewSize) {
     for (const auto& handle : rawPrefetchHandles_) handle.cancel();
     rawPrefetchHandles_.clear();
-    if (fastScrolling() || hasInteractiveWork() || residentPixelBytes() > memoryBudget_ * 3 / 4) return;
+    if (fastScrolling() || hasInteractiveWork() || residentResourceBytes() > memoryBudget_ * 3 / 4) return;
     const int frameCount = availableFrameCount(QFileInfo(path).size(), current);
     const int adjacentCount =
         (current.frameIndex > 0 ? 1 : 0) + (current.frameIndex + 1 < frameCount ? 1 : 0);
@@ -711,6 +719,16 @@ qsizetype ImageLoader::residentPixelBytes() const {
     return residentAccounting_->bytes();
 }
 
+qsizetype ImageLoader::nominalGpuPixelBytes() const {
+    return residentAccounting_->gpuResources()->bytes();
+}
+
+qsizetype ImageLoader::residentResourceBytes() const {
+    const auto cpu = residentPixelBytes(), gpu = nominalGpuPixelBytes();
+    return gpu > std::numeric_limits<qsizetype>::max() - cpu
+        ? std::numeric_limits<qsizetype>::max() : cpu + gpu;
+}
+
 PixelMemoryOwnership ImageLoader::accountImagePixels(const QImage& image) const {
     PixelStorageFootprint footprint; footprint.add(image);
     PixelMemoryOwnership ownership;
@@ -748,7 +766,7 @@ qsizetype ImageLoader::estimatedFullFrameCost(const ImageFrame& preview) {
 
 bool ImageLoader::canAutomaticallyLoadFull(
     const QVector<ImageFramePtr>& previewFrames) const {
-    if (fastScrolling() || hasInteractiveWork() || residentPixelBytes() > memoryBudget_) return false;
+    if (fastScrolling() || hasInteractiveWork() || residentResourceBytes() > memoryBudget_) return false;
     qsizetype total = 0;
     for (const ImageFramePtr& frame : previewFrames) {
         if (!frame) {
