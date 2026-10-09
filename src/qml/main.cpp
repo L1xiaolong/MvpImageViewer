@@ -28,9 +28,87 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
+#include <QScreen>
 #include <QSettings>
 #include <QTimer>
+#include <QPropertyAnimation>
+#include <QParallelAnimationGroup>
+#include <QSequentialAnimationGroup>
+#include <QPauseAnimation>
 #include <QUrl>
+
+// The timer-driven scenario also tests unsynchronised input. Keep this independent
+// animation-clock scenario to distinguish timer cadence from sustained UI work.
+static void startAnimatedScroll(QQuickWindow* window) {
+    QList<QPointer<QObject>> sheets;
+    for (auto* item : window->findChildren<QObject*>()) {
+        if ((item->objectName().startsWith(QStringLiteral("paneContactSheet-")) ||
+             item->objectName() == QStringLiteral("galleryStrip")) && item->property("visible").toBool())
+            sheets.append(item);
+    }
+    auto* sequence = new QSequentialAnimationGroup(window);
+    auto* forward = new QParallelAnimationGroup;
+    auto* reverse = new QParallelAnimationGroup;
+    auto* stop = new QPauseAnimation(480);
+    auto* jump = new QPauseAnimation(480);
+    auto* finalStop = new QPauseAnimation(480);
+    QList<QPointer<QPropertyAnimation>> reverseAnimations;
+    for (const auto& sheet : sheets) {
+        const qreal y = sheet->property("contentY").toDouble();
+        const qreal height = sheet->property("height").toDouble();
+        const qreal maximum = std::max<qreal>(0, sheet->property("contentHeight").toDouble() - height);
+        auto* animation = new QPropertyAnimation(sheet, "contentY", forward);
+        animation->setDuration(1440);
+        animation->setStartValue(y);
+        animation->setEndValue(std::clamp(y + height * 7.2, qreal(0), maximum));
+        auto* back = new QPropertyAnimation(sheet, "contentY", reverse);
+        back->setDuration(1440);
+        back->setEndValue(0.0);
+        reverseAnimations.append(back);
+    }
+    sequence->addAnimation(forward);
+    sequence->addAnimation(stop);
+    sequence->addAnimation(jump);
+    sequence->addAnimation(reverse);
+    sequence->addAnimation(finalStop);
+    auto active = std::make_shared<bool>(false);
+    auto setMoving = [sheets, active](bool moving) {
+        if (*active == moving) return;
+        *active = moving;
+        mvpview::performance::mark(QStringLiteral("scenario.motion"), {{"active", moving}, {"driver", "animation"}});
+        for (const auto& sheet : sheets) if (sheet) sheet->setProperty("benchmarkMoving", moving);
+    };
+    QObject::connect(sequence, &QSequentialAnimationGroup::currentAnimationChanged, window,
+        [forward, reverse, jump, sheets, reverseAnimations, setMoving](QAbstractAnimation* animation) {
+            if (animation == reverse) {
+                for (const auto& back : reverseAnimations) {
+                    if (!back || !back->targetObject()) continue;
+                    auto* sheet = back->targetObject();
+                    const qreal y = sheet->property("contentY").toDouble();
+                    back->setStartValue(y);
+                    back->setEndValue(std::max<qreal>(0, y - sheet->property("height").toDouble() * 7.2));
+                }
+            }
+            setMoving(animation == forward || animation == reverse);
+            if (animation == jump) {
+                mvpview::performance::mark(QStringLiteral("scenario.jump"), {{"driver", "animation"}});
+                for (const auto& sheet : sheets) {
+                    if (!sheet) continue;
+                    sheet->setProperty("benchmarkMoving", true);
+                    const qreal maximum = std::max<qreal>(0, sheet->property("contentHeight").toDouble() - sheet->property("height").toDouble());
+                    sheet->setProperty("contentY", maximum * .8);
+                    sheet->setProperty("benchmarkMoving", false);
+                }
+            }
+        });
+    QObject::connect(sequence, &QAbstractAnimation::finished, window, [sequence, setMoving] {
+        setMoving(false);
+        mvpview::performance::mark(QStringLiteral("scenario.complete"), {{"driver", "animation"}});
+        sequence->deleteLater();
+    });
+    setMoving(true);
+    sequence->start();
+}
 
 static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service& diagnosticService) {
     QGuiApplication app(argc, argv);
@@ -51,6 +129,22 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     // padded macOS artwork in the Dock after launch.
     app.setWindowIcon(QIcon(QStringLiteral(":/brand/app_icon.png")));
 #endif
+    if (mvpview::performance::enabled()) {
+        QJsonObject environment;
+        for (const char* key : {"QSG_RENDER_TIMING", "QSG_INFO", "QSG_RENDER_LOOP",
+                               "QSG_USE_SIMPLE_ANIMATION_DRIVER", "QT_QPA_UPDATE_IDLE_TIME",
+                               "QSG_RHI_BACKEND", "QT_QUICK_BACKEND", "QT_QPA_PLATFORM",
+                               "QT_SCALE_FACTOR", "QT_SCREEN_SCALE_FACTORS"})
+            if (qEnvironmentVariableIsSet(key)) environment.insert(QString::fromLatin1(key), qEnvironmentVariable(key));
+        QJsonObject runtime{{"qtVersion", QString::fromLatin1(qVersion())}, {"qtEnvironment", environment}};
+        if (const auto* screen = app.primaryScreen()) {
+            runtime.insert(QStringLiteral("refreshHz"), screen->refreshRate());
+            runtime.insert(QStringLiteral("devicePixelRatio"), screen->devicePixelRatio());
+            runtime.insert(QStringLiteral("screenWidth"), screen->geometry().width());
+            runtime.insert(QStringLiteral("screenHeight"), screen->geometry().height());
+        }
+        mvpview::performance::mark(QStringLiteral("benchmark.runtime"), runtime);
+    }
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QSettings settings;
     mvpview::AppSettings appSettings(&app);
@@ -343,6 +437,10 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
             if (performanceScenario == QStringLiteral("fullscreen") && !selectedPath.isEmpty()) {
                 QMetaObject::invokeMethod(mainWindow, "openFullScreen",
                     Q_ARG(QVariant, QVariant(QStringList{selectedPath})), Q_ARG(QVariant, QVariant(0)));
+                return;
+            }
+            if (performanceScenario == QStringLiteral("animated-scroll")) {
+                startAnimatedScroll(mainWindow);
                 return;
             }
             auto* scrollTimer = new QTimer(mainWindow);

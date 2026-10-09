@@ -90,3 +90,32 @@ Windows下脚本每50ms读取子进程GetProcessMemoryInfo：peakWorkingSetBytes
 Release回归测试最新通过6.63秒；新增递归查询验证根目录图像只出现一次、图片祖先分支保留、纯文档分支排除、自然排序与取消。仍需真实格式样本、GPU像素对照、Qt6.9独立构建和进一步定位不同目录持续扫描期间的帧间隔问题；完整目标继续进行中。
 
 64项结果背压后另做最终烟测：不同目录四面板冷缩略图缓存下12次停止均完成，补图P95为158ms，运动帧间隔P95为33ms，实际最大预留结果14项，峰值工作集886MiB；事件确认设置已隔离。独立设置下slot-update仍通过slotUploads=[0]、viewUploads=0。结果位于build/perf-results/bounded-results与isolated-slot。
+
+## RAW正确性与调度补充（2026-10-09）
+
+新增tests/dng_fixture.h生成有效的未压缩Bayer DNG（1536×1024，已知14-bit样本，16-bit容器），通过真正的LibRaw打开、解包和处理。它不是注入缓存的假解码器，也不是真实相机拍摄样本。回归先后复现并修复：
+
+- 源缓存命中时，Full CFA图错误套用960×720的CPU后备上限，实际图像变为960×640；CFA全图由编码纹理显示，必须保留原尺寸。现在缓存/首次解码的1536×1024 CFA像素逐点一致。
+- LibRaw三通道16-bit RGB被当成Qt四通道RGBX64读取，导致无嵌入预览的DNG缩略图为空。现在按行写入拥有独立存储的RGBA64/RGBA8888，透明度始终不透明，避免引用已释放的LibRaw输出。按行检查取消；相机RAW缓存身份升级v8，旧像素缓存不会被错误复用。
+- 自动发现文件RAW默认参数被当作用户编辑，触发ThumbnailUrlRole变化和第二次加载。adoptRawParameters只填充默认值；URI处理修订仅随真正编辑变化。首次结果按已发现参数的身份入内存缓存，复用原请求文件版本，避免重复计费、二次解码或错误归入新文件版本。
+
+测试验证传感器样本(50,70)=2384、缓存默认处理与首次处理像素一致、取消后不渲染、首次URI稳定、重复请求返回同一不可变帧、编辑后正确失效。图片提供器从取消线程直接减少共享消费者，再在GUI线程完成Qt响应；起始与取消之间的竞态由互斥锁保护，避免等待GUI队列才通知解码器。Release构建和完整回归通过，最新7.23秒。
+
+测试程序支持 --export-dng 输出同一有效fixture，目录创建由调用方负责：
+
+```powershell
+build/windows-msys2-release/mvpview_performance_tests.exe --export-dng build/perf-fixtures/dng/sensor0.dng
+python tools/performance_benchmark.py --exe build/windows-msys2-release/MVPImageViewer.exe --images build/perf-fixtures/dng --output build/perf-results/dng-progressive --runs 2 --scenario startup --cache-state disk --capture-delay-ms 6000
+```
+
+本机64张fixture：首次未缓存补图381ms，下一轮实验磁盘缓存66ms；两个进程均只完成40个候选请求，没有解码失败，截图确认正常图像、1536×1024和14-bit信息。没有适用的原始DNG首屏速度对照：旧版本在无嵌入预览的16-bit RGB路径存在上述正确性错误。不能将占位图变成真实图像解释为30%速度达标。
+
+## 帧节奏诊断（2026-10-09）
+
+animated-scroll增加Qt动画时钟对照，不替换原来的timer scroll场景。相同不同目录四面板负载，3轮P95仍32/33/33ms，停止补图202/94/181ms。benchmark.runtime记录实际Qt版本、屏幕刷新率/DPR和影响Qt渲染的环境变量，减少测试配置歧义；capture-delay-ms允许慢格式延长观察窗。
+
+开启QSG_RENDER_TIMING与QSG_INFO的单轮日志中，Qt明确报告broken vsync throttling并切换到系统定时器；按运动窗口相邻事件归类，GUI polish/sync的P95为0ms（毫秒取整，不能解读为没有成本），render约2ms、swap约1ms，框架输出本身的帧间隔仍约30ms。这里不是所有GUI任务的完整CPU采样，也不能据此证明没有其他停顿。数据位于build/perf-results/render-phase。
+
+[Qt场景图文档](https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html)说明了vsync失效与QWindow请求更新等待的诊断方法。仅实验设置QT_QPA_UPDATE_IDLE_TIME=0，两轮P95为17ms，但P50为5～6ms，意味着绘制频率明显增加；停止补图138/239ms，并非所有指标改善。没有把该变量设置成应用默认，也没有改变OpenGL基线。实验位于build/perf-results/idle-zero，不能作为默认配置已达标的证据。
+
+完整验收仍未结束：需继续验证CPU预览消费者复用GPU RAW帧时的清晰度、色彩设置变化后的Qt图片缓存失效，以及真实相机/HEIF/超大PNG/慢盘压力、Qt6.9构建、GPU像素对照和完整回退矩阵。目标保持进行中。
