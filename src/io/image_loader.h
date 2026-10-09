@@ -29,6 +29,8 @@ struct RequestOptions {
     LoadCategory category = LoadCategory::Interactive;
     int priorityAdjustment = 0;
     QString caller;
+    // Fixed overlays retain their own consumer priority when browser demand changes.
+    bool viewportManaged = true;
 };
 
 class LoadHandle final {
@@ -106,6 +108,8 @@ class ImageLoader final : public QObject {
         quint64 requestId = 0;
         Callback callback;
         std::shared_ptr<LoadHandle::State> state;
+        int initialPriority = 0;
+        bool viewportManaged = true;
     };
 
     struct InFlightRequest {
@@ -118,12 +122,14 @@ class ImageLoader final : public QObject {
         bool serialized = false;
         bool running = false;
         DecodePurpose purpose = DecodePurpose::Preview;
+        bool viewportPriorityKnown = false;
         QElapsedTimer queuedAt;
         std::function<void()> work;
     };
 
     [[nodiscard]] LoadHandle requestImpl(quint64 requestId, DecodeRequest request,
-                                         Callback callback, int priority);
+                                         Callback callback, int priority, bool viewportManaged = true);
+    bool refreshThumbnailPriority(InFlightRequest& request);
     [[nodiscard]] WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose);
     [[nodiscard]] const WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose) const;
     void enforceMemoryBudget(DecodePurpose insertedPurpose);

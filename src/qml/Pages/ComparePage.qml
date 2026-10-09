@@ -502,11 +502,10 @@ Item {
                     border.width: 1
                     border.color: "#80FFFFFF"
 
-                    Image {
+                    NavigationThumbnail {
                         anchors.fill: parent
                         anchors.margins: 3
-                        source: "image://thumbnail/"
-                                + encodeURIComponent(root.paths[comparisonCell.index])
+                        path: root.paths[comparisonCell.index] || ""
                         sourceSize: Qt.size(90, 65)
                         fillMode: Image.Stretch
                         smooth: root.smoothDisplay

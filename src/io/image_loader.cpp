@@ -105,7 +105,7 @@ LoadHandle ImageLoader::request(quint64 requestId, DecodeRequest request, Callba
 
 LoadHandle ImageLoader::request(quint64 requestId, DecodeRequest request, Callback callback,
                                 RequestOptions options) {
-    return requestImpl(requestId, std::move(request), std::move(callback), priorityFor(options));
+    return requestImpl(requestId, std::move(request), std::move(callback), priorityFor(options), options.viewportManaged);
 }
 
 LoadHandle ImageLoader::requestAnalysis(AnalysisWork work, std::function<void(QVariantMap)> callback) {
@@ -146,7 +146,7 @@ LoadHandle ImageLoader::requestMetadata(quint64 id, ImageFramePtr frame, Callbac
 }
 
 LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Callback callback,
-                                    int priority) {
+                                    int priority, bool viewportManaged) {
     Q_ASSERT(thread() == QThread::currentThread());
     if (request.purpose == DecodePurpose::Preview && request.maximumSize.isValid()) {
         const int edge = std::max(request.maximumSize.width(), request.maximumSize.height());
@@ -154,9 +154,10 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             if (edge <= bucket) { request.maximumSize = QSize(bucket, bucket); break; }
         }
     }
+    const int consumerPriority = priority;
     if (request.purpose == DecodePurpose::Thumbnail) {
         const int demand = viewportPriority(request.path);
-        if (demand > -1000) priority = demand;
+        if (demand > -1000) priority = viewportManaged ? demand : std::max(priority, demand);
     }
     const QFileInfo sourceInfo(request.path);
     if (!DirectoryScanner::isBrowsableEntry(sourceInfo) || !sourceInfo.isFile()) {
@@ -215,7 +216,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             if (found->activeConsumers->compare_exchange_weak(
                     consumers, consumers + 1, std::memory_order_relaxed)) {
                 state->activeConsumers = found->activeConsumers;
-                found->pending.push_back({requestId, std::move(callback), state});
+                found->pending.push_back({requestId, std::move(callback), state, consumerPriority, viewportManaged});
                 found->priority = std::max(found->priority, priority);
                 if (found->workingPriority) found->workingPriority->store(found->priority);
                 decodeWorkingBudget_->wakeWaiters();
@@ -237,11 +238,12 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     inFlight.priority = priority;
     inFlight.workingPriority = std::make_shared<std::atomic_int>(priority);
     inFlight.purpose = request.purpose;
+    inFlight.viewportPriorityKnown = !viewports_.isEmpty();
     inFlight.serialized = !request.metadataSource && decoder_->executionMode(request.path) == DecodeExecutionMode::Serialized;
     inFlight.queuedAt.start();
     request.activeConsumers = activeConsumers;
     request.sourceCache = sourceCache_;
-    inFlight.pending.push_back({requestId, std::move(callback), state});
+    inFlight.pending.push_back({requestId, std::move(callback), state, consumerPriority, viewportManaged});
     inFlight_.insert(key, std::move(inFlight));
 
     const QPointer<ImageLoader> self(this);
@@ -487,12 +489,26 @@ void ImageLoader::updateViewport(const QString& owner, const QHash<QString, int>
     }
     for (auto it = inFlight_.begin(); it != inFlight_.end(); ++it) {
         if (it->purpose == DecodePurpose::Thumbnail) {
-            it->priority = viewportPriority(it->path);
-            if (it->workingPriority) it->workingPriority->store(it->priority);
+            it->viewportPriorityKnown = true;
+            refreshThumbnailPriority(*it);
         }
     }
     decodeWorkingBudget_->wakeWaiters();
     scheduleDispatch();
+}
+
+bool ImageLoader::refreshThumbnailPriority(InFlightRequest& request) {
+    const int demand = viewportPriority(request.path);
+    int priority = -1000;
+    for (const auto& consumer : request.pending) {
+        if (consumer.state->cancelled.load(std::memory_order_relaxed)) continue;
+        priority = std::max(priority, consumer.viewportManaged && request.viewportPriorityKnown
+            ? demand : consumer.initialPriority);
+    }
+    if (priority == request.priority) return false;
+    request.priority = priority;
+    if (request.workingPriority) request.workingPriority->store(priority);
+    return true;
 }
 
 bool ImageLoader::fastScrolling() const {
@@ -529,6 +545,8 @@ void ImageLoader::dispatch() {
         for (const auto& handle : rawPrefetchHandles_) handle.cancel();
     }
     for (auto it = inFlight_.begin(); it != inFlight_.end();) {
+        if (it->purpose == DecodePurpose::Thumbnail && refreshThumbnailPriority(*it))
+            decodeWorkingBudget_->wakeWaiters();
         if (!it->running && it->activeConsumers->load() <= 0) it = inFlight_.erase(it);
         else ++it;
     }

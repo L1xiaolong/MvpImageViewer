@@ -28,6 +28,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardItemModel>
+#include <QQmlEngine>
+#include <QQmlComponent>
+#include <QQuickWindow>
+#include <QQuickItem>
 #include <future>
 #include <mutex>
 #include <stdexcept>
@@ -97,6 +101,7 @@ private:
     QSize size_;
 };
 int main(int argc, char** argv) {
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
     QGuiApplication app(argc, argv);
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--export-dng"))
         return writeDngFixture(QString::fromLocal8Bit(argv[2])) ? 0 : 2;
@@ -125,6 +130,63 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);QQmlEngine engine;
+            engine.addImageProvider("thumbnail",new ThumbnailImageProvider(probe,&loader));
+            const auto componentPath=QStringLiteral(MVPVIEW_SOURCE_DIR "/src/qml/Mvp/NavigationThumbnail.qml");
+            QQmlComponent component(&engine,QUrl::fromLocalFile(componentPath));
+            require(component.isReady(),qPrintable(component.errorString()));
+            std::unique_ptr<QObject> object(component.createWithInitialProperties({{"path",a}}));
+            auto* image=qobject_cast<QQuickItem*>(object.get());require(image,"navigation component creation");
+            QQuickWindow window;image->setParentItem(window.contentItem());image->setWidth(90);image->setHeight(65);
+            const auto source=[&]{return image->property("source").toUrl();};
+            require(source().isEmpty(),"hidden window retained navigation demand");
+            window.show();require(source().query()=="purpose=navigation","visible navigation did not request independent consumer");
+            image->setVisible(false);require(source().isEmpty(),"hidden overlay retained navigation demand");
+            image->setVisible(true);require(!source().isEmpty(),"shown overlay did not restore demand");
+            window.setVisibility(QWindow::Minimized);require(source().isEmpty(),"minimized window retained navigation demand");
+            window.setVisibility(QWindow::Windowed);require(!source().isEmpty(),"restored window did not restore navigation demand");
+            window.hide();require(source().isEmpty(),"window hide retained navigation demand");
+            QCoreApplication::processEvents();
+        }
+        {
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);
+            loader.updateViewport("browser",{{c,80}},false);
+            ThumbnailImageProvider provider(probe,&loader);
+            std::unique_ptr<QQuickImageResponse> response(provider.requestImageResponse(
+                QUrl::toPercentEncoding(a)+"?purpose=navigation",{90,65}));
+            bool finished=false;
+            QObject::connect(response.get(),&QQuickImageResponse::finished,&app,[&]{finished=true;});
+            QCoreApplication::processEvents();
+            loader.updateViewport("browser",{{b,80}},false); // Must not suppress navigation for a.
+            pump([&]{return finished;});
+            std::unique_ptr<QQuickTextureFactory> factory(response->textureFactory());
+            require(factory && factory->image().pixelColor(0,0)==Qt::red,
+                    "browser demand suppressed standalone navigation thumbnail");
+        }
+        {
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);
+            bool blocker=false,grid=false,navigation=false;
+            loader.request(1,{c,DecodePurpose::Full},[&](auto,const auto&){blocker=true;});
+            pump([&]{return !probe->order().isEmpty();});
+            loader.updateViewport("browser",{{a,20}},false);
+            const auto gridHandle=loader.request(2,{a,DecodePurpose::Thumbnail,{128,128}},
+                [&](auto,const auto& result){grid=bool(result.frame);},RequestOptions{LoadCategory::NearViewport});
+            const auto navHandle=loader.request(3,{a,DecodePurpose::Thumbnail,{128,128}},
+                [&](auto,const auto& result){navigation=bool(result.frame);},
+                RequestOptions{LoadCategory::VisibleThumbnail,0,"navigation",false});
+            loader.updateViewport("browser",{},false);
+            navHandle.cancel();
+            pump([&]{return blocker;});
+            QElapsedTimer wait;wait.start();
+            while(wait.elapsed()<50){QCoreApplication::processEvents();QThread::msleep(1);}
+            require(probe->order().size()==1 && !grid && !navigation,
+                    "cancelled navigation consumer left a fixed priority on shared background task");
+            loader.updateViewport("browser",{{a,80}},false);
+            pump([&]{return grid;});
+            require(!navigation && probe->order().size()==2,"shared navigation cancellation lost live grid consumer");
+            gridHandle.cancel();
+        }
         {
             require(nominalGpuBytes({3,2},4,4)==96 && nominalGpuBytes({},4)==0,
                     "GPU dimensions/sample count estimate");

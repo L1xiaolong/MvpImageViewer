@@ -109,6 +109,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
         }
         const QPointer<ThumbnailImageResponse> self(this);
         const bool galleryFull = id_.contains(QStringLiteral("purpose=gallery-full"));
+        const bool navigation = id_.contains(QStringLiteral("purpose=navigation"));
         const bool galleryPreview = !galleryFull && id_.contains(QStringLiteral("purpose=gallery"));
         const LoadCategory category = galleryFull || galleryPreview
                                           ? LoadCategory::Interactive
@@ -136,7 +137,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                 }
                 self->finish();
             },
-            RequestOptions{category, 0, QStringLiteral("qml-thumbnail")});
+            RequestOptions{category, 0, navigation ? QStringLiteral("qml-navigation") : QStringLiteral("qml-thumbnail"), !navigation});
         const QMutexLocker lock(&mutex_);
         handle_ = std::move(handle);
         // Cancellation may have arrived between start()'s first check and attaching

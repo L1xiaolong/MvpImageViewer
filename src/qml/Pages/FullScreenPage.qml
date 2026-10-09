@@ -199,12 +199,10 @@ Item {
         border.color: "#80FFFFFF"
         z: 25
 
-        Image {
+        NavigationThumbnail {
             anchors.fill: parent
             anchors.margins: 3
-            source: root.controller.currentPath
-                    ? "image://thumbnail/" + encodeURIComponent(root.controller.currentPath)
-                    : ""
+            path: root.controller.currentPath || ""
             sourceSize: Qt.size(90, 65)
             fillMode: Image.Stretch
             smooth: root.smoothDisplay
