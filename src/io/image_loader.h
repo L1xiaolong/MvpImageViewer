@@ -145,7 +145,8 @@ class ImageLoader final : public QObject {
     std::shared_ptr<std::atomic_int> pendingWrites_ = std::make_shared<std::atomic_int>(0);
     int parallelRunning_ = 0;
     int serializedRunning_ = 0;
-    std::shared_ptr<SourceFrameCache> sourceCache_ = std::make_shared<SourceFrameCache>();
+    std::shared_ptr<PixelMemoryLedger> cacheAccounting_ = std::make_shared<PixelMemoryLedger>();
+    std::shared_ptr<SourceFrameCache> sourceCache_ = std::make_shared<SourceFrameCache>(cacheAccounting_);
     std::shared_ptr<const IImageDecoder> decoder_;
     std::shared_ptr<ThumbnailDiskCache> diskCache_;
     static constexpr qsizetype kDefaultMemoryBudget = 384LL * 1024 * 1024;

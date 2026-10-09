@@ -109,6 +109,46 @@ int main(int argc, char** argv) {
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
         {
+            auto ledger=std::make_shared<PixelMemoryLedger>();
+            auto sourceCache=std::make_unique<SourceFrameCache>(ledger);
+            auto source=std::make_shared<SourceFrame>(); source->bytes=QByteArray(64,'x');
+            sourceCache->put("sensor",source);
+            auto planes=std::make_shared<PlaneBufferSet>(); planes->storage=source->bytes;
+            planes->displayImage=QImage(2,2,QImage::Format_RGBA8888); planes->displayImage.fill(Qt::blue);
+            auto frame=std::make_shared<ImageFrame>(); frame->storage=planes; frame->uploadImage=planes->displayImage;
+            frame->uploadPlanes=planes;
+            require(frame->byteSize()==80,"frame aliases counted pixels repeatedly");
+            WeightedLruCache<ImageFrame> cache(512);
+            cache.setObserver([ledger](const auto& image,bool added){
+                PixelStorageFootprint footprint;image->appendPixelStorage(footprint);ledger->adjust(footprint,added);
+            });
+            cache.put("display",frame,frame->byteSize());
+            auto metadata=std::make_shared<ImageFrame>(*frame);
+            cache.put("metadata",metadata,metadata->byteSize());
+            require(ledger->bytes()==80,"source/display/metadata storage not deduplicated");
+            cache.erase("display"); require(ledger->bytes()==80,"shared eviction released live cache storage");
+            auto uploaded=std::make_shared<ImageFrame>(*metadata);
+            uploaded->uploadImage=QImage(2,2,QImage::Format_RGBA64); uploaded->uploadImage.fill(Qt::red);
+            cache.put("metadata",uploaded,uploaded->byteSize());
+            require(ledger->bytes()==112,"replacement did not account distinct upload pixels");
+            auto detached=std::make_shared<ImageFrame>(*uploaded);
+            auto uploadPlanes=std::make_shared<PlaneBufferSet>(*planes);
+            uploadPlanes->storage[0]='y'; detached->uploadPlanes=uploadPlanes;
+            cache.put("detached",detached,detached->byteSize());
+            require(ledger->bytes()==176,"detached upload/source buffers were conflated");
+            cache.erase("detached"); require(ledger->bytes()==112,"detached upload eviction lost shared source");
+            PixelStorageFootprint shared; uploaded->appendPixelStorage(shared);
+            auto concurrent=std::async(std::launch::async,[ledger,shared]{
+                for (int i=0;i<1000;++i) { ledger->adjust(shared,true); ledger->adjust(shared,false); }
+            });
+            for (int i=0;i<1000;++i) { ledger->adjust(shared,true); ledger->adjust(shared,false); }
+            concurrent.get(); require(ledger->bytes()==112,"concurrent source/cache ownership drifted");
+            sourceCache->clear(); require(ledger->bytes()==112,"source eviction lost frame-owned bytes");
+            sourceCache->put("sensor",source);
+            cache.clear(); require(ledger->bytes()==64,"cache clear retained orphaned upload storage");
+            sourceCache.reset(); require(ledger->bytes()==0,"cache destructor left ledger references");
+        }
+        {
             auto pressured=std::make_shared<ParallelProbeDecoder>();
             pressured->workingBytes=400LL*1024*1024;
             pressured->interactiveWorkingBytes=32LL*1024*1024;
@@ -116,7 +156,7 @@ int main(int argc, char** argv) {
             for (int i=0;i<20;++i) visible.append(loader.request(i,
                 {path(QString("visible-pressure%1.png").arg(i)),DecodePurpose::Preview},
                 [](auto,const auto&){},RequestOptions{LoadCategory::VisibleThumbnail}));
-            pump([&]{return pressured->entered.load()>=qBound(2,QThread::idealThreadCount(),6)-1;});
+            pump([&]{return pressured->entered.load()>=qBound(2,QThread::idealThreadCount()-1,6)-1;});
             bool delivered=false;
             QElapsedTimer interactionDelay; interactionDelay.start();
             loader.request(100,{path("interactive.png"),DecodePurpose::Preview},
@@ -282,6 +322,18 @@ int main(int argc, char** argv) {
             request.reserveWorkingMemory={};
             RawImageDecoder decoder; auto result=decoder.decode(request); require(bool(result.frame),"raw decode");
             require(request.sourceCache->cost()==24,"source cache not populated");
+            {
+                ImageLoader loader(std::make_shared<RawImageDecoder>()); loader.setMemoryBudget(100);
+                ImageFramePtr retained; bool done=false;
+                loader.request(400,{raw,DecodePurpose::Full,{},parameters},[&](auto,const auto& decoded){
+                    retained=decoded.frame;done=true;
+                });
+                pump([&]{return done;});
+                require(retained && retained->byteSize()==88 && loader.cachedBytes()==88,
+                        "loader counted shared NV12 source bytes twice or evicted the frame");
+                require(loader.isCached({raw,DecodePurpose::Full,{},parameters}),
+                        "deduplicated RAW cache did not retain its admissible frame");
+            }
             require(DisplayHistogramAnalyzer::analyze(*result.frame).isValid(),"display histogram");
             require(!DisplayHistogramAnalyzer::analyze(*result.frame, 10000, []{return true;}).isValid(),"display analysis cancellation");
             require(RawPlaneHistogramAnalyzer::analyze(*result.frame).isValid(),"source histogram");

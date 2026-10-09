@@ -9,11 +9,21 @@ struct SourceFrame {
     std::shared_ptr<const PlaneBufferSet> planes;
     std::optional<RawImageParameters> parameters;
     ImageMetadata metadata;
-    qsizetype byteSize() const { return planes ? planes->storage.size() : bytes.size(); }
+    void appendPixelStorage(PixelStorageFootprint& footprint) const {
+        footprint.add(bytes);
+        if (planes) { footprint.add(planes->storage); footprint.add(planes->displayImage); }
+    }
+    qsizetype byteSize() const { PixelStorageFootprint footprint; appendPixelStorage(footprint); return footprint.bytes(); }
 };
 // Shared by decoder adapters, bounded independently and included in the loader budget.
 class SourceFrameCache {
 public:
+    explicit SourceFrameCache(std::shared_ptr<PixelMemoryLedger> ledger = {}) {
+        if (ledger) cache_.setObserver([ledger](const auto& frame, bool added) {
+            PixelStorageFootprint footprint; frame->appendPixelStorage(footprint);
+            ledger->adjust(footprint, added);
+        });
+    }
     std::shared_ptr<const SourceFrame> get(const QString& key) { QMutexLocker lock(&mutex_); return cache_.get(key); }
     void put(const QString& key, std::shared_ptr<const SourceFrame> frame) {
         QMutexLocker lock(&mutex_); cache_.put(key, frame, frame->byteSize());

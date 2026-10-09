@@ -466,7 +466,9 @@ class Renderer final : public QQuickRhiItemRenderer {
         }
         if (performance::enabled()) {
             qint64 activeBytes = 0, gpuBytes = 0;
-            for (const auto& frame : frames_) if (frame) activeBytes += frame->byteSize();
+            PixelStorageFootprint activeStorage;
+            for (const auto& frame : frames_) if (frame) frame->appendPixelStorage(activeStorage);
+            activeBytes = activeStorage.bytes();
             const auto bytesFor = [](const std::unique_ptr<QRhiTexture>& texture) -> qint64 {
                 if (!texture) return 0;
                 int channels = 4;

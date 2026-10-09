@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/raw_image_parameters.h"
+#include "core/pixel_memory_ledger.h"
 
 #include <QByteArray>
 #include <QDateTime>
@@ -147,17 +148,24 @@ struct ImageFrame {
                                                                       : nullptr;
     }
 
-    [[nodiscard]] qsizetype byteSize() const {
+    void appendPixelStorage(PixelStorageFootprint& footprint) const {
         if (const auto* image = std::get_if<QImage>(&storage)) {
-            return image->sizeInBytes() + uploadImage.sizeInBytes() +
-                   (uploadPlanes ? uploadPlanes->storage.size() : 0);
+            footprint.add(*image);
+        } else if (const auto* planes = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&storage);
+                   planes && *planes) {
+            footprint.add((*planes)->storage);
+            footprint.add((*planes)->displayImage);
         }
-        const auto* planes = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&storage);
-        if (!planes || !*planes) {
-            return 0;
+        footprint.add(uploadImage);
+        if (uploadPlanes) {
+            footprint.add(uploadPlanes->storage);
+            footprint.add(uploadPlanes->displayImage);
         }
-        return (*planes)->storage.size() + (*planes)->displayImage.sizeInBytes() +
-               uploadImage.sizeInBytes() + (uploadPlanes ? uploadPlanes->storage.size() : 0);
+    }
+    [[nodiscard]] qsizetype byteSize() const {
+        PixelStorageFootprint footprint;
+        appendPixelStorage(footprint);
+        return footprint.bytes();
     }
 };
 

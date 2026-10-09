@@ -68,6 +68,13 @@ ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* 
     : QObject(parent), decoder_(std::move(decoder)),
       diskCache_(std::make_shared<ThumbnailDiskCache>()) {
     Q_ASSERT(decoder_);
+    const auto cacheObserver = [ledger = cacheAccounting_](const ImageFramePtr& frame, bool added) {
+        PixelStorageFootprint footprint; frame->appendPixelStorage(footprint);
+        ledger->adjust(footprint, added);
+    };
+    thumbnailCache_.setObserver(cacheObserver);
+    previewCache_.setObserver(cacheObserver);
+    fullCache_.setObserver(cacheObserver);
     pool_.setMaxThreadCount(qBound(2, QThread::idealThreadCount() - 1, 6));
     pool_.setExpiryTimeout(10'000);
     serializedPool_.setMaxThreadCount(1);
@@ -688,7 +695,7 @@ bool ImageLoader::isCached(DecodeRequest request) const {
 
 qsizetype ImageLoader::cachedBytes() const {
     Q_ASSERT(thread() == QThread::currentThread());
-    return thumbnailCache_.cost() + previewCache_.cost() + fullCache_.cost() + sourceCache_->cost();
+    return cacheAccounting_->bytes();
 }
 
 void ImageLoader::setMemoryBudget(qsizetype bytes) {

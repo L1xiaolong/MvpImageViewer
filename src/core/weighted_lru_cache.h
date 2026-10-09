@@ -6,12 +6,16 @@
 #include <algorithm>
 #include <list>
 #include <memory>
+#include <functional>
 
 namespace mvpview {
 
 template <typename T> class WeightedLruCache final {
   public:
     explicit WeightedLruCache(qsizetype maximumCost) : maximumCost_(maximumCost) {}
+    ~WeightedLruCache() { clear(); }
+    using Observer = std::function<void(const std::shared_ptr<const T>&, bool)>;
+    void setObserver(Observer observer) { Q_ASSERT(entries_.isEmpty()); observer_ = std::move(observer); }
 
     [[nodiscard]] std::shared_ptr<const T> get(const QString& key) {
         auto it = entries_.find(key);
@@ -29,6 +33,7 @@ template <typename T> class WeightedLruCache final {
         erase(key);
         order_.push_front(key);
         entries_.insert(key, Entry{std::move(value), cost, order_.begin()});
+        if (observer_) observer_(entries_.value(key).value, true);
         currentCost_ += cost;
         trim();
     }
@@ -39,6 +44,7 @@ template <typename T> class WeightedLruCache final {
             return;
         }
         currentCost_ -= it->cost;
+        if (observer_) observer_(it->value, false);
         order_.erase(it->orderIterator);
         entries_.erase(it);
     }
@@ -46,6 +52,7 @@ template <typename T> class WeightedLruCache final {
     void setMaximumCost(qsizetype bytes) { maximumCost_ = std::max<qsizetype>(0, bytes); trim(); }
 
     void clear() {
+        if (observer_) for (const auto& entry : entries_) observer_(entry.value, false);
         entries_.clear();
         order_.clear();
         currentCost_ = 0;
@@ -84,6 +91,7 @@ template <typename T> class WeightedLruCache final {
     qsizetype currentCost_ = 0;
     std::list<QString> order_;
     QHash<QString, Entry> entries_;
+    Observer observer_;
 };
 
 } // namespace mvpview
