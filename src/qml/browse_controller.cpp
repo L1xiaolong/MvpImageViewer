@@ -101,6 +101,7 @@ BrowseController::BrowseController(ImageLoader* sharedLoader,
 }
 
 void BrowseController::initialize(const QString& initialDirectory, bool startEmpty) {
+    const performance::Scope trace(QStringLiteral("browse.initialize"));
     scanner_ = new DirectoryScanner(this);
     scanner_->setBatchBackpressure(true);
     thumbnailModel_ = new ThumbnailModel(loader_, this);
@@ -495,6 +496,7 @@ void BrowseController::openDirectoryUrl(const QUrl& url) {
 }
 
 QVariantList BrowseController::nativeSidebarPlaces() const {
+    const performance::Scope trace(QStringLiteral("navigation.places"));
     QVariantList places;
     QSet<QString> seenPaths;
     const auto appendPlace = [&places, &seenPaths](const QString& label, const QString& path,
@@ -557,6 +559,7 @@ QVariantList BrowseController::nativeDrivePlaces() const {
 }
 
 void BrowseController::refreshNativeDrivePlaces() {
+    const performance::Scope trace(QStringLiteral("navigation.drives"));
     QVariantList drives;
 #ifdef Q_OS_WIN
     const DWORD mask = GetLogicalDrives();
@@ -1307,6 +1310,7 @@ void BrowseController::setGridCellWidth(int width) {
 
 void BrowseController::openDirectoryInternal(const QString& path, bool addToHistory,
                                              bool pathAlreadyValidated) {
+    const performance::Scope trace(QStringLiteral("directory.open_gui"), {{"validated", pathAlreadyValidated}});
 #ifdef Q_OS_WIN
     if (!pathAlreadyValidated && isWindowsRemotePath(path)) {
         const quint64 requestGeneration = ++directoryRequestGeneration_;

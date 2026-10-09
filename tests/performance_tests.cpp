@@ -11,6 +11,9 @@
 #include <QColorSpace>
 #include "browser/thumbnail_model.h"
 #include "browser/thumbnail_filter_proxy_model.h"
+#include "browser/file_clipboard.h"
+#include <QClipboard>
+#include <QMimeData>
 #include <QGuiApplication>
 #include <QTemporaryDir>
 #include <QFile>
@@ -98,6 +101,19 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        if (QGuiApplication::platformName()==QStringLiteral("offscreen")) {
+            FileClipboard::setPaths({a},true);
+            require(FileClipboard::hasFiles() && FileClipboard::contents().paths==QStringList{a} &&
+                    FileClipboard::contents().cut,"file clipboard URL/cut compatibility");
+            auto* ordinary=new QMimeData; ordinary->setText(QStringLiteral("ordinary text"));
+            QGuiApplication::clipboard()->setMimeData(ordinary);
+            require(!FileClipboard::hasFiles(),"clipboard change retained old files");
+            auto* paths=new QMimeData; paths->setText(a+QLatin1Char('\n')+b);
+            QGuiApplication::clipboard()->setMimeData(paths);
+            require(FileClipboard::hasFiles() && FileClipboard::contents().paths==QStringList{a,b} &&
+                    !FileClipboard::contents().cut,"plain path clipboard compatibility");
+            FileClipboard::clear(); require(!FileClipboard::hasFiles(),"empty clipboard retained file state");
+        }
         {
             const auto budget=std::make_shared<ResultBufferBudget>(100);
             auto first=budget->reserve(60,[]{return false;});

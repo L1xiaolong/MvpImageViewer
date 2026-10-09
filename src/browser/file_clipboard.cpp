@@ -1,14 +1,45 @@
 #include "browser/file_clipboard.h"
 
 #include "browser/local_file_drop.h"
+#include "core/performance_trace.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QMimeData>
 #include <QUrl>
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#include <array>
+#endif
 
 namespace mvpview {
-namespace { bool filesCached = false; bool cachedHasFiles = false; }
+namespace {
+bool filesCached = false;
+bool cachedHasFiles = false;
+#ifdef Q_OS_WIN
+bool mayContainFilePaths() {
+    // Offscreen and other QPA plugins have their own clipboard, independent of Win32.
+    if (QGuiApplication::platformName() != QStringLiteral("windows")) return true;
+    static const std::array<UINT, 10> formats{
+        CF_HDROP, CF_UNICODETEXT, CF_TEXT,
+        RegisterClipboardFormatW(L"UniformResourceLocatorW"),
+        RegisterClipboardFormatW(L"UniformResourceLocator"),
+        RegisterClipboardFormatW(L"FileNameW"), RegisterClipboardFormatW(L"FileName"),
+        RegisterClipboardFormatW(L"text/uri-list"), RegisterClipboardFormatW(L"text/plain"),
+        RegisterClipboardFormatW(L"Shell IDList Array")
+    };
+    // Format availability does not retrieve delayed-rendered data or enumerate an
+    // external IDataObject. Positive/uncertain cases retain Qt's existing URL/text parsing.
+    for (const UINT format : formats) {
+        if (!format) return true;
+        SetLastError(ERROR_SUCCESS);
+        if (IsClipboardFormatAvailable(format)) return true;
+        if (GetLastError() != ERROR_SUCCESS) return true;
+    }
+    return false;
+}
+#endif
+}
 
 void FileClipboard::initialize() {
     // Connect before browser bindings: one clipboard query per change, not per menu item/pane.
@@ -42,6 +73,15 @@ FileClipboardContents FileClipboard::contents() {
 bool FileClipboard::hasFiles() {
     initialize();
     if (!filesCached) {
+        const performance::Scope trace(QStringLiteral("clipboard.probe"));
+#ifdef Q_OS_WIN
+        if (!mayContainFilePaths()) {
+            cachedHasFiles = false;
+            filesCached = true;
+            performance::mark(QStringLiteral("clipboard.no_file_formats"));
+            return false;
+        }
+#endif
         // Snapshot advertised formats once. Querying absent Windows clipboard formats
         // repeatedly can retry OpenClipboard and stall the first UI bindings.
         QMimeData snapshot;

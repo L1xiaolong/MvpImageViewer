@@ -4,6 +4,7 @@
 #include "io/image_decoder.h"
 #include "io/image_loader.h"
 #include "io/raw_preset_store.h"
+#include "core/performance_trace.h"
 
 #include <QAbstractFileIconProvider>
 #include <QEventLoop>
@@ -25,6 +26,7 @@ SystemFolderIconProvider::~SystemFolderIconProvider() = default;
 
 QImage SystemFolderIconProvider::requestImage(const QString& id, QSize* size,
                                                const QSize& requestedSize) {
+    const performance::Scope trace(QStringLiteral("navigation.icon"));
     const QString path = QUrl::fromPercentEncoding(id.toUtf8());
     const QSize target = requestedSize.isValid() ? requestedSize : QSize(32, 32);
     QAbstractFileIconProvider* iconProvider = fileSystemModel_->iconProvider();

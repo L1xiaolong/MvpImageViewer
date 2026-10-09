@@ -180,3 +180,13 @@ ThumbnailFilterProxyModel在设置源模型时保存安全的QPointer。Thumbnai
 日志为build/perf-results/model-sort-before.log、model-sort-after.log。测试入口先同步准备扫描记录（8116/8296ms），该部分不包含在GUI排序表中；生产路径在DirectoryScanner工作线程扫描。复现命令：设置QT_QPA_PLATFORM=offscreen、QT_FORCE_STDERR_LOGGING=1后运行build/windows-msys2-release/mvpview_performance_tests.exe --sort-benchmark build/perf-fixtures/100000。不要将单次测试解读为完整P50/P95或其他指标不回退的证明。
 
 回归覆盖混合目录/扩展名、自然数字名称、准备键/缺失键和缺失类型的顺序一致，以及替换成通用QStandardItemModel后不使用旧源字段。最终Release构建、CTest通过（7.66s），Python基准脚本语法检查通过。
+
+## 启动剪贴板探测（2026-10-09）
+
+新增按作用域开始/结束的性能事件，分别覆盖首次剪贴板检查、浏览器初始化、系统导航图标、导航位置/磁盘列表和目录打开GUI阶段。未开启MVPVIEW_PERF时不启动计时或输出日志。首次剪贴板绑定原来会进入Qt/OLE格式枚举，即使没有任何可粘贴文件格式也耗时约200ms。
+
+Windows平台先调用IsClipboardFormatAvailable检查文件、URL、文本和Shell路径相关的标准/注册格式，仅在全部缺失且没有API错误时返回不可粘贴。该API查询格式可用性而不读取数据，参见[Microsoft文档](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-isclipboardformatavailable)。有任一格式、注册失败、查询错误或非Windows QPA插件时，继续使用原有Qt解析和每次剪贴板变化的缓存失效逻辑。没有修改用户剪贴板，也没有将文件/文本内容读取改成异步。
+
+两个相邻版本分别运行100张合成PNG、两轮冷缓存、独立设置、原生Windows/默认OpenGL/Qt6.11：build/perf-results/startup-phase-scopes的clipboard.probe为206/198ms；build/perf-results/clipboard-format-guard均记录clipboard.no_file_formats，probe为0/0ms（整数毫秒精度）。对应首帧1341/1152ms与1042/907ms，首屏补图140/129ms与125/120ms。该两轮对照仅确认当前缺失格式的剪贴板路径改善，不是原始基准的正式P50/P95验收，不能推论有数据的剪贴板同样不阻塞。
+
+最终Release构建、CTest通过（7.45s）。offscreen剪贴板回归覆盖文件URL、剪切标记、普通文本使旧缓存失效、纯文本路径和清空；测试不接触真实Windows剪贴板。新的原生日志仍记录75～142ms启动GUI心跳间隔；首次图标和浏览器初始化等开销继续保留作用域观测，50ms硬性停顿验收未通过。
