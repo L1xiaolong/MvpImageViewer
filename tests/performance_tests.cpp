@@ -90,6 +90,22 @@ public:
     bool canDecode(const QString&) const override { return true; }
     DecodeResult decode(const DecodeRequest&) const override { return {{}, "Unavailable"}; }
 };
+class RetirementProbeDecoder final : public IImageDecoder {
+public:
+    struct State { std::atomic_int destroyed{0}, guiDestruction{0}; };
+    std::shared_ptr<State> state = std::make_shared<State>();
+    bool canDecode(const QString&) const override { return true; }
+    DecodeResult decode(const DecodeRequest& request) const override {
+        auto planes = std::shared_ptr<PlaneBufferSet>(new PlaneBufferSet, [probe=state](auto* value) {
+            if (QThread::currentThread() == QCoreApplication::instance()->thread()) ++probe->guiDestruction;
+            delete value; ++probe->destroyed;
+        });
+        planes->storage=QByteArray(2*1024*1024,'x');
+        auto frame=std::make_shared<ImageFrame>();frame->storage=std::move(planes);
+        frame->metadata.path=request.path;frame->descriptor.size={1024,512};
+        return {frame,{}};
+    }
+};
 class SizedTexture final : public QSGTexture {
 public:
     explicit SizedTexture(QSize size) : size_(size) {}
@@ -141,6 +157,34 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            WeightedLruCache<ImageFrame> cache(32);QVector<ImageFramePtr> retired;
+            cache.setRetirer([&](auto owner,qsizetype cost){
+                require(cost==16 && owner.use_count()==1,"retirement did not transfer the last owner");
+                retired.append(std::move(owner));
+            });
+            auto frame=std::make_shared<ImageFrame>();cache.put("first",frame,16);frame.reset();
+            cache.erase("first");require(cache.size()==0 && retired.size()==1,"erase did not retire its owner");
+            frame=std::make_shared<ImageFrame>();cache.put("active",frame,16);
+            cache.clear();require(retired.size()==1 && frame.use_count()==1,"clear retired an externally held frame");
+            frame=std::make_shared<ImageFrame>();cache.put("unused",frame,16);frame.reset();
+            cache.clear();require(cache.size()==0 && cache.cost()==0 && retired.size()==2,"clear failed to transfer unused owners");
+        }
+        {
+            auto probe=std::make_shared<RetirementProbeDecoder>();ImageLoader loader(probe);
+            loader.setMemoryBudget(3*1024*1024);
+            for(const auto& file:QStringList{a,b}) {
+                bool done=false;loader.request(1,{file,DecodePurpose::Full},[&](auto,const auto& result){
+                    require(bool(result.frame),"retirement probe decode failed");done=true;
+                });pump([&]{return done;});
+            }
+            pump([&]{return probe->state->destroyed==1;});
+            require(loader.cachedBytes()==2*1024*1024 && probe->state->guiDestruction==0,
+                    "normal budget eviction destroyed large pixels on GUI");
+            loader.clearTransientCaches();require(loader.cachedBytes()==0,"clear left logical cache entries");
+            pump([&]{return probe->state->destroyed==2 && loader.residentPixelBytes()==0;});
+            require(probe->state->guiDestruction==0,"transient clear destroyed large pixels on GUI");
+        }
         {
             WeightedLruCache<ImageFrame> cache(4096);QVector<ImageFramePtr> pinned;
             for(int i=0;i<40;++i){auto frame=std::make_shared<ImageFrame>();

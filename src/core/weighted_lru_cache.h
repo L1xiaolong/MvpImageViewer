@@ -9,6 +9,7 @@
 #include <memory>
 #include <functional>
 #include <limits>
+#include <iterator>
 
 namespace mvpview {
 
@@ -18,6 +19,8 @@ template <typename T> class WeightedLruCache final {
     ~WeightedLruCache() { clear(); }
     using Observer = std::function<void(const std::shared_ptr<const T>&, bool)>;
     void setObserver(Observer observer) { Q_ASSERT(entries_.isEmpty()); observer_ = std::move(observer); }
+    using Retirer = std::function<void(std::shared_ptr<const T>, qsizetype)>;
+    void setRetirer(Retirer retirer) { retirer_ = std::move(retirer); }
 
     [[nodiscard]] std::shared_ptr<const T> get(const QString& key) {
         auto it = entries_.find(key);
@@ -47,14 +50,20 @@ template <typename T> class WeightedLruCache final {
         }
         currentCost_ -= it->cost;
         if (observer_) observer_(it->value, false);
+        const auto cost = it->cost;
+        auto owner = std::move(it->value);
         order_.erase(it->orderIterator);
         entries_.erase(it);
+        retire(std::move(owner), cost);
     }
 
     void setMaximumCost(qsizetype bytes) { maximumCost_ = std::max<qsizetype>(0, bytes); trim(); }
 
     void clear() {
-        if (observer_) for (const auto& entry : entries_) observer_(entry.value, false);
+        for (auto& entry : entries_) {
+            if (observer_) observer_(entry.value, false);
+            retire(std::move(entry.value), entry.cost);
+        }
         entries_.clear();
         order_.clear();
         currentCost_ = 0;
@@ -111,6 +120,12 @@ template <typename T> class WeightedLruCache final {
         typename std::list<QString>::iterator orderIterator;
     };
 
+    void retire(std::shared_ptr<const T> owner, qsizetype cost) {
+        // Transfer the last owner after unlinking, so a fast worker cannot leave
+        // the cache's reference as the final (GUI-thread) pixel destructor.
+        if (retirer_ && owner.use_count() == 1) retirer_(std::move(owner), cost);
+    }
+
     void trim() {
         while (currentCost_ > maximumCost_ && !order_.empty()) {
             erase(order_.back());
@@ -122,6 +137,7 @@ template <typename T> class WeightedLruCache final {
     std::list<QString> order_;
     QHash<QString, Entry> entries_;
     Observer observer_;
+    Retirer retirer_;
     QString pruneNextKey_;
 };
 

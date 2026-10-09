@@ -6,7 +6,7 @@ parser.add_argument('--exe',type=pathlib.Path,required=True)
 parser.add_argument('--images',type=pathlib.Path,required=True)
 parser.add_argument('--output',type=pathlib.Path,required=True)
 parser.add_argument('--runs',type=int,default=20)
-parser.add_argument('--scenario',choices=['startup','scroll','animated-scroll','fullscreen','compare','refresh','slot-update'],default='startup')
+parser.add_argument('--scenario',choices=['startup','scroll','animated-scroll','fullscreen','fullscreen-clear','compare','refresh','slot-update'],default='startup')
 parser.add_argument('--capture-delay-ms',type=int,help='Override capture time for slow formats; 250..50000ms')
 parser.add_argument('--mode',choices=['grid','list','gallery'],default='grid')
 parser.add_argument('--cache-state',choices=['existing','cold','disk'],default='existing')
@@ -19,7 +19,7 @@ if len(args.pane_images)>=args.panes: raise SystemExit('--pane-images requires o
 for directory in [args.images]+args.pane_images:
     if not directory.is_dir(): raise SystemExit(f'Image directory not found: {directory}')
 images=[]
-if args.scenario in {'fullscreen','compare','slot-update'}:
+if args.scenario in {'fullscreen','fullscreen-clear','compare','slot-update'}:
     images=sorted(p for p in args.images.iterdir() if p.suffix.lower() in {'.jpg','.jpeg','.png','.bmp','.dib','.raw','.yuv','.dng','.heic','.heif','.cr2','.cr3','.crw','.nef','.nrw','.arw','.sr2','.srf','.raf','.rw2','.orf','.pef','.srw','.x3f','.rwl'})
 summary=[]
 cold_generation=str(time.time_ns())
@@ -33,8 +33,8 @@ for run in range(args.runs):
     capture_delay=args.capture_delay_ms or (10000 if args.scenario in {'scroll','animated-scroll'} else 6000 if args.scenario=='refresh' else 5000 if args.scenario=='slot-update' else 2500)
     command=[str(args.exe.resolve()),str(args.images.resolve()),'--display-mode',args.mode,'--file-managers',str(args.panes),'--screenshot-native','--screenshot',str(capture.resolve()),'--screenshot-delay',str(capture_delay)]
     for directory in args.pane_images: command+=['--perf-pane-directory',str(directory.resolve())]
-    if args.scenario in {'scroll','animated-scroll','fullscreen','refresh','slot-update'}: command+=['--perf-scenario',args.scenario]
-    if args.scenario=='fullscreen':
+    if args.scenario in {'scroll','animated-scroll','fullscreen','fullscreen-clear','refresh','slot-update'}: command+=['--perf-scenario',args.scenario]
+    if args.scenario in {'fullscreen','fullscreen-clear'}:
         if not images: raise SystemExit('fullscreen requires images')
         command+=['--select',str(images[0].resolve())]
     if args.scenario in {'compare','slot-update'}:
@@ -98,6 +98,12 @@ for run in range(args.runs):
     retirement=[e for e in events if e['event']=='loader.resource_retirement']
     summary[-1]['resourceRetirementBatches']=len(retirement)
     summary[-1]['maxResourceRetirementGuiMs']=max([e['elapsedMs'] for e in retirement],default=None)
+    cache_retirement=[e for e in events if e['event']=='loader.cache_retirement_queued']
+    summary[-1]['cacheRetirementOwners']=len(cache_retirement)
+    summary[-1]['maxCacheRetirementBytes']=max([e['pendingBytes'] for e in cache_retirement],default=0)
+    summary[-1]['cacheRetirementSaturations']=sum(e['event']=='loader.cache_retirement_saturated' for e in events)
+    summary[-1]['guiCacheRetirementReleases']=sum(e['event']=='loader.cache_retirement_released' and e.get('guiThread',False) for e in events)
+    summary[-1]['maxCacheClearGuiMs']=max([e['elapsedMs'] for e in events if e['event']=='scenario.cache_clear'],default=None)
     summary[-1].update({'maxDecodeWorkingBytes':max([e['peakBytes'] for e in working],default=None),
                        'maxDecodeWorkingWaitMs':max([e['workingWaitMs'] for e in completed if 'workingWaitMs' in e],default=None),
                        'maxResidentPixelBytes':max([e.get('peakResidentPixelBytes',e['residentPixelBytes']) for e in events if 'residentPixelBytes' in e],default=None),

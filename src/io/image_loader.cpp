@@ -76,6 +76,13 @@ ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* 
     thumbnailCache_.setObserver(cacheObserver);
     previewCache_.setObserver(cacheObserver);
     fullCache_.setObserver(cacheObserver);
+    const auto cacheRetirer = [this](auto owner, qsizetype cost) {
+        retireCacheOwner(std::move(owner), cost);
+    };
+    thumbnailCache_.setRetirer(cacheRetirer);
+    previewCache_.setRetirer(cacheRetirer);
+    fullCache_.setRetirer(cacheRetirer);
+    sourceCache_->setRetirer(cacheRetirer);
     pool_.setMaxThreadCount(qBound(2, QThread::idealThreadCount() - 1, 6));
     pool_.setExpiryTimeout(10'000);
     serializedPool_.setMaxThreadCount(1);
@@ -100,6 +107,12 @@ ImageLoader::~ImageLoader() {
     decodeWorkingBudget_->close();
     pool_.waitForDone();
     serializedPool_.waitForDone();
+    // Empty caches while their retirement callbacks and writer are still alive.
+    sourceCache_->clear();
+    thumbnailCache_.clear();
+    previewCache_.clear();
+    fullCache_.clear();
+    sourceCache_->setRetirer({});
     writePool_.waitForDone();
 }
 
@@ -900,6 +913,33 @@ void ImageLoader::enforceMemoryBudget(DecodePurpose insertedPurpose) {
             break;
         }
     }
+}
+
+void ImageLoader::retireCacheOwner(std::shared_ptr<const void> owner, qsizetype cost) {
+    // Small allocations are inexpensive; source-cache trims already on a worker
+    // must not enqueue themselves back onto the writer.
+    if (QThread::currentThread() != thread() || cost < 1024 * 1024) return;
+    constexpr qsizetype maximumBytes = kDefaultMemoryBudget;
+    const auto state = cacheRetirement_;
+    auto bytes = state->bytes.load();
+    if (state->owners.load() >= 64 || cost > maximumBytes - bytes) {
+        performance::mark(QStringLiteral("loader.cache_retirement_saturated"),
+            {{"pendingBytes", qint64(bytes)}, {"owners", state->owners.load()}, {"cost", qint64(cost)}});
+        return; // Preserve the bound; release synchronously under saturation.
+    }
+    // Only the GUI admits owners; workers only subtract counters.
+    state->bytes.fetch_add(cost);
+    ++state->owners;
+    performance::mark(QStringLiteral("loader.cache_retirement_queued"),
+        {{"pendingBytes", qint64(state->bytes.load())}, {"owners", state->owners.load()}, {"cost", qint64(cost)}});
+    writePool_.start([owner = std::move(owner), state, cost]() mutable {
+        owner.reset();
+        state->bytes.fetch_sub(cost);
+        --state->owners;
+        performance::mark(QStringLiteral("loader.cache_retirement_released"),
+            {{"pendingBytes", qint64(state->bytes.load())}, {"owners", state->owners.load()},
+             {"guiThread", QThread::currentThread() == QCoreApplication::instance()->thread()}});
+    },100);
 }
 
 void ImageLoader::reclaimInactiveResources() {

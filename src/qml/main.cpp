@@ -433,9 +433,20 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                 mvpview::performance::mark(QStringLiteral("scenario.refresh"));
                 return;
             }
-            if (performanceScenario == QStringLiteral("fullscreen") && !selectedPath.isEmpty()) {
+            if ((performanceScenario == QStringLiteral("fullscreen") ||
+                 performanceScenario == QStringLiteral("fullscreen-clear")) && !selectedPath.isEmpty()) {
                 QMetaObject::invokeMethod(mainWindow, "openFullScreen",
                     Q_ARG(QVariant, QVariant(QStringList{selectedPath})), Q_ARG(QVariant, QVariant(0)));
+                if (performanceScenario == QStringLiteral("fullscreen-clear")) {
+                    QTimer::singleShot(2000, mainWindow, [&browseController] {
+                        QElapsedTimer timer; timer.start();
+                        browseController.loader()->clearCache();
+                        mvpview::performance::mark(QStringLiteral("scenario.cache_clear"),
+                            {{"elapsedMs", timer.elapsed()},
+                             {"cachedBytes", qint64(browseController.loader()->cachedBytes())},
+                             {"residentPixelBytes", qint64(browseController.loader()->residentPixelBytes())}});
+                    });
+                }
                 return;
             }
             if (performanceScenario == QStringLiteral("animated-scroll")) {

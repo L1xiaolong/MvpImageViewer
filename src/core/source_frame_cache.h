@@ -40,6 +40,9 @@ public:
     qsizetype cost() const { QMutexLocker lock(&mutex_); return cache_.cost(); }
     void clear() { QMutexLocker lock(&mutex_); cache_.clear(); }
     void setBudget(qsizetype bytes) { QMutexLocker lock(&mutex_); cache_.setMaximumCost(bytes); }
+    void setRetirer(WeightedLruCache<SourceFrame>::Retirer retirer) {
+        QMutexLocker lock(&mutex_); cache_.setRetirer(std::move(retirer));
+    }
     WeightedLruCache<SourceFrame>::PruneResult pruneUnused(qsizetype maximumExamined, qsizetype targetCost) {
         const std::unique_lock<QMutex> lock(mutex_,std::try_to_lock);
         if (!lock.owns_lock()) return {};

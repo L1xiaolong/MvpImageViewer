@@ -138,6 +138,7 @@ class ImageLoader final : public QObject {
     void dispatch();
     void scheduleDispatch();
     void reclaimInactiveResources();
+    void retireCacheOwner(std::shared_ptr<const void> owner, qsizetype cost);
     int viewportPriority(const QString& path) const;
     struct Viewport { QHash<QString, int> priorities; bool fast = false; };
     QHash<QString, Viewport> viewports_;
@@ -149,6 +150,11 @@ class ImageLoader final : public QObject {
     QTimer dispatchWake_;
     QTimer resourceMaintenanceTimer_;
     std::shared_ptr<std::atomic_bool> retirementPending_ = std::make_shared<std::atomic_bool>(false);
+    struct CacheRetirementState {
+        std::atomic_int owners{0};
+        std::atomic<qsizetype> bytes{0};
+    };
+    std::shared_ptr<CacheRetirementState> cacheRetirement_ = std::make_shared<CacheRetirementState>();
     QElapsedTimer completionClock_;
     std::deque<std::function<void()>> completions_;
     std::shared_ptr<ResultBufferBudget> resultBufferBudget_ =
