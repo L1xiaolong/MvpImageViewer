@@ -3,6 +3,8 @@
 #include "io/raw_image_decoder.h"
 #include "io/directory_scanner.h"
 #include "io/qt_image_decoder.h"
+#include "io/camera_raw_decoder.h"
+#include "dng_fixture.h"
 #include "core/display_histogram.h"
 #include "core/raw_plane_histogram.h"
 #include "core/raw_plane_access.h"
@@ -66,6 +68,8 @@ public:
 };
 int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
+    if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--export-dng"))
+        return writeDngFixture(QString::fromLocal8Bit(argv[2])) ? 0 : 2;
     try {
         QTemporaryDir temp(QDir::currentPath() + "/performance-test-XXXXXX"); require(temp.isValid(), "temporary directory");
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
@@ -195,6 +199,56 @@ int main(int argc, char** argv) {
                 require(bool(r.frame) && r.frame->uploadImage.format()==QImage::Format_RGBA16FPx4,"worker upload conversion"); loaded=true;
             });
             pump([&]{return loaded;});
+        }
+        if (CameraRawDecoder::isAvailable()) {
+            const auto path=temp.filePath("sensor.dng");
+            require(writeDngFixture(path),"DNG fixture");
+            CameraRawDecoder decoder;
+            auto native=decoder.decode({path,DecodePurpose::Full});
+            require(bool(native.frame) && native.frame->rawParameters.has_value(),"LibRaw DNG sensor decode");
+            auto parameters=*native.frame->rawParameters;
+            parameters.demosaic=false;
+            DecodeRequest cfa{path,DecodePurpose::Full,{},parameters};
+            cfa.sourceCache=std::make_shared<SourceFrameCache>();
+            auto fresh=decoder.decode(cfa);
+            auto cached=decoder.decode(cfa);
+            require(bool(fresh.frame) && bool(cached.frame),"DNG source reuse");
+            require(fresh.frame->qImage()->size()==QSize(1536,1024),"DNG full CFA dimensions");
+            require(*fresh.frame->qImage()==*cached.frame->qImage(),"cached CFA changed full-resolution pixels");
+            RawPlaneAccessor source(*cached.frame);
+            auto sample=source.bayerAtSourcePixel({50,70});
+            require(sample && sample->value==64+(50*31+70*11)%16000,"DNG exact sensor sample");
+            DecodeRequest defaults{path,DecodePurpose::Full}; defaults.sourceCache=cfa.sourceCache;
+            auto reset=decoder.decode(defaults);
+            require(bool(reset.frame) && reset.frame->rawParameters->demosaic,"source retained a request override");
+            require(*native.frame->qImage()==*reset.frame->qImage(),"cached file defaults changed developed pixels");
+            cfa.activeConsumers=std::make_shared<std::atomic_int>(-1);
+            require(!decoder.decode(cfa).frame,"cancelled cached DNG source rendered");
+            ImageLoader loader(std::make_shared<CameraRawDecoder>());
+            ThumbnailModel model(&loader);
+            const QFileInfo info(path);
+            model.appendFiles({{path,info.fileName(),info.size(),info.lastModified(),false,"dng"}});
+            const auto before=model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString();
+            int invalidations=0;
+            QObject::connect(&model,&QAbstractItemModel::dataChanged,
+                [&](auto,auto,const auto& roles){if(roles.contains(ThumbnailModel::ThumbnailUrlRole)) ++invalidations;});
+            ImageFramePtr first; bool thumbnailDone=false;
+            loader.request(1,{path,DecodePurpose::Thumbnail,{64,64}},[&](auto,const auto& result){
+                first=result.frame; thumbnailDone=true;
+                if (!first) qCritical()<<"DNG thumbnail:"<<result.error;
+            });
+            pump([&]{return thumbnailDone;},10000);
+            require(bool(first),"DNG thumbnail decode");
+            require(first->qImage()->pixelColor(0,0).alpha()==255,"DNG thumbnail must be opaque");
+            require(before==model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString() && invalidations==0,
+                    "discovered RAW defaults changed thumbnail URL");
+            bool memoryHit=false;
+            loader.request(2,{path,DecodePurpose::Thumbnail,{64,64}},[&](auto,const auto& result){memoryHit=result.frame==first;});
+            require(memoryHit,"discovered RAW defaults lost the decoded memory entry");
+            auto edited=*loader.rawParameters(path); edited.demosaic=!edited.demosaic;
+            loader.setRawParameters(path,edited);
+            require(invalidations==1 && before!=model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString(),
+                    "RAW editing did not invalidate thumbnail pixels");
         }
         {
             auto folder=temp.filePath("many"); QDir().mkpath(folder);

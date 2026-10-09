@@ -58,7 +58,12 @@ int openFile(LibRaw& processor, const QString& path) {
 #endif
 }
 
-QImage processedImageToQImage(const libraw_processed_image_t& processed, QString* error) {
+QImage processedImageToQImage(const libraw_processed_image_t& processed, QString* error,
+                              const DecodeRequest& request) {
+    if (request.isCancelled()) {
+        if (error) *error = QStringLiteral("Cancelled");
+        return {};
+    }
     if (processed.type == LIBRAW_IMAGE_JPEG) {
         if (processed.data_size > static_cast<unsigned int>(std::numeric_limits<int>::max())) {
             if (error) {
@@ -73,6 +78,10 @@ QImage processedImageToQImage(const libraw_processed_image_t& processed, QString
         QImageReader reader(&buffer, "JPEG");
         reader.setAutoTransform(true);
         QImage image = reader.read();
+        if (request.isCancelled()) {
+            if (error) *error = QStringLiteral("Cancelled");
+            return {};
+        }
         if (image.isNull() && error) {
             *error = QStringLiteral("Invalid LibRaw embedded JPEG preview: %1")
                          .arg(reader.errorString());
@@ -102,18 +111,39 @@ QImage processedImageToQImage(const libraw_processed_image_t& processed, QString
         return {};
     }
 
-    // Sixteen-bit output keeps the decoder's real sample depth instead of quantizing a RAW to
-    // 8-bit display values.
+    // Qt's RGBX64 is four 16-bit channels; LibRaw RGB is only three. Pack an
+    // owned opaque RGBA image for either channel count. A raw QImage view would
+    // also outlive dcraw_clear_mem() when source and destination formats match.
     const bool highBitDepth = processed.bits == 16;
-    const QImage::Format sourceFormat =
-        highBitDepth ? (processed.colors == 3 ? QImage::Format_RGBX64 : QImage::Format_RGBA64)
-                     : (processed.colors == 3 ? QImage::Format_RGB888
-                                              : QImage::Format_RGBA8888);
+    QImage result(processed.width, processed.height,
+                  highBitDepth ? QImage::Format_RGBA64 : QImage::Format_RGBA8888);
+    if (result.isNull()) {
+        if (error) *error = QStringLiteral("Could not allocate the LibRaw display image");
+        return {};
+    }
     const qsizetype sourceStride = static_cast<qsizetype>(processed.width) * bytesPerPixel;
-    const QImage source(processed.data, processed.width, processed.height,
-                        static_cast<qsizetype>(sourceStride), sourceFormat);
-    QImage result = source.convertToFormat(highBitDepth ? QImage::Format_RGBA64
-                                                        : QImage::Format_RGBA8888);
+    for (int y = 0; y < processed.height; ++y) {
+        if (request.isCancelled()) {
+            if (error) *error = QStringLiteral("Cancelled");
+            return {};
+        }
+        const auto* row = processed.data + y * sourceStride;
+        if (highBitDepth) {
+            const auto* input = reinterpret_cast<const quint16*>(row);
+            auto* output = reinterpret_cast<QRgba64*>(result.scanLine(y));
+            for (int x = 0; x < processed.width; ++x) {
+                const auto* pixel = input + x * processed.colors;
+                output[x] = QRgba64::fromRgba64(pixel[0], pixel[1], pixel[2], 65535);
+            }
+        } else {
+            auto* output = result.scanLine(y);
+            for (int x = 0; x < processed.width; ++x) {
+                const auto* pixel = row + x * processed.colors;
+                output[x * 4] = pixel[0]; output[x * 4 + 1] = pixel[1];
+                output[x * 4 + 2] = pixel[2]; output[x * 4 + 3] = 255;
+            }
+        }
+    }
     // LibRaw output_color=1 is sRGB. Tag the bitmap explicitly because the memory image does
     // not carry an embedded profile of its own, then move it into the application display space.
     result.setColorSpace(QColorSpace(QColorSpace::SRgb));
@@ -379,8 +409,13 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
         if (const auto source = request.sourceCache->get(sourceKey); source && source->planes && source->parameters) {
             auto parameters = *source->parameters;
             if (request.rawParameters) applyProcessingParameters(parameters, *request.rawParameters);
-            const QSize maximum = request.maximumSize.isEmpty() ? QSize(960, 720) : request.maximumSize;
-            const QSize size = parameters.size.scaled(maximum, Qt::KeepAspectRatio);
+            // Demosaiced Full frames use a bounded CPU fallback and native GPU planes.
+            // CFA display instead uploads this image, so an unbounded Full request must
+            // keep its native size, exactly like a fresh LibRaw decode.
+            const QSize maximum = request.maximumSize.isEmpty() && parameters.demosaic
+                ? QSize(960, 720) : request.maximumSize;
+            const QSize size = maximum.isEmpty() ? QSize{}
+                : parameters.size.scaled(maximum, Qt::KeepAspectRatio);
             const auto cancelled = [&request] { return request.isCancelled(); };
             QImage image = parameters.demosaic
                 ? renderBayerImage(source->planes->storage, parameters, size, cancelled)
@@ -447,7 +482,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
             ProcessedImage processed(processor->dcraw_make_mem_thumb(&imageError));
             if (processed && imageError == LIBRAW_SUCCESS) {
                 QString conversionError;
-                QImage image = processedImageToQImage(*processed, &conversionError);
+                QImage image = processedImageToQImage(*processed, &conversionError, request);
                 if (!image.isNull()) {
                     EncodedColorManagement::normalizeToDisplay(image, metadata);
                     return frameFromImage(std::move(image), std::move(metadata),
@@ -573,7 +608,7 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                         .arg(libRawError(imageError))};
     }
     QString conversionError;
-    QImage image = processedImageToQImage(*processed, &conversionError);
+    QImage image = processedImageToQImage(*processed, &conversionError, request);
     if (image.isNull()) {
         return {{}, conversionError};
     }
@@ -605,7 +640,8 @@ QString CameraRawDecoder::cacheIdentity() const {
 #if MVPVIEW_HAS_LIBRAW
     // v3: 16-bit output, orientation applied during decode, and the retained sensor mosaic.
     // v7: the develop target follows the application display space.
-    return QStringLiteral("camera-raw-v7|libraw-%1|display-%2")
+    // v8: owned opaque RGB packing, including LibRaw's three-channel 16-bit output.
+    return QStringLiteral("camera-raw-v8|libraw-%1|display-%2")
         .arg(QString::fromLatin1(libraw_version()),
              displayColorSpaceKey(currentDisplayColorSpace()));
 #else

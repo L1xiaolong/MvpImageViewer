@@ -64,10 +64,15 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
 
     void cancel() override {
         cancelled_.store(true, std::memory_order_relaxed);
+        {
+            // Qt can cancel on its image-loading thread. Signal the shared decode
+            // context now, rather than waiting for the next GUI event-loop turn.
+            const QMutexLocker lock(&mutex_);
+            handle_.cancel();
+        }
         const QPointer<ThumbnailImageResponse> self(this);
         QMetaObject::invokeMethod(loader_, [self] {
             if (!self) return;
-            self->handle_.cancel();
             self->finish();
         }, Qt::QueuedConnection);
     }
@@ -88,7 +93,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
             parameters = RawPresetStore::loadForFile(path);
             if (!parameters) parameters = RawPresetStore::inferFromFileName(path);
             if (parameters && availableFrameCount(QFileInfo(path).size(), *parameters) > 0) {
-                loader_->setRawParameters(path, *parameters);
+                loader_->adoptRawParameters(path, *parameters);
             } else {
                 parameters.reset();
             }
@@ -105,7 +110,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                                           ? DecodePurpose::Full
                                           : galleryPreview ? DecodePurpose::Preview
                                                            : DecodePurpose::Thumbnail;
-        handle_ = loader_->request(
+        auto handle = loader_->request(
             ++requestCounter_, {path, purpose, requestedSize_, parameters},
             [self](quint64, const DecodeResult& result) {
                 if (!self || self->cancelled_.load(std::memory_order_relaxed)) return;
@@ -120,6 +125,11 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                 self->finish();
             },
             RequestOptions{category, 0, QStringLiteral("qml-thumbnail")});
+        const QMutexLocker lock(&mutex_);
+        handle_ = std::move(handle);
+        // Cancellation may have arrived between start()'s first check and attaching
+        // the handle. Reconcile it without leaving an unowned shared consumer.
+        if (cancelled_.load(std::memory_order_relaxed)) handle_.cancel();
     }
 
     void finish() { if (!finished_) { finished_ = true; emit finished(); } }

@@ -124,9 +124,8 @@ QVariant ThumbnailModel::data(const QModelIndex& index, int role) const {
         QString revision = QStringLiteral("%1-%2")
                                .arg(file.fileSize)
                                .arg(file.modifiedAt.toMSecsSinceEpoch());
-        if (const auto parameters = loader_->rawParameters(file.path)) {
-            revision += QLatin1Char('-') + parameters->cacheKey();
-        }
+        const QString processingRevision = loader_->rawParametersRevision(file.path);
+        if (!processingRevision.isEmpty()) revision += QLatin1Char('-') + processingRevision;
         return QStringLiteral("image://thumbnail/%1?v=%2")
             .arg(QString::fromLatin1(QUrl::toPercentEncoding(file.path)),
                  QString::fromLatin1(QUrl::toPercentEncoding(revision)));

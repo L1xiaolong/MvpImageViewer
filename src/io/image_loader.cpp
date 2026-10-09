@@ -30,6 +30,14 @@ int priorityFor(const RequestOptions& options) {
     return base + options.priorityAdjustment;
 }
 
+QString cacheKeyPrefix(const DecodeRequest& request, const QFileInfo& info) {
+    return info.absoluteFilePath() + QLatin1Char('|') + QString::number(info.size()) +
+        QLatin1Char('|') + QString::number(info.lastModified().toMSecsSinceEpoch()) +
+        QLatin1Char('|') + QString::number(request.maximumSize.width()) + QLatin1Char('x') +
+        QString::number(request.maximumSize.height()) + QLatin1Char('|') +
+        QString::number(static_cast<int>(request.purpose) + (request.metadataSource ? 100 : 0));
+}
+
 } // namespace
 
 void LoadHandle::cancel() const {
@@ -142,7 +150,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     if (!request.rawParameters) {
         request.rawParameters = rawParameters(request.path);
     }
-    const QString key = cacheKey(request, decoder_->cacheIdentity());
+    const QString keyPrefix = cacheKeyPrefix(request, sourceInfo);
+    const QString decoderIdentity = decoder_->cacheIdentity();
+    const QString key = keyPrefix + QLatin1Char('|') +
+        (request.rawParameters ? request.rawParameters->cacheKey() : QStringLiteral("encoded")) +
+        QLatin1Char('|') + decoderIdentity;
     ImageFramePtr reusable;
     if (request.purpose == DecodePurpose::Preview) {
         DecodeRequest candidate = request; candidate.purpose = DecodePurpose::Full; candidate.maximumSize = {};
@@ -216,7 +228,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const auto diskCache = diskCache_;
     const auto pendingWrites = pendingWrites_;
     inFlight_[key].work =
-        [self, decoder, diskCache, request = std::move(request), key, generation,
+        [self, decoder, diskCache, request = std::move(request), key, keyPrefix, decoderIdentity, generation,
          activeConsumers, pendingWrites] {
             DecodeResult result;
             const bool abandoned = request.isCancelled();
@@ -320,7 +332,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             if (!self) return;
             QMetaObject::invokeMethod(
                 self,
-                [self, completion = [self, result = std::move(result), key, purpose = request.purpose,
+                [self, completion = [self, result = std::move(result), key, keyPrefix, decoderIdentity, purpose = request.purpose,
                  sourcePath = request.path, generation, activeConsumers, diskHit, metadataOnly = bool(request.metadataSource),
                  elapsedMs = decodeTimer.elapsed()]() {
                     if (!self) {
@@ -338,17 +350,18 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     const auto currentGeneration = self->inFlight_.constFind(key);
                     if (currentGeneration == self->inFlight_.cend() || currentGeneration->generation != generation) return;
                     if (result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
-                        if (!metadataOnly) self->cacheFor(purpose).put(key, result.frame, result.frame->byteSize());
+                        QString frameKey = key;
+                        if (result.frame->rawParameters &&
+                            self->adoptRawParameters(sourcePath, *result.frame->rawParameters)) {
+                            // Subsequent requests include the discovered defaults. Store once
+                            // under that identity, retaining the original file-version prefix.
+                            frameKey = keyPrefix + QLatin1Char('|') + result.frame->rawParameters->cacheKey() +
+                                QLatin1Char('|') + decoderIdentity;
+                        }
+                        if (!metadataOnly) self->cacheFor(purpose).put(frameKey, result.frame, result.frame->byteSize());
                         self->enforceMemoryBudget(purpose);
                         performance::mark(QStringLiteral("loader.cache_state"),
                             {{"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
-                        // A decoder that derives RAW parameters from the file itself (camera RAW)
-                        // publishes them so the parameters editor and later probes start from the
-                        // real geometry, bit depth, and demosaic setting.
-                        if (result.frame->rawParameters &&
-                            !self->rawParameters(sourcePath)) {
-                            self->setRawParameters(sourcePath, *result.frame->rawParameters);
-                        }
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                          ? result.frame->metadata.sourceSize
@@ -562,8 +575,22 @@ void ImageLoader::setRawParameters(const QString& path, const RawImageParameters
             return;
         }
         rawParameters_.insert(normalized, parameters);
+        rawParameterRevisions_.insert(normalized, parameters.cacheKey());
     }
     emit rawParametersChanged(normalized);
+}
+
+bool ImageLoader::adoptRawParameters(const QString& path, const RawImageParameters& parameters) {
+    const QString normalized = QFileInfo(path).absoluteFilePath();
+    const QWriteLocker lock(&rawParametersLock_);
+    if (rawParameters_.contains(normalized)) return false;
+    rawParameters_.insert(normalized, parameters);
+    return true;
+}
+
+QString ImageLoader::rawParametersRevision(const QString& path) const {
+    const QReadLocker lock(&rawParametersLock_);
+    return rawParameterRevisions_.value(QFileInfo(path).absoluteFilePath());
 }
 
 std::optional<RawImageParameters> ImageLoader::rawParameters(const QString& path) const {
@@ -695,16 +722,9 @@ const WeightedLruCache<ImageFrame>& ImageLoader::cacheFor(DecodePurpose purpose)
 }
 
 QString ImageLoader::cacheKey(const DecodeRequest& request, const QString& decoderIdentity) {
-    const QFileInfo info(request.path);
-    return QStringLiteral("%1|%2|%3|%4x%5|%6|%7|%8")
-        .arg(info.absoluteFilePath())
-        .arg(info.size())
-        .arg(info.lastModified().toMSecsSinceEpoch())
-        .arg(request.maximumSize.width())
-        .arg(request.maximumSize.height())
-        .arg(static_cast<int>(request.purpose) + (request.metadataSource ? 100 : 0))
-        .arg(request.rawParameters ? request.rawParameters->cacheKey() : QStringLiteral("encoded"))
-        .arg(decoderIdentity);
+    return cacheKeyPrefix(request, QFileInfo(request.path)) + QLatin1Char('|') +
+        (request.rawParameters ? request.rawParameters->cacheKey() : QStringLiteral("encoded")) +
+        QLatin1Char('|') + decoderIdentity;
 }
 
 } // namespace mvpview

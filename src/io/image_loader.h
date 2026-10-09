@@ -65,6 +65,9 @@ class ImageLoader final : public QObject {
     void prefetchAdjacentRawFrames(const QString& path, const RawImageParameters& current,
                                    const QSize& previewSize);
     void setRawParameters(const QString& path, const RawImageParameters& parameters);
+    // File-derived defaults fill an empty entry; they do not change the rendered pixels.
+    bool adoptRawParameters(const QString& path, const RawImageParameters& parameters);
+    [[nodiscard]] QString rawParametersRevision(const QString& path) const;
     [[nodiscard]] std::optional<RawImageParameters> rawParameters(const QString& path) const;
     [[nodiscard]] bool isCached(DecodeRequest request) const;
     [[nodiscard]] qsizetype cachedBytes() const;
@@ -146,6 +149,7 @@ class ImageLoader final : public QObject {
     QThreadPool serializedPool_;
     mutable QReadWriteLock rawParametersLock_;
     QHash<QString, RawImageParameters> rawParameters_;
+    QHash<QString, QString> rawParameterRevisions_;
     QHash<QString, InFlightRequest> inFlight_;
     quint64 nextInFlightGeneration_ = 0;
 };
