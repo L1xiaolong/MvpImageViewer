@@ -7,6 +7,7 @@
 #include "io/thumbnail_disk_cache.h"
 
 #include <QFileInfo>
+#include <QCryptographicHash>
 #include <QImageReader>
 #include <QMetaObject>
 #include <QPointer>
@@ -37,6 +38,11 @@ QString cacheKeyPrefix(const DecodeRequest& request, const QFileInfo& info) {
         QString::number(request.maximumSize.height()) + QLatin1Char('|') +
         QString::number(static_cast<int>(request.purpose) + (request.metadataSource ? 100 : 0) +
                         (request.requireDisplayImage ? 200 : 0));
+}
+
+QString computeDisplayRevision(const IImageDecoder& decoder) {
+    return QString::fromLatin1(QCryptographicHash::hash(decoder.cacheIdentity().toUtf8(),
+        QCryptographicHash::Sha256).toHex().left(16));
 }
 
 } // namespace
@@ -557,10 +563,21 @@ void ImageLoader::prefetchAdjacentRawFrames(const QString& path, const RawImageP
     }
 }
 
+QString ImageLoader::displayRevision() const {
+    Q_ASSERT(thread() == QThread::currentThread());
+    if (displayRevision_.isEmpty()) displayRevision_ = computeDisplayRevision(*decoder_);
+    return displayRevision_;
+}
+
 void ImageLoader::clearCache() {
     sourceCache_->clear();
     thumbnailCache_.clear();
     clearTransientCaches();
+    const auto revision = computeDisplayRevision(*decoder_);
+    if (revision != displayRevision_) {
+        displayRevision_ = revision;
+        emit displayRevisionChanged();
+    }
 }
 
 void ImageLoader::clearTransientCaches() {

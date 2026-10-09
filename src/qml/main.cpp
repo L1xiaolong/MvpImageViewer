@@ -244,7 +244,6 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
              {"displayColorSpace", appSettings.displayColorSpace()},
              {"exifOrientation", appSettings.honorExifOrientation()}}, true);
         browseController.loader()->clearCache();
-        browseController.refreshAll();
         fullScreenController.reload();
         compareController.reload();
     });

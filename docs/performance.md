@@ -118,7 +118,7 @@ animated-scroll增加Qt动画时钟对照，不替换原来的timer scroll场景
 
 [Qt场景图文档](https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html)说明了vsync失效与QWindow请求更新等待的诊断方法。仅实验设置QT_QPA_UPDATE_IDLE_TIME=0，两轮P95为17ms，但P50为5～6ms，意味着绘制频率明显增加；停止补图138/239ms，并非所有指标改善。没有把该变量设置成应用默认，也没有改变OpenGL基线。实验位于build/perf-results/idle-zero，不能作为默认配置已达标的证据。
 
-完整验收仍未结束：需继续验证色彩设置变化后的Qt图片缓存失效，以及真实相机/HEIF/超大PNG/慢盘压力、Qt6.9构建、GPU像素对照和完整回退矩阵。目标保持进行中。
+完整验收仍未结束：需继续验证真实相机/HEIF/超大PNG/慢盘压力、Qt6.9构建、GPU像素对照和完整回退矩阵。目标保持进行中。
 
 ## CPU图库预览的清晰度（2026-10-09）
 
@@ -127,3 +127,9 @@ RHI全图帧的原始平面为原生尺寸，但RAW/YUV的CPU后备图通常仅9
 回归通过真正的LibRaw DNG检查首次/源缓存CPU Full都是1536×1024且逐像素一致；先缓存960宽的GPU后备帧，再请求1536预览和CPU Full，验证不会降级、像素一致且再次预览直接命中CPU Full。1536×1024 RAW16和NV12也验证原生CPU尺寸。最终Release构建与CTest通过（8.71s）。
 
 64张合成DNG的原生Gallery冷缓存单轮截图和日志位于build/perf-results/dng-gallery-display：首帧1315ms、可见缩略图首屏232ms、29个完成请求、无解码失败。该单轮在最后删除CPU专用上传缓冲之前运行，只用于UI与显示路径检查，不作为最终内存或全格式性能验收。截图确认大图及缩略图正常，测试的逐像素比对负责尺寸和缓存准确性验证。
+
+## 显示设置变化后的图片身份（2026-10-09）
+
+原有色彩设置处理会清空解码缓存并重新扫描目录，但图片URI仍只有文件版本和RAW编辑参数，无法使Qt Image自身的像素缓存失效。现在URI加入解码器显示配置身份的稳定摘要，包含ICC、方向、位深和目标色域设置。摘要按需初始化，避免在首帧前额外触发格式插件发现；只有显示身份变化才通知ThumbnailUrlRole，常规清缓存不会修改URI。设置变化不再重新扫描目录，Gallery现有onThumbnailUrlChanged同步更新当前预览。
+
+回归使用16-bit Display-P3 PNG：保持设置清缓存时URI及通知次数不变；切换为8-bit后URI改变、对应图像角色恰好通知一次、实际解码为32-bit；恢复设置后URI恢复，模型没有reset、条目数量不变。Release构建及CTest通过（8.62s）。此测试确认像素缓存身份与解码结果，未将其当作真实显示器上的色彩/GPU像素验收。

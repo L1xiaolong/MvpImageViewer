@@ -59,6 +59,10 @@ ThumbnailModel::ThumbnailModel(ImageLoader* loader, QObject* parent)
       folderPlaceholder_(folderPlaceholder()) {
     connect(loader_, &ImageLoader::rawParametersChanged, this,
             [this](const QString& path) { invalidateThumbnail(path); });
+    connect(loader_, &ImageLoader::displayRevisionChanged, this, [this] {
+        if (!files_.isEmpty())
+            emit dataChanged(index(0), index(rowCount() - 1), {ThumbnailUrlRole});
+    });
     connect(loader_, &ImageLoader::thumbnailMetadataReady, this,
             [this](const QString& path, const QSize& sourceSize, int validBits) {
                 const int row = pathToRow_.value(path, -1);
@@ -126,6 +130,7 @@ QVariant ThumbnailModel::data(const QModelIndex& index, int role) const {
                                .arg(file.modifiedAt.toMSecsSinceEpoch());
         const QString processingRevision = loader_->rawParametersRevision(file.path);
         if (!processingRevision.isEmpty()) revision += QLatin1Char('-') + processingRevision;
+        revision += QLatin1Char('-') + loader_->displayRevision();
         return QStringLiteral("image://thumbnail/%1?v=%2")
             .arg(QString::fromLatin1(QUrl::toPercentEncoding(file.path)),
                  QString::fromLatin1(QUrl::toPercentEncoding(revision)));

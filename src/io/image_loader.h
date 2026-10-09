@@ -68,6 +68,7 @@ class ImageLoader final : public QObject {
     // File-derived defaults fill an empty entry; they do not change the rendered pixels.
     bool adoptRawParameters(const QString& path, const RawImageParameters& parameters);
     [[nodiscard]] QString rawParametersRevision(const QString& path) const;
+    [[nodiscard]] QString displayRevision() const;
     [[nodiscard]] std::optional<RawImageParameters> rawParameters(const QString& path) const;
     [[nodiscard]] bool isCached(DecodeRequest request) const;
     [[nodiscard]] qsizetype cachedBytes() const;
@@ -89,10 +90,12 @@ class ImageLoader final : public QObject {
                                           const QString& decoderIdentity = {});
 
   signals:
+    void displayRevisionChanged();
     void rawParametersChanged(const QString& path);
     void thumbnailMetadataReady(const QString& path, const QSize& sourceSize, int validBits);
 
   private:
+    mutable QString displayRevision_;
     struct PendingRequest {
         quint64 requestId = 0;
         Callback callback;

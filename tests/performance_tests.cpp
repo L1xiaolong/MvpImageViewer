@@ -212,6 +212,30 @@ int main(int argc, char** argv) {
                 require(bool(r.frame) && r.frame->uploadImage.format()==QImage::Format_RGBA16FPx4,"worker upload conversion"); loaded=true;
             });
             pump([&]{return loaded;});
+            ThumbnailModel model(&loader); const QFileInfo info(path);
+            model.appendFiles({{path,info.fileName(),info.size(),info.lastModified(),false,"png"}});
+            const auto originalUrl=model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString();
+            int displayInvalidations=0, resets=0;
+            QObject::connect(&model,&QAbstractItemModel::modelReset,[&]{++resets;});
+            QObject::connect(&model,&QAbstractItemModel::dataChanged,[&](auto,auto,const auto& roles){
+                require(roles==QList<int>{ThumbnailModel::ThumbnailUrlRole},"display settings invalidated unrelated model roles");
+                ++displayInvalidations;
+            });
+            loader.clearCache();
+            require(displayInvalidations==0 && originalUrl==model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString(),
+                    "ordinary cache clearing churned image URLs");
+            QtImageDecoder::setPreserveHighBitDepth(false); loader.clearCache();
+            require(displayInvalidations==1 && originalUrl!=model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString(),
+                    "display settings left Qt's image URL unchanged");
+            loaded=false;
+            loader.request(2,{path,DecodePurpose::Full},[&](auto,const auto& r){
+                require(r.frame && r.frame->qImage()->depth()==32,"display settings reused old high-bit pixels"); loaded=true;
+            });
+            pump([&]{return loaded;});
+            QtImageDecoder::setPreserveHighBitDepth(true); loader.clearCache();
+            require(displayInvalidations==2 && resets==0 && model.rowCount()==1 &&
+                    originalUrl==model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString(),
+                    "display configuration identity is unstable or reset the directory");
         }
         if (CameraRawDecoder::isAvailable()) {
             const auto path=temp.filePath("sensor.dng");
