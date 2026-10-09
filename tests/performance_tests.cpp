@@ -1,4 +1,6 @@
 #include "io/image_loader.h"
+#include "qml/accounted_texture_factory.h"
+#include "qml/thumbnail_image_provider.h"
 #include "io/thumbnail_disk_cache.h"
 #include "io/raw_image_decoder.h"
 #include "io/directory_scanner.h"
@@ -79,6 +81,11 @@ public:
         frame->storage=image; frame->descriptor.size=image.size(); return {frame,{}};
     }
 };
+class UnavailableDecoder final : public IImageDecoder {
+public:
+    bool canDecode(const QString&) const override { return true; }
+    DecodeResult decode(const DecodeRequest&) const override { return {{}, "Unavailable"}; }
+};
 int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--export-dng"))
@@ -108,6 +115,45 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        for (const bool unavailable : {false,true}) {
+            std::shared_ptr<const IImageDecoder> providerDecoder = unavailable
+                ? std::shared_ptr<const IImageDecoder>(std::make_shared<UnavailableDecoder>())
+                : std::shared_ptr<const IImageDecoder>(std::make_shared<SlowDecoder>());
+            ImageLoader loader(providerDecoder); ThumbnailImageProvider provider(providerDecoder,&loader);
+            std::unique_ptr<QQuickImageResponse> response(provider.requestImageResponse(
+                QUrl::toPercentEncoding(a),{128,128}));
+            bool finished=false;
+            QObject::connect(response.get(),&QQuickImageResponse::finished,&app,[&]{finished=true;});
+            pump([&]{return finished;});
+            std::unique_ptr<QQuickTextureFactory> factory(response->textureFactory());
+            require(factory && !factory->image().isNull(),"provider returned no image factory");
+            response.reset();loader.clearCache();
+            require(loader.residentPixelBytes()==factory->image().sizeInBytes(),
+                    "provider/factory lifetime lost pixels or retained destroyed response pixels");
+            factory.reset();
+            require(loader.residentPixelBytes()==0,"provider left pixel owners after response/factory destruction");
+        }
+        {
+            auto ledger=std::make_shared<PixelMemoryLedger>();
+            auto frame=std::make_shared<ImageFrame>();
+            QImage image(2,2,QImage::Format_ARGB32_Premultiplied);image.fill(QColor(10,20,30,80));
+            frame->storage=image;PixelStorageFootprint footprint;frame->appendPixelStorage(footprint);
+            frame->pixelOwnership.attach(ledger,std::move(footprint));
+            std::unique_ptr<QQuickTextureFactory> factory(AccountedTextureFactory::create(image,ledger));
+            require(factory && factory->textureSize()==image.size() && factory->image()==image,
+                    "accounted factory changed CPU image/size");
+            require(ledger->bytes()==16,"factory counted shared decoder pixels twice");
+            frame.reset();image={};
+            require(ledger->bytes()==16,"Qt factory pixels vanished when the frame was released");
+            factory.reset();require(ledger->bytes()==0,"Qt factory destruction retained CPU pixels");
+            QImage high(2,2,QImage::Format_RGBA64);high.fill(QColor(20,30,40,90));
+            std::unique_ptr<QQuickTextureFactory> expected(QQuickTextureFactory::textureFactoryForImage(high));
+            factory.reset(AccountedTextureFactory::create(high,ledger));
+            require(factory && expected && factory->image()==expected->image() &&
+                    factory->textureByteCount()==expected->textureByteCount(),"factory altered native Qt conversion");
+            require(ledger->bytes()==factory->image().sizeInBytes(),"factory conversion buffer not accounted");
+            factory.reset();require(ledger->bytes()==0,"converted factory pixels leaked their account");
+        }
         {
             auto tiny=std::make_shared<SlowDecoder>(); ImageLoader loader(tiny);loader.setMemoryBudget(100);
             QVector<ImageFramePtr> retained; int completed=0;

@@ -1,4 +1,5 @@
 #include "qml/thumbnail_image_provider.h"
+#include "qml/accounted_texture_factory.h"
 
 #include "core/raw_image_parameters.h"
 #include "io/image_decoder.h"
@@ -67,7 +68,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
 
     QQuickTextureFactory* textureFactory() const override {
         const QMutexLocker lock(&mutex_);
-        return QQuickTextureFactory::textureFactoryForImage(image_);
+        return AccountedTextureFactory::create(image_, imageOwnership_.ledger());
     }
 
     void cancel() override {
@@ -131,6 +132,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                 {
                     const QMutexLocker lock(&self->mutex_);
                     self->image_ = std::move(image);
+                    self->imageOwnership_ = self->loader_->accountImagePixels(self->image_);
                 }
                 self->finish();
             },
@@ -150,6 +152,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
     LoadHandle handle_;
     mutable QMutex mutex_;
     QImage image_;
+    PixelMemoryOwnership imageOwnership_;
     std::atomic_bool cancelled_{false};
     inline static std::atomic<quint64> requestCounter_{0};
 };

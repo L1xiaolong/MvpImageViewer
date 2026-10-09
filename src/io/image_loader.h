@@ -74,6 +74,8 @@ class ImageLoader final : public QObject {
     [[nodiscard]] bool isCached(DecodeRequest request) const;
     [[nodiscard]] qsizetype cachedBytes() const;
     [[nodiscard]] qsizetype residentPixelBytes() const;
+    // Keep externally held UI pixels registered for the returned token's lifetime.
+    [[nodiscard]] PixelMemoryOwnership accountImagePixels(const QImage& image) const;
     [[nodiscard]] qsizetype memoryBudget() const { return memoryBudget_; }
     void setMemoryBudget(qsizetype bytes);
     [[nodiscard]] bool

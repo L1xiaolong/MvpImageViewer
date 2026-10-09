@@ -35,6 +35,7 @@ public:
     class Lease final {
     public:
         ~Lease() { ledger_->adjust(footprint_, false); }
+        std::shared_ptr<PixelMemoryLedger> ledger() const { return ledger_; }
         Lease(const Lease&) = delete;
         Lease& operator=(const Lease&) = delete;
     private:
@@ -99,6 +100,7 @@ public:
     void attach(const std::shared_ptr<PixelMemoryLedger>& ledger, PixelStorageFootprint footprint) {
         lease_ = ledger->retain(std::move(footprint));
     }
+    std::shared_ptr<PixelMemoryLedger> ledger() const { return lease_ ? lease_->ledger() : nullptr; }
 private:
     std::shared_ptr<PixelMemoryLedger::Lease> lease_;
 };

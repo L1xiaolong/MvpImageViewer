@@ -711,6 +711,13 @@ qsizetype ImageLoader::residentPixelBytes() const {
     return residentAccounting_->bytes();
 }
 
+PixelMemoryOwnership ImageLoader::accountImagePixels(const QImage& image) const {
+    PixelStorageFootprint footprint; footprint.add(image);
+    PixelMemoryOwnership ownership;
+    ownership.attach(residentAccounting_, std::move(footprint));
+    return ownership;
+}
+
 void ImageLoader::setMemoryBudget(qsizetype bytes) {
     Q_ASSERT(thread() == QThread::currentThread());
     memoryBudget_ = std::max<qsizetype>(bytes, 1);

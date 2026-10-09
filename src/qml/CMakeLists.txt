@@ -11,6 +11,7 @@ qt_add_executable(MVPImageViewerQml
     browse_workspace_controller.h
     browse_workspace_controller.cpp
     thumbnail_image_provider.h
+    accounted_texture_factory.h
     thumbnail_image_provider.cpp
     qml_image_canvas.h
     qml_image_canvas.cpp
