@@ -2,7 +2,6 @@
 
 #include "core/pixel_memory_ledger.h"
 #include "core/nominal_gpu_bytes.h"
-#include "core/performance_trace.h"
 #include <QQuickTextureFactory>
 #include <QSGTexture>
 #include <QMutexLocker>
@@ -36,20 +35,9 @@ public:
         PixelStorageFootprint footprint;
         footprint.addResource(texture, nominalGpuBytes(texture->textureSize(), 4));
         const auto gpuLedger = ledger->gpuResources();
-        const auto before = gpuLedger->bytes();
         auto lease = gpuLedger->retain(std::move(footprint));
-        const auto report = [gpuLedger] {
-            performance::mark(QStringLiteral("render.qml_texture_resources"),
-                {{"nominalGpuPixelBytes", qint64(gpuLedger->bytes())},
-                 {"peakNominalGpuPixelBytes", qint64(gpuLedger->peakBytes())}});
-        };
-        // Trace coarse growth/final release, not every thumbnail on the render
-        // thread. Cache-state samples also report this ledger's exact peak.
-        constexpr qsizetype reportBucket = 4LL * 1024 * 1024;
-        if (gpuLedger->bytes() / reportBucket > before / reportBucket) report();
-        QObject::connect(texture, &QObject::destroyed, [lease = std::move(lease), gpuLedger, report]() mutable {
+        QObject::connect(texture, &QObject::destroyed, [lease = std::move(lease)]() mutable {
             lease.reset();
-            if (gpuLedger->bytes() == 0) report();
         });
     }
 private:

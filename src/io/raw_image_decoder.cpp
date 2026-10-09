@@ -1,5 +1,4 @@
 #include "io/raw_image_decoder.h"
-#include "core/performance_trace.h"
 
 #include "core/color_conversion.h"
 #include "core/raw_plane_access.h"
@@ -18,7 +17,6 @@
 
 namespace mvpview {
 namespace {
-
 // Full frames keep source planes for GPU display and exact probes. The CPU image is an
 // emergency fallback, so bounding it avoids repeating a full-resolution demosaic before
 // the plane texture can be submitted.
@@ -184,7 +182,6 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     image.setColorSpace(displayQColorSpace(currentDisplayColorSpace()));
     return image;
 }
-
 } // namespace
 
 QString RawImageDecoder::cacheIdentity() const {
@@ -250,7 +247,7 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
             addedAllocationBytes(sourceCost, frameSize), estimatedPixelBytes(plannedOutput, 32))))
         return {{}, QStringLiteral("Cancelled")};
     QByteArray bytes = cachedSource ? cachedSource->bytes : QByteArray{};
-    if (cachedSource) performance::mark(QStringLiteral("source.hit"));
+
     if (!cachedSource) {
         QFile file(request.path);
         if (!file.open(QIODevice::ReadOnly)) return {{}, file.errorString()};
@@ -376,5 +373,4 @@ std::optional<quint16> RawImageDecoder::bayerValueAt(const ImageFrame& frame, in
 QString RawImageDecoder::pixelDescription(const ImageFrame& frame, int x, int y) {
     return RawPlaneAccessor(frame).pixelDescriptionAtDisplayPixel({x, y});
 }
-
 } // namespace mvpview

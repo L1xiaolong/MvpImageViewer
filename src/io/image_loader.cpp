@@ -2,7 +2,6 @@
 
 #include "io/directory_scanner.h"
 #include "diagnostics/diagnostics.h"
-#include "core/performance_trace.h"
 #include "core/nominal_gpu_bytes.h"
 #include "io/metadata_reader.h"
 #include "io/thumbnail_disk_cache.h"
@@ -216,7 +215,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
         }
     }
     if (auto cached = reusable ? reusable : cacheFor(request.purpose).get(key)) {
-        performance::mark(QStringLiteral("loader.memory_hit"), {{"purpose", int(request.purpose)}});
+
         if (request.purpose == DecodePurpose::Thumbnail) {
             const QSize sourceSize = cached->metadata.sourceSize.isValid()
                                          ? cached->metadata.sourceSize
@@ -319,15 +318,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     [&request] { return request.isCancelled(); },
                     [workingPriority] { return workingPriority->load(); });
                 workingWaitMs += wait.elapsed();
-                const auto snapshot = decodeWorkingBudget->snapshot();
-                performance::mark(QStringLiteral("loader.decode_working"),
-                    {{"bytes", qint64(snapshot.bytes)}, {"peakBytes", qint64(snapshot.peakBytes)},
-                     {"estimatedBytes", qint64(bytes)}, {"admitted", bool(workingReservation)}});
+
                 return bool(workingReservation);
             };
             DecodeResult result;
             const bool abandoned = request.isCancelled();
-            const bool previewHit = bool(thumbnailSource);
             if (!abandoned && !thumbnailSource && request.purpose == DecodePurpose::Thumbnail) {
                 QImage cachedImage = diskCache->load(key);
                 if (!cachedImage.isNull()) {
@@ -377,7 +372,6 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             QElapsedTimer decodeTimer;
             decodeTimer.start();
             const bool diskHit = bool(result.frame);
-            bool sourceDecode = false;
             if (!abandoned && !request.isCancelled() && !result.frame) {
                 if (thumbnailSource) {
                     const auto* source = thumbnailSource->qImage();
@@ -409,7 +403,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     auto frame = std::make_shared<ImageFrame>(*request.metadataSource);
                     MetadataReader::enrich(request.path, frame->metadata);
                     result.frame = std::move(frame);
-                } else { sourceDecode = true; result = decoder->decode(request); }
+                } else { result = decoder->decode(request); }
                 if (result.frame && request.purpose == DecodePurpose::Thumbnail &&
                     activeConsumers->load(std::memory_order_relaxed) > 0) {
                     if (const QImage* image = result.frame->qImage()) {
@@ -462,7 +456,6 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 tracked->pixelOwnership.attach(residentAccounting, std::move(footprint));
                 result.frame = std::move(tracked);
             }
-            QElapsedTimer resultWait; resultWait.start();
             std::shared_ptr<ResultBufferBudget::Reservation> resultReservation;
             if (result.frame && !request.metadataSource) {
                 resultReservation = resultBufferBudget->reserve(result.frame->byteSize(),
@@ -475,19 +468,12 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             QMetaObject::invokeMethod(
                 self,
                 [self, completion = [self, resultReservation, result = std::move(result), key, keyPrefix, decoderIdentity, purpose = request.purpose,
-                 sourcePath = request.path, generation, activeConsumers, diskHit, previewHit, sourceDecode, metadataOnly = bool(request.metadataSource),
-                 elapsedMs = decodeElapsedMs, workingWaitMs, bufferWaitMs = resultWait.elapsed()]() {
+                 sourcePath = request.path, generation, activeConsumers, diskHit, metadataOnly = bool(request.metadataSource),
+                 elapsedMs = decodeElapsedMs]() {
                     if (!self) {
                         return;
                     }
-                    performance::mark(QStringLiteral("loader.completed"),
-                        {{"elapsedMs", elapsedMs}, {"workingWaitMs", workingWaitMs}, {"bufferWaitMs", bufferWaitMs}, {"diskHit", diskHit}, {"previewHit", previewHit}, {"sourceDecode", sourceDecode}, {"purpose", int(purpose)},
-                         {"cancelled", activeConsumers->load() <= 0}, {"failed", !result.frame && activeConsumers->load() > 0},
-                         {"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
-                    const auto buffers = self->resultBufferBudget_->snapshot();
-                    performance::mark(QStringLiteral("loader.result_buffers"),
-                        {{"bytes", qint64(buffers.bytes)}, {"peakBytes", qint64(buffers.peakBytes)},
-                         {"waiters", buffers.waiters}});
+
                     diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
                         QStringLiteral("loader.completed"),
                         {{"elapsedMs", elapsedMs}, {"diskHit", diskHit},
@@ -506,12 +492,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                         }
                         if (!metadataOnly) self->cacheFor(purpose).put(frameKey, result.frame, result.frame->byteSize());
                         self->enforceMemoryBudget(purpose);
-                        performance::mark(QStringLiteral("loader.cache_state"),
-                            {{"cachedBytes", qint64(self->cachedBytes())}, {"residentPixelBytes", qint64(self->residentPixelBytes())},
-                             {"peakResidentPixelBytes", qint64(self->residentAccounting_->peakBytes())},
-                             {"nominalGpuPixelBytes", qint64(self->nominalGpuPixelBytes())},
-                             {"peakNominalGpuPixelBytes", qint64(self->residentAccounting_->gpuResources()->peakBytes())},
-                             {"sourceBytes", qint64(self->sourceCache_->cost())}});
+
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                          ? result.frame->metadata.sourceSize
@@ -557,13 +538,6 @@ int ImageLoader::viewportPriority(const QString& path) const {
 
 void ImageLoader::updateViewport(const QString& owner, const QHash<QString, int>& priorities,
                                  bool fast) {
-    const auto previous = viewports_.constFind(owner);
-    if (previous == viewports_.cend() || previous->priorities != priorities || previous->fast != fast) {
-        int visible = 0;
-        for (int priority : priorities) if (priority >= 60) ++visible;
-        performance::mark(QStringLiteral("viewport.updated"),
-            {{"owner", owner}, {"visible", visible}, {"candidates", priorities.size()}, {"fast", fast}});
-    }
     if (priorities.isEmpty()) { viewports_.remove(owner); ownerService_.remove(owner); }
     else viewports_.insert(owner, {priorities, fast});
     if (fast) {
@@ -671,10 +645,7 @@ void ImageLoader::dispatch() {
         if (best == inFlight_.end()) break;
         ownerService_[ownerFor(best->path)] = ++serviceSequence_;
         best->running = true;
-        performance::mark(QStringLiteral("loader.dispatched"),
-            {{"queueMs", best->queuedAt.elapsed()}, {"priority", best->priority},
-             {"pending", inFlight_.size()},
-             {"pendingResults", qint64(completions_.size()) + parallelRunning_ + serializedRunning_ + 1}});
+
         diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
             QStringLiteral("loader.dispatched"),
             {{"queueMs", best->queuedAt.elapsed()}, {"priority", best->priority},
@@ -922,9 +893,7 @@ bool ImageLoader::canAutomaticallyLoadFull(
         const auto gpu = estimatedFullTextureCost(*frame);
         // Preserve old preview pixels/textures until the new upload is complete.
         if (cost > memoryBudget_ - prospective || gpu > memoryBudget_ - prospective - cost) {
-            performance::mark(QStringLiteral("loader.automatic_full_denied"),
-                {{"residentResourceBytes", qint64(resident)}, {"cpuEstimate", qint64(cost)},
-                 {"gpuEstimate", qint64(gpu)}, {"budget", qint64(memoryBudget_)}});
+
             return false;
         }
         prospective += cost + gpu;
@@ -974,22 +943,18 @@ void ImageLoader::retireCacheOwner(std::shared_ptr<const void> owner, qsizetype 
     const auto state = cacheRetirement_;
     auto bytes = state->bytes.load();
     if (state->owners.load() >= 64 || cost > maximumBytes - bytes) {
-        performance::mark(QStringLiteral("loader.cache_retirement_saturated"),
-            {{"pendingBytes", qint64(bytes)}, {"owners", state->owners.load()}, {"cost", qint64(cost)}});
+
         return; // Preserve the bound; release synchronously under saturation.
     }
     // Only the GUI admits owners; workers only subtract counters.
     state->bytes.fetch_add(cost);
     ++state->owners;
-    performance::mark(QStringLiteral("loader.cache_retirement_queued"),
-        {{"pendingBytes", qint64(state->bytes.load())}, {"owners", state->owners.load()}, {"cost", qint64(cost)}});
+
     writePool_.start([owner = std::move(owner), state, cost]() mutable {
         owner.reset();
         state->bytes.fetch_sub(cost);
         --state->owners;
-        performance::mark(QStringLiteral("loader.cache_retirement_released"),
-            {{"pendingBytes", qint64(state->bytes.load())}, {"owners", state->owners.load()},
-             {"guiThread", QThread::currentThread() == QCoreApplication::instance()->thread()}});
+
     },100);
 }
 
@@ -999,10 +964,10 @@ void ImageLoader::reclaimInactiveResources() {
     for (const auto& handle : rawPrefetchHandles_) handle.cancel();
     const auto deficit = residentResourceBytes() - memoryBudget_;
     QVector<std::shared_ptr<const void>> retired;
-    qsizetype retiredCost = 0, examined = 0;
+    qsizetype retiredCost = 0;
     QElapsedTimer timer;timer.start();
     const auto collect = [&](auto result) {
-        examined += result.examined; retiredCost += result.cost;
+        retiredCost += result.cost;
         for (auto& owner : result.retired) retired.append(std::move(owner));
     };
     for (auto* cache : {&fullCache_, &previewCache_, &thumbnailCache_}) {
@@ -1012,21 +977,14 @@ void ImageLoader::reclaimInactiveResources() {
     if (timer.elapsed() < 4 && retiredCost < deficit)
         collect(sourceCache_->pruneUnused(32,deficit-retiredCost));
     if (retired.isEmpty()) return;
-    performance::mark(QStringLiteral("loader.resource_retirement"),
-        {{"owners", retired.size()}, {"examined", qint64(examined)}, {"elapsedMs", timer.elapsed()},
-         {"removedCacheCost", qint64(retiredCost)}, {"residentResourceBytes", qint64(residentResourceBytes())}});
+
     retirementPending_->store(true);
     const auto pending = retirementPending_;
-    const auto resident = residentAccounting_;
     // Reuse the bounded single writer. One retirement batch may queue, ahead of
     // pending compression tasks, without expanding ordinary decode concurrency.
-    writePool_.start([owners = std::move(retired), pending, resident]() mutable {
+    writePool_.start([owners = std::move(retired), pending]() mutable {
         owners.clear();
-        performance::mark(QStringLiteral("loader.resource_released"),
-            {{"residentPixelBytes", qint64(resident->bytes())},
-             {"peakResidentPixelBytes", qint64(resident->peakBytes())},
-             {"nominalGpuPixelBytes", qint64(resident->gpuResources()->bytes())},
-             {"guiThread", QThread::currentThread() == QCoreApplication::instance()->thread()}});
+
         pending->store(false);
     },100);
 }

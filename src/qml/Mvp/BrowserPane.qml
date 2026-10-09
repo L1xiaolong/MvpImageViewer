@@ -461,7 +461,6 @@ Rectangle {
     GridView {
         id: contactSheet
         objectName: "paneContactSheet-" + root.paneIndex
-        property bool benchmarkMoving: false
         visible: root.controller.currentDirectory.length > 0
         z: 1
         anchors.left: parent.left

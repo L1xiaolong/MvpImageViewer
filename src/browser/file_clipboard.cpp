@@ -1,7 +1,6 @@
 #include "browser/file_clipboard.h"
 
 #include "browser/local_file_drop.h"
-#include "core/performance_trace.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -49,7 +48,6 @@ void FileClipboard::initialize() {
     QObject::connect(clipboard, &QClipboard::dataChanged, clipboard, [] { filesCached = false; });
 }
 
-
 void FileClipboard::setPaths(const QStringList& paths, bool cut) {
     QList<QUrl> urls;
     urls.reserve(paths.size());
@@ -73,12 +71,11 @@ FileClipboardContents FileClipboard::contents() {
 bool FileClipboard::hasFiles() {
     initialize();
     if (!filesCached) {
-        const performance::Scope trace(QStringLiteral("clipboard.probe"));
 #ifdef Q_OS_WIN
         if (!mayContainFilePaths()) {
             cachedHasFiles = false;
             filesCached = true;
-            performance::mark(QStringLiteral("clipboard.no_file_formats"));
+
             return false;
         }
 #endif
@@ -97,5 +94,4 @@ bool FileClipboard::hasFiles() {
 }
 
 void FileClipboard::clear() { QGuiApplication::clipboard()->clear(); }
-
 } // namespace mvpview

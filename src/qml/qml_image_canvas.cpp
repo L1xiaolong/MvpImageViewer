@@ -2,7 +2,6 @@
 #include "qml/qml_image_canvas.h"
 
 #include "core/comparison_pixel_probe.h"
-#include "core/performance_trace.h"
 #include "core/nominal_gpu_bytes.h"
 #include "render/bayer_render_parameters.h"
 #include "render/yuv_render_parameters.h"
@@ -27,7 +26,6 @@
 
 namespace mvpview {
 namespace {
-
 bool isIndependentViewAdjustment(Qt::KeyboardModifiers modifiers) {
 #if defined(Q_OS_MACOS)
     // Qt exposes the physical Control key as MetaModifier on macOS, while
@@ -275,23 +273,13 @@ class Renderer final : public QQuickRhiItemRenderer {
             for (const auto* texture : {slot.encoded.get(), slot.y.get(), slot.u.get(), slot.v.get(), slot.raw.get()})
                 footprint.addResource(texture, textureBytes(texture));
         }
-        const auto slotBytes = footprint.bytes();
         footprint.addResource(colorTexture(), textureBytes(colorTexture()));
         footprint.addResource(resolveTexture(), textureBytes(resolveTexture()));
         for (const auto* buffer : {msaaColorBuffer(), depthStencilBuffer()}) {
             if (buffer) footprint.addResource(buffer,
                 nominalGpuBytes(buffer->pixelSize(), 4, buffer->sampleCount()));
         }
-        const auto canvasBytes = footprint.bytes();
         gpuOwnership_.attach(gpuLedger_, std::move(footprint));
-        if (performance::enabled()) {
-            PixelStorageFootprint activeStorage;
-            for (const auto& frame : frames_) if (frame) frame->appendPixelStorage(activeStorage);
-            performance::mark(QStringLiteral("render.resources"),
-                {{"activeBytes", qint64(activeStorage.bytes())}, {"gpuBytes", qint64(canvasBytes)},
-                 {"slotGpuBytes", qint64(slotBytes)}, {"nominalGpuPixelBytes", qint64(gpuLedger_->bytes())},
-                 {"peakNominalGpuPixelBytes", qint64(gpuLedger_->peakBytes())}});
-        }
     }
 
     void resetPipelines() {
@@ -506,8 +494,6 @@ class Renderer final : public QQuickRhiItemRenderer {
             ensurePlaceholder(slot.raw, QRhiTexture::R8);
             uploadedBytes += encoded.sizeInBytes();
             slotDirty_[static_cast<std::size_t>(index)] = false;
-            performance::mark(QStringLiteral("render.upload"),
-                {{"slot", index}, {"bytes", uploadedBytes}, {"frameBytes", frame ? qint64(frame->byteSize()) : 0}});
         }
         commandBuffer->resourceUpdate(updates);
         rebuildBindings();
@@ -781,24 +767,13 @@ class Renderer final : public QQuickRhiItemRenderer {
             const auto size = itemSize_;
             QMetaObject::invokeMethod(canvas, [canvas, frames, size] {
                 if (canvas && canvas->frames() == frames &&
-                    QSize(qRound(canvas->width()), qRound(canvas->height())) == size)
-                    {
-                        if (performance::enabled() && canvas->window()) {
-                            auto connection = std::make_shared<QMetaObject::Connection>();
-                            *connection = QObject::connect(canvas->window(), &QQuickWindow::frameSwapped, canvas,
-                                [connection] {
-                                    QObject::disconnect(*connection);
-                                    performance::mark(QStringLiteral("image.presented"));
-                                }, Qt::QueuedConnection);
-                        }
-                        performance::mark(QStringLiteral("image.submitted"));
-                        emit canvas->imageFrameRendered();
-                    }
+                    QSize(qRound(canvas->width()), qRound(canvas->height())) == size) {
+                    emit canvas->imageFrameRendered();
+                }
             }, Qt::QueuedConnection);
         }
     }
 };
-
 } // namespace
 
 QmlImageCanvas::QmlImageCanvas(QQuickItem* parent) : QQuickRhiItem(parent) {
@@ -1317,5 +1292,4 @@ void QmlImageCanvas::hoverLeaveEvent(QHoverEvent* event) {
 }
 
 QQuickRhiItemRenderer* QmlImageCanvas::createRenderer() { return new Renderer; }
-
 } // namespace mvpview

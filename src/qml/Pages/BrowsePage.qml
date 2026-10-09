@@ -1018,7 +1018,6 @@ Rectangle {
             GridView {
                 id: galleryStrip
                 objectName: "galleryStrip"
-                property bool benchmarkMoving: false
                 anchors.fill: parent
                 anchors.margins: 8
                 // Reserve a real workspace footer so users always have a dependable

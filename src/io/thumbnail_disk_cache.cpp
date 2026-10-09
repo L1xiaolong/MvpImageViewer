@@ -16,7 +16,6 @@ namespace mvpview {
 
 ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
     : rootDirectory_(std::move(rootDirectory)) {
-    if (rootDirectory_.isEmpty()) rootDirectory_ = qEnvironmentVariable("MVPVIEW_THUMBNAIL_CACHE_DIR");
     if (rootDirectory_.isEmpty()) {
         rootDirectory_ = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
                          QStringLiteral("/thumbnails-v2");

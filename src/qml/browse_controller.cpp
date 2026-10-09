@@ -17,7 +17,6 @@
 
 #include <QClipboard>
 #include <QElapsedTimer>
-#include "core/performance_trace.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -101,7 +100,6 @@ BrowseController::BrowseController(ImageLoader* sharedLoader,
 }
 
 void BrowseController::initialize(const QString& initialDirectory, bool startEmpty) {
-    const performance::Scope trace(QStringLiteral("browse.initialize"));
     scanner_ = new DirectoryScanner(this);
     scanner_->setBatchBackpressure(true);
     thumbnailModel_ = new ThumbnailModel(loader_, this);
@@ -122,9 +120,8 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
         do {
             const qsizetype count = std::min<qsizetype>(32, pendingScanFiles_.size() - pendingScanOffset_);
             if (count <= 0) break;
-            QElapsedTimer chunk; chunk.start();
             thumbnailModel_->appendFiles(pendingScanFiles_.mid(pendingScanOffset_, count));
-            performance::mark(QStringLiteral("directory.model_chunk"), {{"elapsedMs", chunk.elapsed()}, {"items", count}});
+
             pendingScanOffset_ += count;
             while (!pendingScanBatchEnds_.empty() && pendingScanBatchEnds_.front() <= pendingScanOffset_) {
                 pendingScanBatchEnds_.pop_front();
@@ -221,7 +218,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                 pendingScanFiles_ += files;
                 pendingScanBatchEnds_.push_back(pendingScanFiles_.size());
                 if (!scanBatchTimer_->isActive()) scanBatchTimer_->start(0);
-                performance::mark(QStringLiteral("directory.batch"), {{"items", files.size()}});
+
                 setStatusText(QStringLiteral("Scanning %1… %2 items")
                                   .arg(QDir::toNativeSeparators(currentDirectory_))
                                   .arg(thumbnailModel_->rowCount()));
@@ -238,7 +235,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                     });
                     return;
                 }
-                performance::mark(QStringLiteral("directory.finished"), {{"items", files.size()}});
+
                 diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.scan_complete"),
                     {{"directory", diagnostics::fileId(directory)}, {"generation", static_cast<qint64>(generation)}, {"items", files.size()}}, true);
                 if (!incrementalScan_) {
@@ -496,7 +493,6 @@ void BrowseController::openDirectoryUrl(const QUrl& url) {
 }
 
 QVariantList BrowseController::nativeSidebarPlaces() const {
-    const performance::Scope trace(QStringLiteral("navigation.places"));
     QVariantList places;
     QSet<QString> seenPaths;
     const auto appendPlace = [&places, &seenPaths](const QString& label, const QString& path,
@@ -559,7 +555,6 @@ QVariantList BrowseController::nativeDrivePlaces() const {
 }
 
 void BrowseController::refreshNativeDrivePlaces() {
-    const performance::Scope trace(QStringLiteral("navigation.drives"));
     QVariantList drives;
 #ifdef Q_OS_WIN
     const DWORD mask = GetLogicalDrives();
@@ -798,26 +793,6 @@ QString BrowseController::registerThumbnailViewport() {
 int BrowseController::thumbnailIndexForPath(const QString& path) const {
     const int row = thumbnailModel_->rowForPath(path);
     return row < 0 ? -1 : filterModel_->mapFromSource(thumbnailModel_->index(row)).row();
-}
-
-bool BrowseController::performanceTracing() const { return performance::enabled(); }
-
-void BrowseController::reportThumbnailPresentation(const QString& owner, int generation,
-                                                    int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs, int animationCycles) {
-    performance::mark(QStringLiteral("viewport.presented"),
-        {{"owner", owner}, {"generation", generation}, {"visible", count}, {"elapsedMs", elapsedMs}, {"first", first}, {"firstElapsedMs", firstElapsedMs}, {"animationCycles", animationCycles}});
-}
-
-void BrowseController::reportThumbnailObservation(const QString& state, const QString& owner,
-                                                   int generation, int count, qint64 elapsedMs) {
-    if (state != QStringLiteral("demand") && state != QStringLiteral("stopped") &&
-        state != QStringLiteral("settled") && state != QStringLiteral("retargeted") &&
-        state != QStringLiteral("report") && state != QStringLiteral("anchor_layout")) return;
-    QJsonObject fields{{"owner", owner}, {"visible", count}, {"elapsedMs", elapsedMs}};
-    fields.insert(state == QStringLiteral("demand") ? QStringLiteral("generation") :
-                  (state == QStringLiteral("report") || state == QStringLiteral("anchor_layout"))
-                    ? QStringLiteral("frame") : QStringLiteral("stopId"), generation);
-    performance::mark(QStringLiteral("viewport.") + state, fields);
 }
 
 void BrowseController::setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast) {
@@ -1311,15 +1286,6 @@ void BrowseController::setGridCellWidth(int width) {
 
 void BrowseController::openDirectoryInternal(const QString& path, bool addToHistory,
                                              bool pathAlreadyValidated) {
-    const performance::Scope trace(QStringLiteral("directory.open_gui"), {{"validated", pathAlreadyValidated}});
-    QElapsedTimer phase;
-    if (performance::enabled()) phase.start();
-    const auto markPhase = [&phase](const char* name) {
-        if (!phase.isValid()) return;
-        performance::mark(QStringLiteral("directory.open_phase"),
-            {{"phase", QString::fromLatin1(name)}, {"elapsedUs", phase.nsecsElapsed() / 1000}});
-        phase.restart();
-    };
 #ifdef Q_OS_WIN
     if (!pathAlreadyValidated && isWindowsRemotePath(path)) {
         const quint64 requestGeneration = ++directoryRequestGeneration_;
@@ -1361,7 +1327,6 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
         setStatusText(QStringLiteral("Folder is hidden, unreadable, or unavailable: %1").arg(path));
         return;
     }
-    markPhase("validation");
     // The gallery owns an asynchronous decode independently of the thumbnail model. Clear it
     // before publishing the directory change so neither the old frame nor a late completion from
     // the previous folder can remain visible while the new folder is scanned.
@@ -1378,7 +1343,6 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
 #else
     Q_UNUSED(previousDirectory);
 #endif
-    markPhase("directory-state");
     // Persist at navigation time so an ordinary force-quit or crash still restores the last
     // meaningful workspace on the next start.
     diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.open"),
@@ -1391,7 +1355,6 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
         settings.setValue(QStringLiteral("browser/lastDirectory"), currentDirectory_);
         settings.setValue(QStringLiteral("browser/recentLocations"), recentLocations_);
     }
-    markPhase("persistence");
     emit recentLocationsChanged();
     recentCandidateTimer_->stop();
     recentCandidateDirectory_ = currentDirectory_;
@@ -1407,7 +1370,6 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     emit currentDirectoryChanged();
     emit navigationStateChanged();
     clearSelection();
-    markPhase("notifications");
     if (!directoryWatcher_->directories().isEmpty()) {
         directoryWatcher_->removePaths(directoryWatcher_->directories());
     }
@@ -1416,15 +1378,12 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
 #else
     directoryWatcher_->addPath(currentDirectory_);
 #endif
-    markPhase("watcher");
     scanBatchTimer_->stop();
     pendingScanFiles_.clear(); pendingScanOffset_ = 0; pendingScanBatchEnds_.clear();
     thumbnailModel_->setFiles({});
     incrementalScan_ = true;
     setStatusText(QStringLiteral("Scanning %1…").arg(QDir::toNativeSeparators(currentDirectory_)));
-    markPhase("model-reset");
     scanGeneration_ = scanner_->scanAsync(currentDirectory_);
-    markPhase("scan-start");
 }
 
 void BrowseController::rescanCurrentDirectory() {
@@ -1563,5 +1522,4 @@ QStringList BrowseController::allImagePaths() const {
     }
     return result;
 }
-
 } // namespace mvpview

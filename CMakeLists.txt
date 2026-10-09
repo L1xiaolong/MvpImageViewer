@@ -109,8 +109,3 @@ else()
 endif()
 add_subdirectory(third_party/miniz)
 add_subdirectory(src)
-
-include(CTest)
-if(BUILD_TESTING)
-    add_subdirectory(tests)
-endif()

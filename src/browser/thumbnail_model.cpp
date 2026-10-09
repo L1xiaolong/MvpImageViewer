@@ -1,7 +1,6 @@
 #include "browser/thumbnail_model.h"
 
 #include "io/image_loader.h"
-#include "core/performance_trace.h"
 
 #include <QFileInfo>
 #include <QIcon>
@@ -16,7 +15,6 @@
 
 namespace mvpview {
 namespace {
-
 QString formattedFileSize(qint64 bytes) {
     constexpr qint64 mebibyte = 1024LL * 1024LL;
     if (bytes >= mebibyte) {
@@ -37,7 +35,6 @@ QString platformFolderIconName() {
 }
 
 QPixmap textPlaceholder(const QString& text) {
-    const performance::Scope trace(QStringLiteral("model.text_placeholder"));
     QPixmap result(160, 120);
     result.fill(QColor(48, 51, 57));
     QPainter painter(&result);
@@ -48,13 +45,11 @@ QPixmap textPlaceholder(const QString& text) {
 }
 
 QPixmap folderPlaceholder() {
-    const performance::Scope trace(QStringLiteral("model.folder_placeholder"));
     const QIcon icon = QIcon::fromTheme(QStringLiteral("folder"));
     if (!icon.isNull()) return icon.pixmap(120, 96);
     const QPixmap bundled(QStringLiteral(":/icons/ui/%1").arg(platformFolderIconName()));
     return bundled.isNull() ? textPlaceholder(QStringLiteral("Folder")) : bundled;
 }
-
 } // namespace
 
 ThumbnailModel::ThumbnailModel(ImageLoader* loader, QObject* parent)
@@ -387,5 +382,4 @@ void ThumbnailModel::rebuildPathIndex() {
         pathToRow_.insert(files_.at(row).path, row);
     }
 }
-
 } // namespace mvpview

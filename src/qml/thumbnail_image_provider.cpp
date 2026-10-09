@@ -5,7 +5,6 @@
 #include "io/image_decoder.h"
 #include "io/image_loader.h"
 #include "io/raw_preset_store.h"
-#include "core/performance_trace.h"
 
 #include <QAbstractFileIconProvider>
 #include <QEventLoop>
@@ -19,7 +18,6 @@
 #include <QUrl>
 
 namespace mvpview {
-
 SystemFolderIconProvider::SystemFolderIconProvider()
     : QQuickImageProvider(QQuickImageProvider::Image,
                           QQuickImageProvider::ForceAsynchronousImageLoading) {}
@@ -28,8 +26,6 @@ SystemFolderIconProvider::~SystemFolderIconProvider() = default;
 
 QImage SystemFolderIconProvider::requestImage(const QString& id, QSize* size,
                                                const QSize& requestedSize) {
-    const performance::Scope trace(QStringLiteral("navigation.icon"),
-        {{"guiThread", QThread::currentThread() == QCoreApplication::instance()->thread()}});
     const QString path = QUrl::fromPercentEncoding(id.toUtf8());
     const QSize target = requestedSize.isValid() ? requestedSize : QSize(32, 32);
     // Requests execute on Qt's image loading thread. Keep native icon state local,
@@ -38,14 +34,12 @@ QImage SystemFolderIconProvider::requestImage(const QString& id, QSize* size,
     QIcon icon = iconProvider.icon(QFileInfo(path));
     if (icon.isNull()) icon = iconProvider.icon(QAbstractFileIconProvider::Folder);
     const QImage image = icon.pixmap(target).toImage();
-    performance::mark(QStringLiteral("navigation.icon_result"),
-        {{"width", image.width()}, {"height", image.height()}, {"null", image.isNull()}});
+
     if (size) *size = image.size();
     return image;
 }
 
 namespace {
-
 QImage placeholder(const QString& text, const QSize& size) {
     QImage image(size.expandedTo(QSize(160, 120)), QImage::Format_RGBA8888);
     image.fill(QColor(QStringLiteral("#E8EBEB")));
@@ -157,7 +151,6 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
     std::atomic_bool cancelled_{false};
     inline static std::atomic<quint64> requestCounter_{0};
 };
-
 } // namespace
 
 ThumbnailImageProvider::ThumbnailImageProvider(std::shared_ptr<const IImageDecoder> decoder,
@@ -199,5 +192,4 @@ QSize ThumbnailImageProvider::bucketedSize(const QSize& requestedSize) {
     }
     return {512, 512};
 }
-
 } // namespace mvpview
