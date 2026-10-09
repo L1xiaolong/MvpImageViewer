@@ -1,6 +1,7 @@
 #include "browser/thumbnail_model.h"
 
 #include "io/image_loader.h"
+#include "core/performance_trace.h"
 
 #include <QFileInfo>
 #include <QIcon>
@@ -36,6 +37,7 @@ QString platformFolderIconName() {
 }
 
 QPixmap textPlaceholder(const QString& text) {
+    const performance::Scope trace(QStringLiteral("model.text_placeholder"));
     QPixmap result(160, 120);
     result.fill(QColor(48, 51, 57));
     QPainter painter(&result);
@@ -46,6 +48,7 @@ QPixmap textPlaceholder(const QString& text) {
 }
 
 QPixmap folderPlaceholder() {
+    const performance::Scope trace(QStringLiteral("model.folder_placeholder"));
     const QIcon icon = QIcon::fromTheme(QStringLiteral("folder"));
     if (!icon.isNull()) return icon.pixmap(120, 96);
     const QPixmap bundled(QStringLiteral(":/icons/ui/%1").arg(platformFolderIconName()));
@@ -55,8 +58,7 @@ QPixmap folderPlaceholder() {
 } // namespace
 
 ThumbnailModel::ThumbnailModel(ImageLoader* loader, QObject* parent)
-    : QAbstractListModel(parent), loader_(loader), placeholder_(textPlaceholder("Loading…")),
-      folderPlaceholder_(folderPlaceholder()) {
+    : QAbstractListModel(parent), loader_(loader) {
     connect(loader_, &ImageLoader::rawParametersChanged, this,
             [this](const QString& path) { invalidateThumbnail(path); });
     connect(loader_, &ImageLoader::displayRevisionChanged, this, [this] {
@@ -92,8 +94,10 @@ QVariant ThumbnailModel::data(const QModelIndex& index, int role) const {
         return file.fileName;
     case Qt::DecorationRole:
         if (file.isDirectory) {
+            if (folderPlaceholder_.isNull()) folderPlaceholder_ = folderPlaceholder();
             return folderPlaceholder_;
         }
+        if (placeholder_.isNull()) placeholder_ = textPlaceholder(QStringLiteral("Loading…"));
         return placeholder_;
     case Qt::ToolTipRole:
         return file.isDirectory

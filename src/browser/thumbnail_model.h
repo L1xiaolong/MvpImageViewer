@@ -61,8 +61,9 @@ class ThumbnailModel final : public QAbstractListModel {
     mutable QHash<QString, int> bitDepths_;
     QStringList selectedPaths_;
     QHash<QString, int> selectedOrdinals_;
-    QPixmap placeholder_;
-    QPixmap folderPlaceholder_;
+    // QML uses ThumbnailUrlRole; legacy decoration artwork is created only when requested.
+    mutable QPixmap placeholder_;
+    mutable QPixmap folderPlaceholder_;
 };
 
 } // namespace mvpview

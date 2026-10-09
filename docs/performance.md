@@ -190,3 +190,9 @@ Windows平台先调用IsClipboardFormatAvailable检查文件、URL、文本和Sh
 两个相邻版本分别运行100张合成PNG、两轮冷缓存、独立设置、原生Windows/默认OpenGL/Qt6.11：build/perf-results/startup-phase-scopes的clipboard.probe为206/198ms；build/perf-results/clipboard-format-guard均记录clipboard.no_file_formats，probe为0/0ms（整数毫秒精度）。对应首帧1341/1152ms与1042/907ms，首屏补图140/129ms与125/120ms。该两轮对照仅确认当前缺失格式的剪贴板路径改善，不是原始基准的正式P50/P95验收，不能推论有数据的剪贴板同样不阻塞。
 
 最终Release构建、CTest通过（7.45s）。offscreen剪贴板回归覆盖文件URL、剪切标记、普通文本使旧缓存失效、纯文本路径和清空；测试不接触真实Windows剪贴板。新的原生日志仍记录75～142ms启动GUI心跳间隔；首次图标和浏览器初始化等开销继续保留作用域观测，50ms硬性停顿验收未通过。
+
+## 浏览模型装饰位图按需创建（2026-10-09）
+
+ThumbnailModel原先在构造时用QPainter绘制Loading文字并读取主题文件夹图标，即使生产QML只使用ThumbnailUrlRole，也会触发字体/图标初始化。现在保持空位图，首次读取对应Qt::DecorationRole时才创建并保留；旧式模型消费者仍得到相同装饰，不改图片URL或解码行为。两个辅助函数加入model.text_placeholder/model.folder_placeholder作用域观测。
+
+Release构建、CTest通过（8.00s）。build/perf-results/lazy-decoration-startup与CTest曾并行执行，不用于性能对照；随后独立重复的build/perf-results/lazy-decoration-startup-serial为原生Windows、默认OpenGL、Qt6.11、100张合成PNG、两轮冷缓存和独立设置。首次browse.initialize为41/35ms，前一提交clipboard-format-guard为148/88ms；生产启动没有model.*占位绘制事件。整体首帧1015/933ms、补图123/126ms，与前一提交1042/907ms、125/120ms相比没有证据支持整体改善，字体初始化可能移到了真实文字绘制。GUI心跳仍有72～132ms间隔。该修改只确认移除了不使用的构造工作，不宣称50ms启动停顿或完整性能目标达成。
