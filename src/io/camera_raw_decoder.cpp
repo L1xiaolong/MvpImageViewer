@@ -417,6 +417,9 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
                 ? QSize(960, 720) : request.maximumSize;
             const QSize size = maximum.isEmpty() ? QSize{}
                 : parameters.size.scaled(maximum, Qt::KeepAspectRatio);
+            if (!request.prepareAllocation(estimatedPixelBytes(
+                    size.isEmpty() ? parameters.size : size, 32)))
+                return {{}, QStringLiteral("Cancelled")};
             const auto cancelled = [&request] { return request.isCancelled(); };
             QImage image = parameters.demosaic
                 ? renderBayerImage(source->planes->storage, parameters, size, cancelled)
@@ -477,6 +480,10 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
 
     if (request.purpose != DecodePurpose::Full && !mosaicPreview &&
         !applicationDevelopPreview) {
+        const QSize thumbSize(processor->imgdata.thumbnail.twidth, processor->imgdata.thumbnail.theight);
+        if (!request.prepareAllocation(estimatedPixelBytes(
+                thumbSize.isValid() ? thumbSize : metadata.sourceSize, 48)))
+            return {{}, QStringLiteral("Cancelled")};
         code = processor->unpack_thumb();
         if (code == LIBRAW_SUCCESS) {
             int imageError = LIBRAW_SUCCESS;
@@ -526,6 +533,9 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
     processor->imgdata.params.output_color = 1;
     processor->imgdata.params.use_camera_wb = 1;
     if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
+    const QSize rawSize(processor->imgdata.sizes.raw_width, processor->imgdata.sizes.raw_height);
+    if (!request.prepareAllocation(estimatedPixelBytes(rawSize, 48)))
+        return {{}, QStringLiteral("Cancelled")};
     code = processor->unpack();
     std::shared_ptr<PlaneBufferSet> mosaic;
     if (code == LIBRAW_SUCCESS && rawParameters &&

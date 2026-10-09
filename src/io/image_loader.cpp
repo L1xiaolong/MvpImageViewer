@@ -85,6 +85,7 @@ ImageLoader::~ImageLoader() {
     dispatchWake_.stop();
     for (auto& job : inFlight_) job.activeConsumers->store(-1);
     resultBufferBudget_->close(); // Wake workers before waiting for them on the GUI thread.
+    decodeWorkingBudget_->close();
     pool_.waitForDone();
     serializedPool_.waitForDone();
     writePool_.waitForDone();
@@ -209,6 +210,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 state->activeConsumers = found->activeConsumers;
                 found->pending.push_back({requestId, std::move(callback), state});
                 found->priority = std::max(found->priority, priority);
+                if (found->workingPriority) found->workingPriority->store(found->priority);
+                decodeWorkingBudget_->wakeWaiters();
                 scheduleDispatch();
                 return LoadHandle(state);
             }
@@ -225,6 +228,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const quint64 generation = inFlight.generation;
     inFlight.path = request.path;
     inFlight.priority = priority;
+    inFlight.workingPriority = std::make_shared<std::atomic_int>(priority);
     inFlight.purpose = request.purpose;
     inFlight.serialized = !request.metadataSource && decoder_->executionMode(request.path) == DecodeExecutionMode::Serialized;
     inFlight.queuedAt.start();
@@ -238,9 +242,26 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const auto diskCache = diskCache_;
     const auto pendingWrites = pendingWrites_;
     const auto resultBufferBudget = resultBufferBudget_;
+    const auto decodeWorkingBudget = decodeWorkingBudget_;
+    const auto workingPriority = inFlight_[key].workingPriority;
     inFlight_[key].work =
         [self, decoder, diskCache, request = std::move(request), key, keyPrefix, decoderIdentity, generation,
-         activeConsumers, pendingWrites, resultBufferBudget] {
+         activeConsumers, pendingWrites, resultBufferBudget, decodeWorkingBudget, workingPriority]() mutable {
+            std::shared_ptr<ResultBufferBudget::Reservation> workingReservation;
+            qint64 workingWaitMs = 0;
+            request.reserveWorkingMemory = [&](qsizetype bytes) {
+                workingReservation.reset();
+                QElapsedTimer wait; wait.start();
+                workingReservation = decodeWorkingBudget->reserve(bytes,
+                    [&request] { return request.isCancelled(); },
+                    [workingPriority] { return workingPriority->load(); });
+                workingWaitMs += wait.elapsed();
+                const auto snapshot = decodeWorkingBudget->snapshot();
+                performance::mark(QStringLiteral("loader.decode_working"),
+                    {{"bytes", qint64(snapshot.bytes)}, {"peakBytes", qint64(snapshot.peakBytes)},
+                     {"estimatedBytes", qint64(bytes)}, {"admitted", bool(workingReservation)}});
+                return bool(workingReservation);
+            };
             DecodeResult result;
             const bool abandoned = request.isCancelled();
             if (!abandoned && request.purpose == DecodePurpose::Thumbnail) {
@@ -341,7 +362,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 }
                 result.frame = std::move(prepared);
             }
-            const qint64 decodeElapsedMs = decodeTimer.elapsed();
+            const qint64 decodeElapsedMs = qMax<qint64>(0, decodeTimer.elapsed() - workingWaitMs);
             QElapsedTimer resultWait; resultWait.start();
             std::shared_ptr<ResultBufferBudget::Reservation> resultReservation;
             if (result.frame && !request.metadataSource) {
@@ -349,17 +370,19 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     [&request] { return request.isCancelled(); });
                 if (!resultReservation) result = {{}, QStringLiteral("Cancelled")};
             }
+            workingReservation.reset(); // Result credits now own the submission phase.
+            request.reserveWorkingMemory = {};
             if (!self) return;
             QMetaObject::invokeMethod(
                 self,
                 [self, completion = [self, resultReservation, result = std::move(result), key, keyPrefix, decoderIdentity, purpose = request.purpose,
                  sourcePath = request.path, generation, activeConsumers, diskHit, metadataOnly = bool(request.metadataSource),
-                 elapsedMs = decodeElapsedMs, bufferWaitMs = resultWait.elapsed()]() {
+                 elapsedMs = decodeElapsedMs, workingWaitMs, bufferWaitMs = resultWait.elapsed()]() {
                     if (!self) {
                         return;
                     }
                     performance::mark(QStringLiteral("loader.completed"),
-                        {{"elapsedMs", elapsedMs}, {"bufferWaitMs", bufferWaitMs}, {"diskHit", diskHit}, {"purpose", int(purpose)},
+                        {{"elapsedMs", elapsedMs}, {"workingWaitMs", workingWaitMs}, {"bufferWaitMs", bufferWaitMs}, {"diskHit", diskHit}, {"purpose", int(purpose)},
                          {"cancelled", activeConsumers->load() <= 0}, {"failed", !result.frame && activeConsumers->load() > 0},
                          {"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
                     const auto buffers = self->resultBufferBudget_->snapshot();
@@ -444,9 +467,13 @@ void ImageLoader::updateViewport(const QString& owner, const QHash<QString, int>
         for (const auto& handle : imagePrefetchHandles_) handle.cancel();
         for (const auto& handle : rawPrefetchHandles_) handle.cancel();
     }
-    for (auto it = inFlight_.begin(); it != inFlight_.end(); ++it)
-        if (it->purpose == DecodePurpose::Thumbnail)
+    for (auto it = inFlight_.begin(); it != inFlight_.end(); ++it) {
+        if (it->purpose == DecodePurpose::Thumbnail) {
             it->priority = viewportPriority(it->path);
+            if (it->workingPriority) it->workingPriority->store(it->priority);
+        }
+    }
+    decodeWorkingBudget_->wakeWaiters();
     scheduleDispatch();
 }
 

@@ -58,8 +58,10 @@ public:
     mutable std::atomic_int active{0}, peak{0};
     mutable std::atomic_bool interactiveStarted{false};
     std::atomic_bool release{false};
+    qsizetype workingBytes = 0;
     bool canDecode(const QString&) const override { return true; }
     DecodeResult decode(const DecodeRequest& request) const override {
+        if (!request.prepareAllocation(workingBytes)) return {{}, "Cancelled"};
         const int count = ++active;
         int previous = peak.load();
         while (previous < count && !peak.compare_exchange_weak(previous, count)) {}
@@ -101,6 +103,19 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            auto constrained=std::make_shared<ParallelProbeDecoder>();
+            constrained->workingBytes=400LL*1024*1024;
+            ImageLoader loader(constrained); int completed=0;
+            auto first=loader.request(1,{a,DecodePurpose::Preview},[&](auto,const auto&){++completed;});
+            auto second=loader.request(2,{b,DecodePurpose::Preview},[&](auto,const auto&){++completed;});
+            pump([&]{return constrained->active.load()==1;});
+            QThread::msleep(60); QCoreApplication::processEvents();
+            require(constrained->peak.load()==1,"decode working budget admitted concurrent oversized pixels");
+            constrained->release=true;
+            pump([&]{return completed==2;});
+            require(constrained->peak.load()==1,"decode working reservation leaked across result transfer");
+        }
         if (QGuiApplication::platformName()==QStringLiteral("offscreen")) {
             FileClipboard::setPaths({a},true);
             require(FileClipboard::hasFiles() && FileClipboard::contents().paths==QStringList{a} &&
@@ -113,6 +128,28 @@ int main(int argc, char** argv) {
             require(FileClipboard::hasFiles() && FileClipboard::contents().paths==QStringList{a,b} &&
                     !FileClipboard::contents().cut,"plain path clipboard compatibility");
             FileClipboard::clear(); require(!FileClipboard::hasFiles(),"empty clipboard retained file state");
+        }
+        {
+            const auto budget=std::make_shared<ResultBufferBudget>(100);
+            auto blocker=budget->reserve(100,[]{return false;});
+            auto earlier=std::async(std::launch::async,[budget]{
+                return budget->reserve(80,[]{return false;},[]{return 10;});
+            });
+            pump([&]{return budget->snapshot().waiters==1;});
+            std::atomic_int priority{0};
+            auto promoted=std::async(std::launch::async,[budget,&priority]{
+                return budget->reserve(80,[]{return false;},[&]{return priority.load();});
+            });
+            pump([&]{return budget->snapshot().waiters==2;});
+            priority=100; blocker.reset();
+            const auto ready=promoted.wait_for(std::chrono::seconds(1));
+            if (ready!=std::future_status::ready) budget->close();
+            require(ready==std::future_status::ready,"promoted working request did not wake");
+            auto interactive=promoted.get();
+            require(interactive && earlier.wait_for(std::chrono::milliseconds(20))==std::future_status::timeout,
+                    "working budget did not promote a waiting visible request");
+            interactive.reset(); auto remaining=earlier.get();
+            require(bool(remaining),"working budget starved the remaining request");
         }
         {
             const auto budget=std::make_shared<ResultBufferBudget>(100);
@@ -212,6 +249,11 @@ int main(int argc, char** argv) {
             require(file.write(bytes)==bytes.size(),"raw write"); file.close();
             RawImageParameters parameters; parameters.size={4,4}; parameters.format=RawPixelFormat::NV12;
             DecodeRequest request{raw,DecodePurpose::Full,{},parameters}; request.sourceCache=std::make_shared<SourceFrameCache>();
+            qsizetype rawWorking=0;
+            request.reserveWorkingMemory=[&](qsizetype bytes){rawWorking=bytes;return false;};
+            require(!RawImageDecoder{}.decode(request).frame && rawWorking>24 && request.sourceCache->cost()==0,
+                    "RAW allocated source pixels before working admission");
+            request.reserveWorkingMemory={};
             RawImageDecoder decoder; auto result=decoder.decode(request); require(bool(result.frame),"raw decode");
             require(request.sourceCache->cost()==24,"source cache not populated");
             require(DisplayHistogramAnalyzer::analyze(*result.frame).isValid(),"display histogram");
@@ -269,6 +311,10 @@ int main(int argc, char** argv) {
             for (QString suffix : {"png","jpg","bmp"}) {
                 QImage image(8,4,QImage::Format_RGBA8888); image.fill(QColor(30,100,180));
                 auto path=temp.filePath("encoded."+suffix); require(image.save(path),"encoded fixture");
+                DecodeRequest refused{path,DecodePurpose::Full}; qsizetype encodedWorking=0;
+                refused.reserveWorkingMemory=[&](qsizetype bytes){encodedWorking=bytes;return false;};
+                require(!decoder.decode(refused).frame && encodedWorking>=8*4*16,
+                        "encoded decode bypassed working admission");
                 auto result=decoder.decode({path,DecodePurpose::Full});
                 require(bool(result.frame) && result.frame->descriptor.size==QSize(8,4),"encoded decode");
                 require(result.frame->metadata.metadataReaderName.isEmpty(),"EXIF delayed display");
@@ -312,6 +358,10 @@ int main(int argc, char** argv) {
             const auto path=temp.filePath("sensor.dng");
             require(writeDngFixture(path),"DNG fixture");
             CameraRawDecoder decoder;
+            DecodeRequest refused{path,DecodePurpose::Full}; qsizetype cameraWorking=0;
+            refused.reserveWorkingMemory=[&](qsizetype bytes){cameraWorking=bytes;return false;};
+            require(!decoder.decode(refused).frame && cameraWorking>=1536LL*1024*16,
+                    "LibRaw unpack bypassed working admission");
             auto native=decoder.decode({path,DecodePurpose::Full});
             require(bool(native.frame) && native.frame->rawParameters.has_value(),"LibRaw DNG sensor decode");
             auto parameters=*native.frame->rawParameters;

@@ -109,6 +109,7 @@ class ImageLoader final : public QObject {
         quint64 generation = 0;
         QString path;
         int priority = 0;
+        std::shared_ptr<std::atomic_int> workingPriority;
         bool serialized = false;
         bool running = false;
         DecodePurpose purpose = DecodePurpose::Preview;
@@ -138,6 +139,8 @@ class ImageLoader final : public QObject {
     std::deque<std::function<void()>> completions_;
     std::shared_ptr<ResultBufferBudget> resultBufferBudget_ =
         std::make_shared<ResultBufferBudget>(128LL * 1024 * 1024);
+    std::shared_ptr<ResultBufferBudget> decodeWorkingBudget_ =
+        std::make_shared<ResultBufferBudget>(512LL * 1024 * 1024);
     QThreadPool writePool_;
     std::shared_ptr<std::atomic_int> pendingWrites_ = std::make_shared<std::atomic_int>(0);
     int parallelRunning_ = 0;

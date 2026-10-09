@@ -7,6 +7,8 @@
 #include <QString>
 
 #include <atomic>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -29,6 +31,12 @@ struct DecodeRequest {
         return activeConsumers && activeConsumers->load(std::memory_order_relaxed) <= 0;
     }
     std::shared_ptr<SourceFrameCache> sourceCache;
+    // Called on the decode worker after header discovery, before large pixel allocations.
+    // Replacement is valid only at a stage with no previous private pixel allocation alive.
+    std::function<bool(qsizetype)> reserveWorkingMemory;
+    [[nodiscard]] bool prepareAllocation(qsizetype bytes) const {
+        return !isCancelled() && (!reserveWorkingMemory || reserveWorkingMemory(bytes));
+    }
     ImageFramePtr metadataSource;
     // QML Image consumes the CPU image; RHI consumers can use native source planes.
     // Keep these representations distinct when Full has a bounded CPU fallback.
@@ -38,6 +46,18 @@ struct DecodeRequest {
     QSize maximumSize;
     std::optional<RawImageParameters> rawParameters;
 };
+
+inline qsizetype estimatedPixelBytes(QSize size, qsizetype bytesPerPixel) {
+    if (!size.isValid()) return 0;
+    const auto pixels = qint64(size.width()) * size.height();
+    const auto limit = std::numeric_limits<qsizetype>::max();
+    return pixels > limit / bytesPerPixel ? limit : qsizetype(pixels * bytesPerPixel);
+}
+
+inline qsizetype addedAllocationBytes(qsizetype a, qsizetype b) {
+    const auto limit = std::numeric_limits<qsizetype>::max();
+    return b > limit - a ? limit : a + b;
+}
 
 struct DecodeResult {
     ImageFramePtr frame;

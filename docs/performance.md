@@ -204,3 +204,20 @@ SystemFolderIconProvider使用ForceAsynchronousImageLoading，将Quick Access的
 navigation.icon记录guiThread，navigation.icon_result记录空图和尺寸。Release构建、CTest通过（7.60s）。原生独立测试build/perf-results/async-native-icons：100张合成PNG、三轮冷缓存、独立设置、默认OpenGL/Qt6.11，每轮5个图标均guiThread=false、非空，日志没有线程/图片警告，截图确认Home/Desktop/Documents/Downloads/Pictures图标正常。首帧895/851/892ms，首屏补图125/124/141ms；相邻版本lazy-decoration-startup-serial首帧1015/933ms，但不同样本次数的局部对照不构成正式回退矩阵。GUI心跳仍72～138ms，启动50ms门槛未通过。
 
 build/perf-results/async-icons-four-panes：1万、100、10万、1000条目四个不同目录，两轮动画前滚/跳跃/反向/停止，第一轮冷、第二轮复用本次积累的磁盘缓存。每轮12个停止视口均补齐，停止补图P95为107/74ms，运动帧P95为16/17ms，重复上报与解码失败均0，峰值工作集750358528/618946560字节。与前次frame-anchor-fix的100/78ms相比冷停止补图单次增加7ms，不能声称全部指标回退不超过5%；需扩充配对重复次数并覆盖真实格式。
+
+## 像素分配前的解码工作预算（2026-10-09）
+
+此前128MiB结果预算只在完整帧生成后准入。DecodeRequest现在提供工作线程的reserveWorkingMemory/prepareAllocation接口，生产ImageLoader在解码期间管理独立的512MiB工作预约；Qt在读取头信息后、read之前申请，RAW/YUV在源字节resize和转换前申请，LibRaw在缓存源帧渲染、unpack_thumb或unpack前申请。缓存版本和图像身份不包含此调度接口，直接解码调用未配置预算时维持兼容行为。缺少Qt头尺寸时按整个工作预算估算，避免无尺寸请求默认零成本。
+
+Qt PNG/JPEG/BMP按整数像素表示估算原生8字节/像素及显示/转换/上传16字节/像素，其他插件为原生16及输出32字节/像素；即使插件仅在解码后缩放，也保留原生像素估算。RAW/YUV包含源读取、上传副本和输出转换；LibRaw按原始传感器48字节/像素估算工作缓冲，缓存传感器渲染仅计新的显示缓冲。算术饱和避免大尺寸乘法溢出。它是调度估算，不是逐个库分配的精确统计；头解析、插件内部和色彩库不透明临时分配不能由此保证RSS上限。
+
+预算等待按实时优先级和同级先后顺序准入。合并请求及视口更新同步原子优先级并唤醒等待者；消费者取消每25ms检查，退出关闭两种预算后再等待工作线程。工作预约保留到上传准备及结果字节预约成功后释放。允许单张超过预算的图像在空预算内独占，保留精确全图和超大格式支持。解码缓存384MiB、自动原图256MiB、结果128MiB和既有并发上限不变，没有增加线程。metadata结果和内存命中不重复预约已有像素。
+
+loader.decode_working输出估算预约和峰值；loader.completed的workingWaitMs独立于解码elapsedMs及结果bufferWaitMs，基准增加maxDecodeWorkingBytes/maxDecodeWorkingWaitMs。回归验证两个400MiB的并行任务不能同时进入像素阶段、等待请求的动态提升、预算取消/退出/超额独占，以及Qt PNG/JPEG/BMP、NV12源缓存和真正LibRaw DNG在拒绝准入时不返回像素。最终Release构建与CTest通过（7.73s），Python语法检查通过。
+
+初版256MiB与统一偏保守的估算使合成四图对比最后上传相对首帧推迟到357ms，因此未保留为默认；按格式估算和优先级后仍需合理的独立工作空间，最终采用512MiB。早期实验decode-admission-large、decode-admission-large-integer、decode-admission-priority-large不是最终验收结果。
+
+- build/perf-results/decode-admission-final-large：四张3072×3072 RGB16合成PNG，两轮冷缓存、独立设置、默认OpenGL/Qt6.11；四个Preview的工作预算等待均0，最高预约529530880字节，低于512MiB；仅缩略图最长等待65ms。结果峰值113246208/75497472字节，无解码失败。峰值工作集686714880/616075264字节，最后预览上传相对首帧123/122ms。前一结果预算实验单轮同指标约101ms，非配对样本且中间有其他改动，不能证明≤5%回退；还需正式对照和真实超大PNG。四图截图已检查，不能代替GPU精确色彩验收。
+- build/perf-results/decode-admission-final-four-panes：1万、100、10万、1000条目四个不同目录，两轮动画前滚/跳跃/反向/停止；第一轮冷、第二轮复用本次积累磁盘缓存。每轮12个停止视口全部补齐，停止补图P95为89/62ms，运动帧P95为17/16ms，重复上报和解码失败均0，工作预算等待均0。工作预约峰值120440832/60220416字节，进程工作集峰值696340480/619020288字节。
+
+分配前估算准入已接入三类生产解码器，但源缓存、活动帧、Qt Image、上传所有者及GPU仍未形成去重的统一账本或全局准入；512MiB工作预算不等于进程内存上限。等待预算的工作线程仍占执行通道，极端压力下需继续验证新交互的通道等待和跨面板公平性。完整目标仍进行中。

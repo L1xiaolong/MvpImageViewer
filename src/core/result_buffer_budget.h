@@ -5,6 +5,8 @@
 #include <QWaitCondition>
 #include <functional>
 #include <memory>
+#include <vector>
+#include <algorithm>
 
 namespace mvpview {
 
@@ -32,15 +34,30 @@ public:
     };
 
     explicit ResultBufferBudget(qsizetype maximumBytes) : maximumBytes_(qMax<qsizetype>(1, maximumBytes)) {}
-    std::shared_ptr<Reservation> reserve(qsizetype bytes, const std::function<bool()>& cancelled) {
+    std::shared_ptr<Reservation> reserve(qsizetype bytes, const std::function<bool()>& cancelled,
+                                         std::function<int()> priority = [] { return 0; }) {
         bytes = qMax<qsizetype>(0, bytes);
         QMutexLocker lock(&mutex_);
-        while (!closed_ && !cancelled() && bytes_ > 0 &&
-               (bytes_ >= maximumBytes_ || bytes > maximumBytes_ - bytes_)) {
+        Waiter waiter{std::move(priority)};
+        queue_.push_back(&waiter);
+        const auto eligible = [&] {
+            const int ownPriority = waiter.priority();
+            bool preceding = true;
+            for (auto* queued : queue_) {
+                if (queued == &waiter) { preceding = false; continue; }
+                const int queuedPriority = queued->priority();
+                if (queuedPriority > ownPriority || (preceding && queuedPriority == ownPriority)) return false;
+            }
+            return true;
+        };
+        while (!closed_ && !cancelled() && (!eligible() || (bytes_ > 0 &&
+               (bytes_ >= maximumBytes_ || bytes > maximumBytes_ - bytes_)))) {
             ++waiters_;
             changed_.wait(&mutex_, 25);
             --waiters_;
         }
+        queue_.erase(std::find(queue_.begin(), queue_.end(), &waiter));
+        changed_.wakeAll();
         if (closed_ || cancelled()) return {};
         bytes_ += bytes;
         peakBytes_ = qMax(peakBytes_, bytes_);
@@ -50,12 +67,18 @@ public:
         QMutexLocker lock(&mutex_);
         return {bytes_, peakBytes_, waiters_};
     }
+    void wakeWaiters() {
+        QMutexLocker lock(&mutex_);
+        changed_.wakeAll();
+    }
     void close() {
         QMutexLocker lock(&mutex_);
         closed_ = true;
         changed_.wakeAll();
     }
 private:
+    struct Waiter { std::function<int()> priority; };
+    std::vector<Waiter*> queue_;
     void release(qsizetype bytes) {
         QMutexLocker lock(&mutex_);
         bytes_ -= bytes;

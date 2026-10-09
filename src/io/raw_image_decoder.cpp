@@ -239,6 +239,16 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
         QString::number(parameters.msbAligned), QString::number(parameters.validBits())
     }.join(QLatin1Char('|'));
     const auto cachedSource = request.sourceCache ? request.sourceCache->get(sourceKey) : nullptr;
+    QSize plannedOutput = orientedImageSize(parameters.size, parameters.orientation);
+    const QSize plannedMaximum = request.purpose == DecodePurpose::Full && !request.requireDisplayImage
+        ? kFullFallbackMaximumSize : request.maximumSize;
+    if (!plannedMaximum.isEmpty() && (plannedOutput.width() > plannedMaximum.width() ||
+                                     plannedOutput.height() > plannedMaximum.height()))
+        plannedOutput = plannedOutput.scaled(plannedMaximum, Qt::KeepAspectRatio);
+    const qsizetype sourceCost = cachedSource ? 0 : frameSize;
+    if (!request.prepareAllocation(addedAllocationBytes(
+            addedAllocationBytes(sourceCost, frameSize), estimatedPixelBytes(plannedOutput, 32))))
+        return {{}, QStringLiteral("Cancelled")};
     QByteArray bytes = cachedSource ? cachedSource->bytes : QByteArray{};
     if (cachedSource) performance::mark(QStringLiteral("source.hit"));
     if (!cachedSource) {

@@ -129,6 +129,21 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
         }
     }
 
+    const auto admit = [&request](QSize source, const QByteArray& format) {
+        if (source.isEmpty()) return request.prepareAllocation(512LL * 1024 * 1024);
+        QSize output = source;
+        if (!request.maximumSize.isEmpty() && (source.width() > request.maximumSize.width() ||
+                                              source.height() > request.maximumSize.height()))
+            output = source.scaled(request.maximumSize, Qt::KeepAspectRatio);
+        // PNG/JPEG/BMP have integer output up to RGBA64. Other plugins can expose
+        // RGBA32F. Include native pixels even if a plugin scales after decoding,
+        // and two output images for conversion/color or upload preparation.
+        const bool integerFormat = format == "png" || format == "jpeg" || format == "jpg" || format == "bmp";
+        return request.prepareAllocation(addedAllocationBytes(
+            estimatedPixelBytes(source, integerFormat ? 8 : 16),
+            estimatedPixelBytes(output, integerFormat ? 16 : 32)));
+    };
+    if (!admit(sourceSize, reader.format())) return {{}, QStringLiteral("Cancelled")};
     QImage image = reader.read();
     if (image.isNull()) {
         // Some camera exports keep an old extension when replacing a damaged file. Let Qt
@@ -142,6 +157,7 @@ DecodeResult QtImageDecoder::decode(const DecodeRequest& request) const {
              sourceSize.height() > request.maximumSize.height())) {
             contentReader.setScaledSize(sourceSize.scaled(request.maximumSize, Qt::KeepAspectRatio));
         }
+        if (!admit(sourceSize, contentReader.format())) return {{}, QStringLiteral("Cancelled")};
         image = contentReader.read();
         if (image.isNull()) return {{}, contentReader.errorString()};
         fileFormat = QString::fromLatin1(QImageReader::imageFormat(request.path)).toUpper();
