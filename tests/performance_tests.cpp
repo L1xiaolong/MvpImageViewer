@@ -100,6 +100,17 @@ public:
 private:
     QSize size_;
 };
+class CountingDecoder final : public IImageDecoder {
+public:
+    explicit CountingDecoder(std::shared_ptr<const IImageDecoder> decoder) : decoder_(std::move(decoder)) {}
+    mutable std::atomic_int calls{0};
+    QString cacheIdentity() const override { return decoder_->cacheIdentity(); }
+    bool canDecode(const QString& path) const override { return decoder_->canDecode(path); }
+    DecodeExecutionMode executionMode(const QString& path) const override { return decoder_->executionMode(path); }
+    DecodeResult decode(const DecodeRequest& request) const override { ++calls;return decoder_->decode(request); }
+private:
+    std::shared_ptr<const IImageDecoder> decoder_;
+};
 int main(int argc, char** argv) {
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
     QGuiApplication app(argc, argv);
@@ -130,6 +141,52 @@ int main(int argc, char** argv) {
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
+        {
+            const auto imagePath=temp.filePath("derived-p3.png");
+            QImage image(8,4,QImage::Format_RGBA64);image.fill(QColor::fromRgbF(.1234,.3456,.789,.4));
+            image.setColorSpace(QColorSpace(QColorSpace::DisplayP3));require(image.save(imagePath),"derived PNG fixture");
+            auto probe=std::make_shared<CountingDecoder>(std::make_shared<QtImageDecoder>());ImageLoader loader(probe);
+            ImageFramePtr source,thumbnail;
+            loader.request(1,{imagePath,DecodePurpose::Preview,{512,512}},[&](auto,const auto& result){source=result.frame;});
+            pump([&]{return bool(source);});
+            loader.request(2,{imagePath,DecodePurpose::Thumbnail,{4,4}},[&](auto,const auto& result){thumbnail=result.frame;});
+            require(!thumbnail,"cached preview scaling ran synchronously on GUI request");
+            pump([&]{return bool(thumbnail);});
+            require(probe->calls==1 && *thumbnail->qImage()==source->qImage()->scaled({4,4},Qt::KeepAspectRatio,Qt::SmoothTransformation),
+                    "thumbnail reopened source or changed prepared preview pixels");
+            require(thumbnail->descriptor.storageBits==16 && thumbnail->qImage()->colorSpace()==source->qImage()->colorSpace() &&
+                    thumbnail->metadata.sourceSize==QSize(8,4) && thumbnail->sourceSamplesPending && thumbnail->byteSize()==64,
+                    "derived thumbnail lost native depth/color/source dimensions or retained full upload storage");
+            QtImageDecoder::setPreserveHighBitDepth(false);
+            ImageFramePtr eight;
+            loader.request(3,{imagePath,DecodePurpose::Thumbnail,{4,4}},[&](auto,const auto& result){eight=result.frame;});
+            pump([&]{return bool(eight);});
+            require(probe->calls==2 && eight->qImage()->depth()==32,"changed display identity reused incompatible preview");
+            QtImageDecoder::setPreserveHighBitDepth(true);
+            const auto oldSize=QFileInfo(imagePath).size();
+            QImage replacement(8,4,QImage::Format_RGBA8888);replacement.fill(Qt::green);
+            require(replacement.save(imagePath) && QFileInfo(imagePath).size()!=oldSize,"changed-version fixture");
+            ImageFramePtr changed;
+            loader.request(4,{imagePath,DecodePurpose::Thumbnail,{4,4}},[&](auto,const auto& result){changed=result.frame;});
+            pump([&]{return bool(changed);});
+            require(probe->calls==3 && changed->qImage()->pixelColor(0,0)==Qt::green,"file version reused stale display preview");
+        }
+        {
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);ImageFramePtr source;
+            loader.request(1,{a,DecodePurpose::Full},[&](auto,const auto& result){source=result.frame;});
+            pump([&]{return bool(source);});
+            loader.updateViewport("derived",{{a,20}},true);
+            bool cancelledCallback=false;
+            auto handle=loader.request(2,{a,DecodePurpose::Thumbnail,{2,2}},[&](auto,const auto&){cancelledCallback=true;},
+                RequestOptions{LoadCategory::NearViewport});
+            handle.cancel();
+            ImageFramePtr thumbnail;
+            loader.request(3,{a,DecodePurpose::Thumbnail,{2,2}},[&](auto,const auto& result){thumbnail=result.frame;},
+                RequestOptions{LoadCategory::VisibleThumbnail,0,"navigation",false});
+            pump([&]{return bool(thumbnail);});
+            require(probe->order().size()==1 && !cancelledCallback && thumbnail->qImage()->size()==QSize(2,2),
+                    "cancelled derived consumer lost visible replacement or reopened serialized source");
+        }
         {
             auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);QQmlEngine engine;
             engine.addImageProvider("thumbnail",new ThumbnailImageProvider(probe,&loader));
@@ -553,6 +610,18 @@ int main(int argc, char** argv) {
             require(!DisplayHistogramAnalyzer::analyze(*result.frame, 10000, []{return true;}).isValid(),"display analysis cancellation");
             require(RawPlaneHistogramAnalyzer::analyze(*result.frame).isValid(),"source histogram");
             const auto firstPlane=std::get<std::shared_ptr<const PlaneBufferSet>>(result.frame->storage);
+            {
+                auto probe=std::make_shared<CountingDecoder>(std::make_shared<RawImageDecoder>());ImageLoader loader(probe);
+                ImageFramePtr full,thumbnail;
+                loader.request(1,{raw,DecodePurpose::Full,{},parameters},[&](auto,const auto& decoded){full=decoded.frame;});
+                pump([&]{return bool(full);});
+                loader.request(2,{raw,DecodePurpose::Thumbnail,{2,2},parameters},[&](auto,const auto& decoded){thumbnail=decoded.frame;});
+                pump([&]{return bool(thumbnail);});
+                require(probe->calls==1 && thumbnail->byteSize()==16 && thumbnail->rawParameters && full->rawParameters &&
+                        thumbnail->rawParameters->cacheKey()==full->rawParameters->cacheKey() &&
+                        *thumbnail->qImage()==full->qImage()->scaled({2,2},Qt::KeepAspectRatio,Qt::SmoothTransformation),
+                        "YUV thumbnail reopened source, retained planes or changed processed display");
+            }
             parameters.yuvMatrix=YuvMatrix::BT601; request.rawParameters=parameters;
             auto recolored=decoder.decode(request);
             require(recolored.frame && request.sourceCache->cost()==24 &&
@@ -682,7 +751,8 @@ int main(int argc, char** argv) {
             require(*freshCpu.frame->qImage()==*cachedCpu.frame->qImage(),"cached CPU full RAW pixels changed");
             cfa.activeConsumers=std::make_shared<std::atomic_int>(-1);
             require(!decoder.decode(cfa).frame,"cancelled cached DNG source rendered");
-            ImageLoader loader(std::make_shared<CameraRawDecoder>());
+            auto cameraProbe=std::make_shared<CountingDecoder>(std::make_shared<CameraRawDecoder>());
+            ImageLoader loader(cameraProbe);
             ThumbnailModel model(&loader);
             const QFileInfo info(path);
             model.appendFiles({{path,info.fileName(),info.size(),info.lastModified(),false,"dng"}});
@@ -721,6 +791,13 @@ int main(int argc, char** argv) {
             memoryHit=false;
             loader.request(6,galleryPreview,[&](auto,const auto& result){memoryHit=result.frame==fullDisplay;});
             require(memoryHit && loader.isCached(galleryPreview),"gallery did not reuse its sufficient CPU full cache");
+            const int sourceCalls=cameraProbe->calls;
+            ImageFramePtr derived;
+            loader.request(7,{path,DecodePurpose::Thumbnail,{128,128}},[&](auto,const auto& result){derived=result.frame;});
+            pump([&]{return bool(derived);},10000);
+            require(cameraProbe->calls==sourceCalls && derived->qImage()->size()==QSize(128,85) &&
+                    *derived->qImage()==cpuPreview->qImage()->scaled({128,128},Qt::KeepAspectRatio,Qt::SmoothTransformation),
+                    "DNG navigation thumbnail invoked LibRaw or changed prepared display pixels");
             auto edited=*loader.rawParameters(path); edited.demosaic=!edited.demosaic;
             loader.setRawParameters(path,edited);
             require(invalidations==1 && before!=model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString(),
