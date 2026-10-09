@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QColorSpace>
+#include <QStringList>
 #include <QtEndian>
 
 #include <algorithm>
@@ -219,30 +220,41 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     if (!parameters.hasValidOrientation()) {
         return {{}, QStringLiteral("RAW/YUV orientation is invalid")};
     }
+    if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
     const qsizetype frameSize = frameByteSize(parameters);
-    QFile file(request.path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        return {{}, file.errorString()};
-    }
+    const QFileInfo sourceInfo(request.path);
     qsizetype offset = 0;
-    if (!checkedFrameOffset(parameters, frameSize, file.size(), offset) || !file.seek(offset)) {
+    if (!checkedFrameOffset(parameters, frameSize, sourceInfo.size(), offset)) {
         return {{}, QStringLiteral("RAW/YUV parameters exceed the file bounds")};
     }
-    const QFileInfo sourceInfo(request.path);
-    const QString sourceKey = QStringLiteral("raw:%1:%2:%3:%4:%5")
-        .arg(sourceInfo.absoluteFilePath()).arg(sourceInfo.size())
-        .arg(sourceInfo.lastModified().toMSecsSinceEpoch()).arg(offset).arg(frameSize);
+    // Source identity describes storage, not the display transform. Colour, white
+    // balance and orientation edits reuse bytes; another frame/layout is independent.
+    const QString sourceKey = QStringList{
+        QStringLiteral("raw-v2"), sourceInfo.absoluteFilePath(), QString::number(sourceInfo.size()),
+        QString::number(sourceInfo.lastModified().toMSecsSinceEpoch()),
+        QString::number(parameters.frameIndex), QString::number(offset), QString::number(frameSize),
+        QString::number(parameters.size.width()), QString::number(parameters.size.height()),
+        QString::number(int(parameters.format)), QString::number(rowStride(parameters)),
+        QString::number(chromaStride(parameters)), QString::number(parameters.littleEndian),
+        QString::number(parameters.msbAligned), QString::number(parameters.validBits())
+    }.join(QLatin1Char('|'));
     const auto cachedSource = request.sourceCache ? request.sourceCache->get(sourceKey) : nullptr;
     QByteArray bytes = cachedSource ? cachedSource->bytes : QByteArray{};
     if (cachedSource) performance::mark(QStringLiteral("source.hit"));
     if (!cachedSource) {
-    bytes.resize(frameSize);
-    for (qsizetype read = 0; read < frameSize;) {
-        if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
-        const qint64 count = file.read(bytes.data() + read, std::min<qsizetype>(1024 * 1024, frameSize - read));
-        if (count <= 0) return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
-        read += count;
-    }
+        QFile file(request.path);
+        if (!file.open(QIODevice::ReadOnly)) return {{}, file.errorString()};
+        qsizetype currentOffset = 0;
+        if (!checkedFrameOffset(parameters, frameSize, file.size(), currentOffset) ||
+            currentOffset != offset || !file.seek(offset))
+            return {{}, QStringLiteral("RAW/YUV parameters exceed the file bounds")};
+        bytes.resize(frameSize);
+        for (qsizetype read = 0; read < frameSize;) {
+            if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
+            const qint64 count = file.read(bytes.data() + read, std::min<qsizetype>(1024 * 1024, frameSize - read));
+            if (count <= 0) return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
+            read += count;
+        }
         if (request.sourceCache && !request.isCancelled()) {
             auto source = std::make_shared<SourceFrame>(); source->bytes = bytes;
             request.sourceCache->put(sourceKey, std::move(source));

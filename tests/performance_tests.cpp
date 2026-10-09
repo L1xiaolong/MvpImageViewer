@@ -149,7 +149,8 @@ int main(int argc, char** argv) {
         }
         {
             auto raw=temp.filePath("frame.yuv"); QFile file(raw); require(file.open(QIODevice::WriteOnly),"raw create");
-            QByteArray bytes(24, char(128)); require(file.write(bytes)==bytes.size(),"raw write"); file.close();
+            QByteArray bytes(24, char(128)); bytes.append(QByteArray(24,char(200)));
+            require(file.write(bytes)==bytes.size(),"raw write"); file.close();
             RawImageParameters parameters; parameters.size={4,4}; parameters.format=RawPixelFormat::NV12;
             DecodeRequest request{raw,DecodePurpose::Full,{},parameters}; request.sourceCache=std::make_shared<SourceFrameCache>();
             RawImageDecoder decoder; auto result=decoder.decode(request); require(bool(result.frame),"raw decode");
@@ -157,8 +158,19 @@ int main(int argc, char** argv) {
             require(DisplayHistogramAnalyzer::analyze(*result.frame).isValid(),"display histogram");
             require(!DisplayHistogramAnalyzer::analyze(*result.frame, 10000, []{return true;}).isValid(),"display analysis cancellation");
             require(RawPlaneHistogramAnalyzer::analyze(*result.frame).isValid(),"source histogram");
+            const auto firstPlane=std::get<std::shared_ptr<const PlaneBufferSet>>(result.frame->storage);
             parameters.yuvMatrix=YuvMatrix::BT601; request.rawParameters=parameters;
-            require(bool(decoder.decode(request).frame),"parameter reuse decode");
+            auto recolored=decoder.decode(request);
+            require(recolored.frame && request.sourceCache->cost()==24 &&
+                    std::get<std::shared_ptr<const PlaneBufferSet>>(recolored.frame->storage)->storage.constData()==firstPlane->storage.constData(),
+                    "display transform reread RAW source bytes");
+            parameters.format=RawPixelFormat::NV21; request.rawParameters=parameters;
+            require(decoder.decode(request).frame && request.sourceCache->cost()==48,"RAW source layout identity");
+            parameters.frameIndex=1; request.rawParameters=parameters;
+            auto nextFrame=decoder.decode(request);
+            require(nextFrame.frame && request.sourceCache->cost()==72,"RAW source frame identity");
+            const auto sample=RawPlaneAccessor(*nextFrame.frame).yuvAtSourcePixel({0,0});
+            require(sample && sample->y==200,"RAW cached source used another frame");
             request.activeConsumers=std::make_shared<std::atomic_int>(-1);
             require(!decoder.decode(request).frame,"raw cancellation");
         }
