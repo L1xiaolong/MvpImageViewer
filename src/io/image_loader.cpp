@@ -35,7 +35,8 @@ QString cacheKeyPrefix(const DecodeRequest& request, const QFileInfo& info) {
         QLatin1Char('|') + QString::number(info.lastModified().toMSecsSinceEpoch()) +
         QLatin1Char('|') + QString::number(request.maximumSize.width()) + QLatin1Char('x') +
         QString::number(request.maximumSize.height()) + QLatin1Char('|') +
-        QString::number(static_cast<int>(request.purpose) + (request.metadataSource ? 100 : 0));
+        QString::number(static_cast<int>(request.purpose) + (request.metadataSource ? 100 : 0) +
+                        (request.requireDisplayImage ? 200 : 0));
 }
 
 } // namespace
@@ -150,6 +151,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     if (!request.rawParameters) {
         request.rawParameters = rawParameters(request.path);
     }
+    if (!request.rawParameters && decoder_->executionMode(request.path) == DecodeExecutionMode::Parallel)
+        request.requireDisplayImage = false; // Encoded images already contain their full CPU image.
     const QString keyPrefix = cacheKeyPrefix(request, sourceInfo);
     const QString decoderIdentity = decoder_->cacheIdentity();
     const QString key = keyPrefix + QLatin1Char('|') +
@@ -310,7 +313,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                     }
                 }
             }
-            if (result.frame && !request.isCancelled() && request.purpose != DecodePurpose::Thumbnail && !request.metadataSource) {
+            if (result.frame && !request.isCancelled() && request.purpose != DecodePurpose::Thumbnail &&
+                !request.metadataSource && !request.requireDisplayImage) {
                 auto prepared = std::make_shared<ImageFrame>(*result.frame);
                 if (const auto* image = prepared->qImage(); image && image->format() == QImage::Format_RGBA64)
                     prepared->uploadImage = image->convertedTo(QImage::Format_RGBA16FPx4);
@@ -603,6 +607,8 @@ std::optional<RawImageParameters> ImageLoader::rawParameters(const QString& path
 bool ImageLoader::isCached(DecodeRequest request) const {
     Q_ASSERT(thread() == QThread::currentThread());
     if (!request.rawParameters) request.rawParameters = rawParameters(request.path);
+    if (!request.rawParameters && decoder_->executionMode(request.path) == DecodeExecutionMode::Parallel)
+        request.requireDisplayImage = false;
     if (request.purpose == DecodePurpose::Preview) {
         DecodeRequest candidate = request;
         candidate.purpose = DecodePurpose::Full;

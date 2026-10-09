@@ -110,8 +110,10 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                                           ? DecodePurpose::Full
                                           : galleryPreview ? DecodePurpose::Preview
                                                            : DecodePurpose::Thumbnail;
+        DecodeRequest request{path, purpose, requestedSize_, parameters};
+        request.requireDisplayImage = galleryFull || galleryPreview;
         auto handle = loader_->request(
-            ++requestCounter_, {path, purpose, requestedSize_, parameters},
+            ++requestCounter_, std::move(request),
             [self](quint64, const DecodeResult& result) {
                 if (!self || self->cancelled_.load(std::memory_order_relaxed)) return;
                 QImage image;

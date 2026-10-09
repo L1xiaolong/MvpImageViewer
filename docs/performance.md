@@ -118,4 +118,12 @@ animated-scroll增加Qt动画时钟对照，不替换原来的timer scroll场景
 
 [Qt场景图文档](https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html)说明了vsync失效与QWindow请求更新等待的诊断方法。仅实验设置QT_QPA_UPDATE_IDLE_TIME=0，两轮P95为17ms，但P50为5～6ms，意味着绘制频率明显增加；停止补图138/239ms，并非所有指标改善。没有把该变量设置成应用默认，也没有改变OpenGL基线。实验位于build/perf-results/idle-zero，不能作为默认配置已达标的证据。
 
-完整验收仍未结束：需继续验证CPU预览消费者复用GPU RAW帧时的清晰度、色彩设置变化后的Qt图片缓存失效，以及真实相机/HEIF/超大PNG/慢盘压力、Qt6.9构建、GPU像素对照和完整回退矩阵。目标保持进行中。
+完整验收仍未结束：需继续验证色彩设置变化后的Qt图片缓存失效，以及真实相机/HEIF/超大PNG/慢盘压力、Qt6.9构建、GPU像素对照和完整回退矩阵。目标保持进行中。
+
+## CPU图库预览的清晰度（2026-10-09）
+
+RHI全图帧的原始平面为原生尺寸，但RAW/YUV的CPU后备图通常仅960×720。图库的QML Image只能显示CPU图，原来直接复用Full缓存会在切换到全图时降低清晰度。DecodeRequest新增requireDisplayImage：图库预览/全图请求独立的CPU表示，相机RAW与RAW/YUV的完整CPU显示保留原生尺寸；GPU画布仍使用有界后备图与原始平面。缓存身份包含表示类型，图库只复用同类足够清晰的Full/Preview；编码图片不需要不同表示，继续共享缓存。CPU专用表示不创建没有消费者的半浮点/P010 GPU上传缓冲。
+
+回归通过真正的LibRaw DNG检查首次/源缓存CPU Full都是1536×1024且逐像素一致；先缓存960宽的GPU后备帧，再请求1536预览和CPU Full，验证不会降级、像素一致且再次预览直接命中CPU Full。1536×1024 RAW16和NV12也验证原生CPU尺寸。最终Release构建与CTest通过（8.71s）。
+
+64张合成DNG的原生Gallery冷缓存单轮截图和日志位于build/perf-results/dng-gallery-display：首帧1315ms、可见缩略图首屏232ms、29个完成请求、无解码失败。该单轮在最后删除CPU专用上传缓冲之前运行，只用于UI与显示路径检查，不作为最终内存或全格式性能验收。截图确认大图及缩略图正常，测试的逐像素比对负责尺寸和缓存准确性验证。

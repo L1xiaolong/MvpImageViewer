@@ -164,6 +164,19 @@ int main(int argc, char** argv) {
         }
         {
             RawImageDecoder decoder;
+            for (auto format : {RawPixelFormat::NV12, RawPixelFormat::Raw16}) {
+                RawImageParameters parameters; parameters.size={1536,1024}; parameters.format=format;
+                auto path=temp.filePath("large-display.raw"); QFile file(path);
+                require(file.open(QIODevice::WriteOnly),"CPU full source fixture");
+                QByteArray bytes(frameByteSize(parameters),char(128));
+                require(file.write(bytes)==bytes.size(),"CPU full source write"); file.close();
+                DecodeRequest request{path,DecodePurpose::Full,{},parameters};
+                auto fallback=decoder.decode(request);
+                request.requireDisplayImage=true;
+                auto display=decoder.decode(request);
+                require(fallback.frame && display.frame && fallback.frame->qImage()->width()==960 &&
+                        display.frame->qImage()->size()==parameters.size,"RAW/YUV CPU full display lost native dimensions");
+            }
             for (auto format : {RawPixelFormat::NV12, RawPixelFormat::NV21, RawPixelFormat::I420,
                                 RawPixelFormat::P010, RawPixelFormat::MipiRaw10, RawPixelFormat::MipiRaw12, RawPixelFormat::Raw16}) {
                 for (bool littleEndian : {true, false}) {
@@ -222,6 +235,13 @@ int main(int argc, char** argv) {
             auto reset=decoder.decode(defaults);
             require(bool(reset.frame) && reset.frame->rawParameters->demosaic,"source retained a request override");
             require(*native.frame->qImage()==*reset.frame->qImage(),"cached file defaults changed developed pixels");
+            DecodeRequest cpuFull{path,DecodePurpose::Full}; cpuFull.requireDisplayImage=true;
+            auto freshCpu=decoder.decode(cpuFull);
+            cpuFull.sourceCache=cfa.sourceCache;
+            auto cachedCpu=decoder.decode(cpuFull);
+            require(freshCpu.frame && cachedCpu.frame && freshCpu.frame->qImage()->size()==QSize(1536,1024),
+                    "CPU full RAW display used the GPU fallback dimensions");
+            require(*freshCpu.frame->qImage()==*cachedCpu.frame->qImage(),"cached CPU full RAW pixels changed");
             cfa.activeConsumers=std::make_shared<std::atomic_int>(-1);
             require(!decoder.decode(cfa).frame,"cancelled cached DNG source rendered");
             ImageLoader loader(std::make_shared<CameraRawDecoder>());
@@ -245,6 +265,24 @@ int main(int argc, char** argv) {
             bool memoryHit=false;
             loader.request(2,{path,DecodePurpose::Thumbnail,{64,64}},[&](auto,const auto& result){memoryHit=result.frame==first;});
             require(memoryHit,"discovered RAW defaults lost the decoded memory entry");
+            ImageFramePtr gpuFull, cpuPreview, fullDisplay;
+            bool gpuDone=false, previewDone=false, fullDone=false;
+            loader.request(3,{path,DecodePurpose::Full},[&](auto,const auto& result){gpuFull=result.frame;gpuDone=true;});
+            pump([&]{return gpuDone;},10000);
+            require(gpuFull && gpuFull->qImage()->width()==960,"GPU RAW fallback fixture");
+            DecodeRequest galleryPreview{path,DecodePurpose::Preview,{1536,1536}};
+            galleryPreview.requireDisplayImage=true;
+            loader.request(4,galleryPreview,[&](auto,const auto& result){cpuPreview=result.frame;previewDone=true;});
+            pump([&]{return previewDone;},10000);
+            require(cpuPreview && cpuPreview->qImage()->size()==QSize(1536,1024),"gallery reused an undersized GPU full fallback");
+            loader.request(5,cpuFull,[&](auto,const auto& result){fullDisplay=result.frame;fullDone=true;});
+            pump([&]{return fullDone;},10000);
+            require(fullDisplay && *fullDisplay->qImage()==*cpuPreview->qImage(),"gallery full upgrade changed RAW display pixels");
+            require(fullDisplay->uploadImage.isNull() && cpuPreview->uploadImage.isNull(),
+                    "CPU-only gallery allocated an unused GPU upload buffer");
+            memoryHit=false;
+            loader.request(6,galleryPreview,[&](auto,const auto& result){memoryHit=result.frame==fullDisplay;});
+            require(memoryHit && loader.isCached(galleryPreview),"gallery did not reuse its sufficient CPU full cache");
             auto edited=*loader.rawParameters(path); edited.demosaic=!edited.demosaic;
             loader.setRawParameters(path,edited);
             require(invalidations==1 && before!=model.index(0).data(ThumbnailModel::ThumbnailUrlRole).toString(),

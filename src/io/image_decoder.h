@@ -30,6 +30,9 @@ struct DecodeRequest {
     }
     std::shared_ptr<SourceFrameCache> sourceCache;
     ImageFramePtr metadataSource;
+    // QML Image consumes the CPU image; RHI consumers can use native source planes.
+    // Keep these representations distinct when Full has a bounded CPU fallback.
+    bool requireDisplayImage = false;
     QString path;
     DecodePurpose purpose = DecodePurpose::Preview;
     QSize maximumSize;

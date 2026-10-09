@@ -255,7 +255,8 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
     const QSize logicalDisplaySize = orientedImageSize(parameters.size, parameters.orientation);
     QSize outputSize = logicalDisplaySize;
     const QSize maximumSize =
-        request.purpose == DecodePurpose::Full ? kFullFallbackMaximumSize : request.maximumSize;
+        request.purpose == DecodePurpose::Full && !request.requireDisplayImage
+            ? kFullFallbackMaximumSize : request.maximumSize;
     if (!maximumSize.isEmpty() &&
         (outputSize.width() > maximumSize.width() || outputSize.height() > maximumSize.height())) {
         outputSize.scale(maximumSize, Qt::KeepAspectRatio);

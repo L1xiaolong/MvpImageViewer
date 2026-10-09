@@ -412,7 +412,8 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
             // Demosaiced Full frames use a bounded CPU fallback and native GPU planes.
             // CFA display instead uploads this image, so an unbounded Full request must
             // keep its native size, exactly like a fresh LibRaw decode.
-            const QSize maximum = request.maximumSize.isEmpty() && parameters.demosaic
+            const QSize maximum = request.maximumSize.isEmpty() && parameters.demosaic &&
+                                  !request.requireDisplayImage
                 ? QSize(960, 720) : request.maximumSize;
             const QSize size = maximum.isEmpty() ? QSize{}
                 : parameters.size.scaled(maximum, Qt::KeepAspectRatio);
@@ -576,9 +577,10 @@ DecodeResult decodeWithLibRaw(const DecodeRequest& request) {
 
     if (code == LIBRAW_SUCCESS && mosaic && rawParameters && rawParameters->demosaic &&
         (request.purpose == DecodePurpose::Full || applicationDevelopPreview)) {
-        const QSize maximum = request.maximumSize.isEmpty() ? QSize(960, 720)
+        const QSize maximum = request.maximumSize.isEmpty() && !request.requireDisplayImage ? QSize(960, 720)
                                                              : request.maximumSize;
-        const QSize fallbackSize = rawParameters->size.scaled(maximum, Qt::KeepAspectRatio);
+        const QSize fallbackSize = maximum.isEmpty() ? QSize{}
+            : rawParameters->size.scaled(maximum, Qt::KeepAspectRatio);
         QImage developed = renderBayerImage(mosaic->storage, *rawParameters, fallbackSize,
                                              [&request] { return request.isCancelled(); });
         if (!developed.isNull()) {
