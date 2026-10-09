@@ -12,10 +12,6 @@ class ImageLoader;
 
 } // namespace mvpview
 
-QT_BEGIN_NAMESPACE
-class QFileSystemModel;
-QT_END_NAMESPACE
-
 namespace mvpview {
 
 // Resolves Windows Shell folder artwork for Quick Access entries. Other platforms keep using
@@ -27,8 +23,6 @@ class SystemFolderIconProvider final : public QQuickImageProvider {
     QImage requestImage(const QString& id, QSize* size,
                         const QSize& requestedSize) override;
 
-  private:
-    std::unique_ptr<QFileSystemModel> fileSystemModel_;
 };
 
 // Cross-platform image provider for QML thumbnails. The URL contains only an encoded local path;

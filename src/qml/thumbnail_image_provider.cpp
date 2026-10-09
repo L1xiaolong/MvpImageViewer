@@ -9,30 +9,36 @@
 #include <QAbstractFileIconProvider>
 #include <QEventLoop>
 #include <QFileInfo>
-#include <QFileSystemModel>
+#include <QCoreApplication>
 #include <QMutexLocker>
 #include <QPainter>
 #include <QPointer>
 #include <QQuickTextureFactory>
+#include <QThread>
 #include <QUrl>
 
 namespace mvpview {
 
 SystemFolderIconProvider::SystemFolderIconProvider()
-    : QQuickImageProvider(QQuickImageProvider::Image),
-      fileSystemModel_(std::make_unique<QFileSystemModel>()) {}
+    : QQuickImageProvider(QQuickImageProvider::Image,
+                          QQuickImageProvider::ForceAsynchronousImageLoading) {}
 
 SystemFolderIconProvider::~SystemFolderIconProvider() = default;
 
 QImage SystemFolderIconProvider::requestImage(const QString& id, QSize* size,
                                                const QSize& requestedSize) {
-    const performance::Scope trace(QStringLiteral("navigation.icon"));
+    const performance::Scope trace(QStringLiteral("navigation.icon"),
+        {{"guiThread", QThread::currentThread() == QCoreApplication::instance()->thread()}});
     const QString path = QUrl::fromPercentEncoding(id.toUtf8());
     const QSize target = requestedSize.isValid() ? requestedSize : QSize(32, 32);
-    QAbstractFileIconProvider* iconProvider = fileSystemModel_->iconProvider();
-    QIcon icon = iconProvider->icon(QFileInfo(path));
-    if (icon.isNull()) icon = iconProvider->icon(QAbstractFileIconProvider::Folder);
+    // Requests execute on Qt's image loading thread. Keep native icon state local,
+    // rather than accessing a QFileSystemModel created on the GUI thread.
+    QAbstractFileIconProvider iconProvider;
+    QIcon icon = iconProvider.icon(QFileInfo(path));
+    if (icon.isNull()) icon = iconProvider.icon(QAbstractFileIconProvider::Folder);
     const QImage image = icon.pixmap(target).toImage();
+    performance::mark(QStringLiteral("navigation.icon_result"),
+        {{"width", image.width()}, {"height", image.height()}, {"null", image.isNull()}});
     if (size) *size = image.size();
     return image;
 }

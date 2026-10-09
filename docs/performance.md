@@ -196,3 +196,11 @@ Windows平台先调用IsClipboardFormatAvailable检查文件、URL、文本和Sh
 ThumbnailModel原先在构造时用QPainter绘制Loading文字并读取主题文件夹图标，即使生产QML只使用ThumbnailUrlRole，也会触发字体/图标初始化。现在保持空位图，首次读取对应Qt::DecorationRole时才创建并保留；旧式模型消费者仍得到相同装饰，不改图片URL或解码行为。两个辅助函数加入model.text_placeholder/model.folder_placeholder作用域观测。
 
 Release构建、CTest通过（8.00s）。build/perf-results/lazy-decoration-startup与CTest曾并行执行，不用于性能对照；随后独立重复的build/perf-results/lazy-decoration-startup-serial为原生Windows、默认OpenGL、Qt6.11、100张合成PNG、两轮冷缓存和独立设置。首次browse.initialize为41/35ms，前一提交clipboard-format-guard为148/88ms；生产启动没有model.*占位绘制事件。整体首帧1015/933ms、补图123/126ms，与前一提交1042/907ms、125/120ms相比没有证据支持整体改善，字体初始化可能移到了真实文字绘制。GUI心跳仍有72～132ms间隔。该修改只确认移除了不使用的构造工作，不宣称50ms启动停顿或完整性能目标达成。
+
+## 导航Shell图标异步加载（2026-10-09）
+
+SystemFolderIconProvider使用ForceAsynchronousImageLoading，将Quick Access的Shell图标查询交给Qt的图片加载线程。requestImage创建局部QAbstractFileIconProvider，不再访问GUI线程创建的QFileSystemModel，也不为图标提供器额外构造文件系统模型。保留原生按路径图标和Folder后备规则、图片URL及Qt图片缓存，不增加解码线程。线程行为见[Qt图片提供器文档](https://doc.qt.io/qt-6/qquickimageprovider.html)；[Qt6.9 Windows图标实现](https://raw.githubusercontent.com/qt/qtbase/v6.9.0/src/plugins/platforms/windows/qwindowstheme.cpp)也有工作线程COM初始化和Shell查询路径。静态源码检查不能代替Qt6.9独立构建。Qt该类型使用每个引擎一个图片加载线程，慢Shell图标仍可能延迟同线程的其他图片；没有把这个有限导航请求优化当成全局资源预算已完成。
+
+navigation.icon记录guiThread，navigation.icon_result记录空图和尺寸。Release构建、CTest通过（7.60s）。原生独立测试build/perf-results/async-native-icons：100张合成PNG、三轮冷缓存、独立设置、默认OpenGL/Qt6.11，每轮5个图标均guiThread=false、非空，日志没有线程/图片警告，截图确认Home/Desktop/Documents/Downloads/Pictures图标正常。首帧895/851/892ms，首屏补图125/124/141ms；相邻版本lazy-decoration-startup-serial首帧1015/933ms，但不同样本次数的局部对照不构成正式回退矩阵。GUI心跳仍72～138ms，启动50ms门槛未通过。
+
+build/perf-results/async-icons-four-panes：1万、100、10万、1000条目四个不同目录，两轮动画前滚/跳跃/反向/停止，第一轮冷、第二轮复用本次积累的磁盘缓存。每轮12个停止视口均补齐，停止补图P95为107/74ms，运动帧P95为16/17ms，重复上报与解码失败均0，峰值工作集750358528/618946560字节。与前次frame-anchor-fix的100/78ms相比冷停止补图单次增加7ms，不能声称全部指标回退不超过5%；需扩充配对重复次数并覆盖真实格式。
