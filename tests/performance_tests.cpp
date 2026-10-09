@@ -76,6 +76,26 @@ int main(int argc, char** argv) {
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
         {
+            const auto budget=std::make_shared<ResultBufferBudget>(100);
+            auto first=budget->reserve(60,[]{return false;});
+            auto waiting=std::async(std::launch::async,[budget]{return budget->reserve(50,[]{return false;});});
+            pump([&]{return budget->snapshot().waiters==1;});
+            require(budget->snapshot().bytes==60,"result budget admitted excess bytes");
+            first.reset(); auto second=waiting.get();
+            require(second && budget->snapshot().bytes==50 && budget->snapshot().peakBytes<=100,"result reservation did not wake/release");
+            std::atomic_bool cancelled=false;
+            auto cancelWaiting=std::async(std::launch::async,[budget,&cancelled]{return budget->reserve(60,[&]{return cancelled.load();});});
+            pump([&]{return budget->snapshot().waiters==1;}); cancelled=true;
+            require(!cancelWaiting.get() && budget->snapshot().bytes==50,"result wait ignored cancellation");
+            second.reset();
+            auto oversized=budget->reserve(180,[]{return false;});
+            require(oversized && budget->snapshot().bytes==180,"explicit oversized image rejected");
+            auto closing=std::async(std::launch::async,[budget]{return budget->reserve(1,[]{return false;});});
+            pump([&]{return budget->snapshot().waiters==1;}); budget->close();
+            require(!closing.get(),"closing result budget left a worker waiting");
+            oversized.reset(); require(budget->snapshot().bytes==0,"result reservation leaked bytes");
+        }
+        {
             auto parallel=std::make_shared<ParallelProbeDecoder>(); ImageLoader loader(parallel);
             QVector<LoadHandle> background; bool backgroundDelivered=false;
             for (int i=0;i<20;++i) background.append(loader.request(i,

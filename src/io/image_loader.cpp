@@ -84,6 +84,7 @@ ImageLoader::~ImageLoader() {
     dispatchTimer_.stop();
     dispatchWake_.stop();
     for (auto& job : inFlight_) job.activeConsumers->store(-1);
+    resultBufferBudget_->close(); // Wake workers before waiting for them on the GUI thread.
     pool_.waitForDone();
     serializedPool_.waitForDone();
     writePool_.waitForDone();
@@ -236,9 +237,10 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const auto decoder = decoder_;
     const auto diskCache = diskCache_;
     const auto pendingWrites = pendingWrites_;
+    const auto resultBufferBudget = resultBufferBudget_;
     inFlight_[key].work =
         [self, decoder, diskCache, request = std::move(request), key, keyPrefix, decoderIdentity, generation,
-         activeConsumers, pendingWrites] {
+         activeConsumers, pendingWrites, resultBufferBudget] {
             DecodeResult result;
             const bool abandoned = request.isCancelled();
             if (!abandoned && request.purpose == DecodePurpose::Thumbnail) {
@@ -339,19 +341,31 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 }
                 result.frame = std::move(prepared);
             }
+            const qint64 decodeElapsedMs = decodeTimer.elapsed();
+            QElapsedTimer resultWait; resultWait.start();
+            std::shared_ptr<ResultBufferBudget::Reservation> resultReservation;
+            if (result.frame && !request.metadataSource) {
+                resultReservation = resultBufferBudget->reserve(result.frame->byteSize(),
+                    [&request] { return request.isCancelled(); });
+                if (!resultReservation) result = {{}, QStringLiteral("Cancelled")};
+            }
             if (!self) return;
             QMetaObject::invokeMethod(
                 self,
-                [self, completion = [self, result = std::move(result), key, keyPrefix, decoderIdentity, purpose = request.purpose,
+                [self, completion = [self, resultReservation, result = std::move(result), key, keyPrefix, decoderIdentity, purpose = request.purpose,
                  sourcePath = request.path, generation, activeConsumers, diskHit, metadataOnly = bool(request.metadataSource),
-                 elapsedMs = decodeTimer.elapsed()]() {
+                 elapsedMs = decodeElapsedMs, bufferWaitMs = resultWait.elapsed()]() {
                     if (!self) {
                         return;
                     }
                     performance::mark(QStringLiteral("loader.completed"),
-                        {{"elapsedMs", elapsedMs}, {"diskHit", diskHit}, {"purpose", int(purpose)},
+                        {{"elapsedMs", elapsedMs}, {"bufferWaitMs", bufferWaitMs}, {"diskHit", diskHit}, {"purpose", int(purpose)},
                          {"cancelled", activeConsumers->load() <= 0}, {"failed", !result.frame && activeConsumers->load() > 0},
                          {"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
+                    const auto buffers = self->resultBufferBudget_->snapshot();
+                    performance::mark(QStringLiteral("loader.result_buffers"),
+                        {{"bytes", qint64(buffers.bytes)}, {"peakBytes", qint64(buffers.peakBytes)},
+                         {"waiters", buffers.waiters}});
                     diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
                         QStringLiteral("loader.completed"),
                         {{"elapsedMs", elapsedMs}, {"diskHit", diskHit},

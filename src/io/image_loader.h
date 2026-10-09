@@ -1,4 +1,5 @@
 #pragma once
+#include "core/result_buffer_budget.h"
 
 #include "core/weighted_lru_cache.h"
 #include "io/image_decoder.h"
@@ -135,6 +136,8 @@ class ImageLoader final : public QObject {
     QTimer dispatchWake_;
     QElapsedTimer completionClock_;
     std::deque<std::function<void()>> completions_;
+    std::shared_ptr<ResultBufferBudget> resultBufferBudget_ =
+        std::make_shared<ResultBufferBudget>(128LL * 1024 * 1024);
     QThreadPool writePool_;
     std::shared_ptr<std::atomic_int> pendingWrites_ = std::make_shared<std::atomic_int>(0);
     int parallelRunning_ = 0;
