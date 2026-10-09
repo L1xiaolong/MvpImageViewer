@@ -364,3 +364,18 @@ canAutomaticallyLoadFull此前只判断当前驻留尚未超限和原图CPU成�
 - build/perf-results/automatic-full-admission-fit：1800×1200合成PNG目录，应用冷缓存全屏；6次源解码含Full、无失败及自动联合预算拒绝。CPU/GPU峰值22866944/77788704字节，工作集476917760字节，确认预算足够时不会一律停止自动补全。
 
 这仍是单次预估，不是跨面板的原子额度预约；连续多个控制器可能在首个任务分配前各自通过判断，后台任务、画布尺寸变化也可能在之后增长。源帧/已缓存原图复用未逐项扣减新增成本，估算会保守；真实图集、mipmap、驱动空间和临时分配未全部计入。严格联合准入、满载GUI释放回退及完整性能门槛继续未完成。
+
+## 区分交换信号与GUI通知，合并导航设置写入（2026-10-09）
+
+此前motionFrameP95来自GUI收到排队frameSwapped通知后的间隔，包含通知延迟，不能直接解释成渲染线程绘制/交换间隔。保留这个旧指标，在场景图信号线程直接采样swapIntervalUs、before/afterSynchronizing及before/afterRendering耗时，将不可变样本随原GUI通知记录；sampleSinceStartMs用于运动区间归属，deliveryDelayMs单独反映GUI排队。新增帧计时日志仍在GUI侧提交，不在渲染阶段执行qInfo。新增motionSwapFrameP95、motionSynchronizeP95Ms、motionRenderP95Ms及motionFrameDeliveryP95Ms；这些是Qt信号阶段的墙钟时间，不是GPU硬件计时或屏幕实际呈现时间。没有替换旧指标、改Windows OpenGL默认或调整验收门槛。
+
+PerformanceGuiApplication仅在MVPVIEW_PERF模式对GUI线程notify计时，记录大于等于4ms的实际事件处理、类型、接收对象类、起止时点及嵌套深度。它与16ms心跳的递送间隔分开；嵌套事件耗时可能重叠，guiEventsOver50Ms计记录数，不能累加成总停顿。maxMotionGuiEventMs单列与运动区间重叠的事件。回归通过12ms延迟销毁的DeferredDelete，验证接收对象在事件处理中销毁后仍安全记录其预先快照的身份及耗时。生产模式没有这些计时/字符串构造/帧信号连接。
+
+- build/perf-results/frame-stage-four-panes：设置写入优化前，Qt6.11、Windows默认OpenGL、独立设置，四目录（1万、100、10万、1000条目），共享初始空应用磁盘缓存，两轮动画滚动。旧通知间隔P95均33ms，直接交换信号P95为18.399/18.862ms，同步0.339/0.296ms、渲染阶段17.043/17.303ms、递送延迟20/20ms；所有531个首轮帧信号均来自非GUI线程。每轮12个停止视口补齐，无失败或重复上报，停止补图207/122ms。实际GUI事件最大221.424/210.966ms，首帧通知里连续打开三个目录各70～75ms。初次标准链接被普通启动PID2828占用，未关闭进程，曾链接独立验证文件；后续CMake标准目标重新链接成功，上述实际基准使用标准可执行文件。
+- build/perf-results/directory-phase-startup：进一步分阶段记录，四个目录打开为69/73/73/71ms；持久化阶段21.798/26.209/22.015/22.252ms，通知链45.795/45.448/49.039/47.540ms。代码核查发现每次导航使用两个临时QSettings各写一次，通知共享最近目录时emptyPane及其他接收面板又重复写同一值。
+
+现在将导航的lastDirectory和recentLocations放在一个QSettings作用域内一次提交；setSharedRecentLocations只更新接收面板及发通知，不重复持久化。全仓库调用只来自BrowseWorkspaceController共享同步；原导航和清空操作均已先写入或删除设置，导航时间点持久化及原键/排序/12条上限保留。没有推迟到退出时才保存，clear最近记录也不再被接收面板重新创建空设置键。
+
+- build/perf-results/navigation-write-coalescing-four-panes：最终代码，同配置两轮滚动。目录打开分别14/13/15/14ms与15/13/19/14ms；第一轮持久化11.103～11.688ms、通知1.040～3.005ms，首帧通知整体45.496ms（此前221.424ms）。分别读取两个隔离INI文件并断言lastDirectory为10000目录、recentLocations依次10000/1000-b/100000/100，均通过。每轮12个停止视口补齐，无失败和重复上报；停止补图141/191ms。直接交换信号P95为18.561/19.262ms，旧通知P95为33/34ms，同步0.353/0.316ms、渲染阶段17.230/17.358ms、递送延迟20/21ms。运动区间GUI事件最大21.132/20.741ms，无大于50ms记录；全程GUI事件最大119.517/119.679ms，启动Expose/首批UpdateRequest及截图退出仍存在超过50ms记录。源调用225/138次、磁盘命中0/221次，工作集708030464/739807232字节；第二轮仍非纯磁盘命中，完成需求数量不同，不能以两轮局部样本证明全格式30%或不超过5%回退。
+
+最终标准Release构建成功，CTest两个测试均通过（11.01s），Python语法检查通过。交换信号的这两轮合成PNG样本在20ms内，不能扩大为全部滚动/缩放/格式达标，也不能据此消除GUI通知延迟或屏幕呈现的验证要求。后续需定位启动Qt窗口事件中的剩余百毫秒等待，并继续跨面板资源预约、完整正确性与格式性能矩阵。

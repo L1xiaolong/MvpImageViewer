@@ -69,6 +69,9 @@ for run in range(args.runs):
                 motion.append((start_motion,e['sinceStartMs'])); start_motion=None
     motion_frames=[e.get('intervalMs',e.get('gapMs')) for e in events if e['event']=='ui.frame' and any(a+100<e['sinceStartMs']<b for a,b in motion)]
     motion_frames=[v for v in motion_frames if v is not None]
+    sampled_frames=[e for e in events if e['event']=='ui.frame' and any(a+100<e.get('sampleSinceStartMs',e['sinceStartMs'])<b for a,b in motion)]
+    def percentile95(values):
+        return sorted(values)[max(0,math.ceil(len(values)*.95)-1)] if values else None
     viewport_reports=[e for e in events if e['event']=='viewport.report']
     report_keys={(e['owner'],e['frame']) for e in viewport_reports}
     presented=[e for e in events if e['event']=='viewport.presented']
@@ -105,6 +108,16 @@ for run in range(args.runs):
     summary[-1]['guiCacheRetirementReleases']=sum(e['event']=='loader.cache_retirement_released' and e.get('guiThread',False) for e in events)
     summary[-1]['maxCacheClearGuiMs']=max([e['elapsedMs'] for e in events if e['event']=='scenario.cache_clear'],default=None)
     summary[-1]['automaticFullResourceDenials']=sum(e['event']=='loader.automatic_full_denied' for e in events)
+    summary[-1]['motionSwapFrameP95']=percentile95([e['swapIntervalUs']/1000 for e in sampled_frames if e.get('swapIntervalUs',-1)>=0])
+    summary[-1]['motionSynchronizeP95Ms']=percentile95([e['synchronizeUs']/1000 for e in sampled_frames if e.get('synchronizeUs',-1)>=0])
+    summary[-1]['motionRenderP95Ms']=percentile95([e['renderUs']/1000 for e in sampled_frames if e.get('renderUs',-1)>=0])
+    summary[-1]['motionFrameDeliveryP95Ms']=percentile95([e['deliveryDelayMs'] for e in sampled_frames if 'deliveryDelayMs' in e])
+    gui_events=[e for e in events if e['event']=='ui.gui_event']
+    summary[-1]['maxGuiEventMs']=max([e['elapsedUs']/1000 for e in gui_events],default=None)
+    summary[-1]['guiEventsOver50Ms']=sum(e['elapsedUs']>50000 for e in gui_events)
+    motion_gui_events=[e for e in gui_events if any(e.get('startSinceStartMs',e['sinceStartMs']-e['elapsedUs']/1000)<b and e['sinceStartMs']>a for a,b in motion)]
+    summary[-1]['maxMotionGuiEventMs']=max([e['elapsedUs']/1000 for e in motion_gui_events],default=None)
+    summary[-1]['motionGuiEventsOver50Ms']=sum(e['elapsedUs']>50000 for e in motion_gui_events)
     summary[-1].update({'maxDecodeWorkingBytes':max([e['peakBytes'] for e in working],default=None),
                        'maxDecodeWorkingWaitMs':max([e['workingWaitMs'] for e in completed if 'workingWaitMs' in e],default=None),
                        'maxResidentPixelBytes':max([e.get('peakResidentPixelBytes',e['residentPixelBytes']) for e in events if 'residentPixelBytes' in e],default=None),

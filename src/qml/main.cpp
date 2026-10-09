@@ -3,6 +3,7 @@
 #include <QStandardPaths>
 #include "io/default_image_decoder.h"
 #include "core/performance_trace.h"
+#include "qml/performance_gui_application.h"
 #include "browser/file_clipboard.h"
 #include "platform/full_screen_presentation_controller.h"
 #include "qml/app_settings.h"
@@ -111,7 +112,7 @@ static void startAnimatedScroll(QQuickWindow* window) {
 }
 
 static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service& diagnosticService) {
-    QGuiApplication app(argc, argv);
+    mvpview::PerformanceGuiApplication app(argc, argv);
     mvpview::FileClipboard::initialize();
 #ifdef Q_OS_WIN
     // Qt defaults to D3D11 on Windows. Some Intel drivers crash while Qt Quick creates
@@ -388,9 +389,39 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
         });
         heartbeat->start();
         auto lastFrame = std::make_shared<QElapsedTimer>(); lastFrame->start();
-        QObject::connect(mainWindow, &QQuickWindow::frameSwapped, &app, [lastFrame] {
-            mvpview::performance::mark(QStringLiteral("ui.frame"), {{"intervalMs", lastFrame->restart()}});
-        }, Qt::QueuedConnection);
+        struct RenderTiming {
+            QElapsedTimer sync, render, swap;
+            qint64 syncUs = -1, renderUs = -1;
+        };
+        // These fields belong to the scene-graph signal thread. Only snapshots
+        // cross to the GUI; logging remains on the existing GUI notification.
+        auto timing = std::make_shared<RenderTiming>();
+        QObject::connect(mainWindow, &QQuickWindow::beforeSynchronizing, &app, [timing] {
+            timing->sync.start();timing->syncUs = timing->renderUs = -1;
+        }, Qt::DirectConnection);
+        QObject::connect(mainWindow, &QQuickWindow::afterSynchronizing, &app, [timing] {
+            if (timing->sync.isValid()) timing->syncUs = timing->sync.nsecsElapsed() / 1000;
+        }, Qt::DirectConnection);
+        QObject::connect(mainWindow, &QQuickWindow::beforeRendering, &app, [timing] {
+            timing->render.start();
+        }, Qt::DirectConnection);
+        QObject::connect(mainWindow, &QQuickWindow::afterRendering, &app, [timing] {
+            if (timing->render.isValid()) timing->renderUs = timing->render.nsecsElapsed() / 1000;
+        }, Qt::DirectConnection);
+        QObject::connect(mainWindow, &QQuickWindow::frameSwapped, &app, [timing, lastFrame, &app] {
+            const auto intervalUs = timing->swap.isValid() ? timing->swap.nsecsElapsed() / 1000 : -1;
+            timing->swap.start();
+            const auto sampledAt = mvpview::performance::clock().elapsed();
+            const auto syncUs = timing->syncUs, renderUs = timing->renderUs;
+            const bool guiThread = QThread::currentThread() == app.thread();
+            QMetaObject::invokeMethod(&app, [lastFrame, intervalUs, sampledAt, syncUs, renderUs, guiThread] {
+                mvpview::performance::mark(QStringLiteral("ui.frame"),
+                    {{"intervalMs", lastFrame->restart()}, {"swapIntervalUs", intervalUs},
+                     {"sampleSinceStartMs", sampledAt}, {"synchronizeUs", syncUs}, {"renderUs", renderUs},
+                     {"deliveryDelayMs", mvpview::performance::clock().elapsed() - sampledAt},
+                     {"signalOnGuiThread", guiThread}});
+            }, Qt::QueuedConnection);
+        }, Qt::DirectConnection);
     }
 
     if (!displayMode.isEmpty()) {

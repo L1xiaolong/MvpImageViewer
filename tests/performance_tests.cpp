@@ -1,6 +1,7 @@
 #include "io/image_loader.h"
 #include "qml/accounted_texture_factory.h"
 #include "qml/thumbnail_image_provider.h"
+#include "qml/performance_gui_application.h"
 #include "io/thumbnail_disk_cache.h"
 #include "io/raw_image_decoder.h"
 #include "io/directory_scanner.h"
@@ -129,7 +130,35 @@ private:
 };
 int main(int argc, char** argv) {
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
-    QGuiApplication app(argc, argv);
+    const bool notifyProbe = argc == 2 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--gui-notify-probe");
+    if (notifyProbe) qputenv("MVPVIEW_PERF", "1");
+    PerformanceGuiApplication app(argc, argv);
+    if (notifyProbe) {
+        static QVector<QJsonObject> observed;
+        const auto previous = qInstallMessageHandler([](QtMsgType, const QMessageLogContext&, const QString& message) {
+            if (!message.startsWith(QStringLiteral("MVPVIEW_PERF "))) return;
+            const auto object = QJsonDocument::fromJson(message.mid(13).toUtf8()).object();
+            if (object.value("event").toString() == QStringLiteral("ui.gui_event")) observed.append(object);
+        });
+        bool destroyed = false;
+        class SlowDestruction final : public QObject {
+        public:
+            explicit SlowDestruction(bool& destroyed) : destroyed_(destroyed) {}
+            ~SlowDestruction() override { QThread::msleep(12);destroyed_ = true; }
+        private:
+            bool& destroyed_;
+        };
+        auto* receiver = new SlowDestruction(destroyed);
+        receiver->deleteLater();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        const bool measured = std::any_of(observed.cbegin(), observed.cend(), [](const auto& event) {
+            return event.value("eventType").toInt() == QEvent::DeferredDelete &&
+                event.value("elapsedUs").toDouble() >= 10000 && event.value("depth").toInt() >= 1 &&
+                event.value("receiverClass").toString() == QStringLiteral("QObject");
+        });
+        qInstallMessageHandler(previous);
+        return destroyed && measured ? 0 : 1;
+    }
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--export-dng"))
         return writeDngFixture(QString::fromLocal8Bit(argv[2])) ? 0 : 2;
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--sort-benchmark")) {

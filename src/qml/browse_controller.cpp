@@ -1311,6 +1311,14 @@ void BrowseController::setGridCellWidth(int width) {
 void BrowseController::openDirectoryInternal(const QString& path, bool addToHistory,
                                              bool pathAlreadyValidated) {
     const performance::Scope trace(QStringLiteral("directory.open_gui"), {{"validated", pathAlreadyValidated}});
+    QElapsedTimer phase;
+    if (performance::enabled()) phase.start();
+    const auto markPhase = [&phase](const char* name) {
+        if (!phase.isValid()) return;
+        performance::mark(QStringLiteral("directory.open_phase"),
+            {{"phase", QString::fromLatin1(name)}, {"elapsedUs", phase.nsecsElapsed() / 1000}});
+        phase.restart();
+    };
 #ifdef Q_OS_WIN
     if (!pathAlreadyValidated && isWindowsRemotePath(path)) {
         const quint64 requestGeneration = ++directoryRequestGeneration_;
@@ -1352,6 +1360,7 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
         setStatusText(QStringLiteral("Folder is hidden, unreadable, or unavailable: %1").arg(path));
         return;
     }
+    markPhase("validation");
     // The gallery owns an asynchronous decode independently of the thumbnail model. Clear it
     // before publishing the directory change so neither the old frame nor a late completion from
     // the previous folder can remain visible while the new folder is scanned.
@@ -1368,15 +1377,20 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
 #else
     Q_UNUSED(previousDirectory);
 #endif
+    markPhase("directory-state");
     // Persist at navigation time so an ordinary force-quit or crash still restores the last
     // meaningful workspace on the next start.
     diagnostics::event(diagnostics::Level::Info, diagnostics::browse(), QStringLiteral("directory.open"),
         {{"directory", diagnostics::fileId(currentDirectory_)}}, true);
-    QSettings().setValue(QStringLiteral("browser/lastDirectory"), currentDirectory_);
     recentLocations_.removeAll(currentDirectory_);
     recentLocations_.prepend(currentDirectory_);
     while (recentLocations_.size() > 12) recentLocations_.removeLast();
-    QSettings().setValue(QStringLiteral("browser/recentLocations"), recentLocations_);
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("browser/lastDirectory"), currentDirectory_);
+        settings.setValue(QStringLiteral("browser/recentLocations"), recentLocations_);
+    }
+    markPhase("persistence");
     emit recentLocationsChanged();
     recentCandidateTimer_->stop();
     recentCandidateDirectory_ = currentDirectory_;
@@ -1392,6 +1406,7 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     emit currentDirectoryChanged();
     emit navigationStateChanged();
     clearSelection();
+    markPhase("notifications");
     if (!directoryWatcher_->directories().isEmpty()) {
         directoryWatcher_->removePaths(directoryWatcher_->directories());
     }
@@ -1400,12 +1415,15 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
 #else
     directoryWatcher_->addPath(currentDirectory_);
 #endif
+    markPhase("watcher");
     scanBatchTimer_->stop();
     pendingScanFiles_.clear(); pendingScanOffset_ = 0; pendingScanBatchEnds_.clear();
     thumbnailModel_->setFiles({});
     incrementalScan_ = true;
     setStatusText(QStringLiteral("Scanning %1…").arg(QDir::toNativeSeparators(currentDirectory_)));
+    markPhase("model-reset");
     scanGeneration_ = scanner_->scanAsync(currentDirectory_);
+    markPhase("scan-start");
 }
 
 void BrowseController::rescanCurrentDirectory() {
@@ -1458,7 +1476,8 @@ void BrowseController::setSharedRecentFolders(const QStringList& paths) {
 void BrowseController::setSharedRecentLocations(const QStringList& paths) {
     if (recentLocations_ == paths) return;
     recentLocations_ = paths;
-    QSettings().setValue(QStringLiteral("browser/recentLocations"), recentLocations_);
+    // The originating navigation/clear already persisted this shared state.
+    // Receiving panes must not synchronously rewrite the same settings file.
     emit recentLocationsChanged();
 }
 
