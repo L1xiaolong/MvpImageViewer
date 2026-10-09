@@ -130,7 +130,7 @@ class BrowseController final : public QObject {
     Q_INVOKABLE QString registerThumbnailViewport();
     bool performanceTracing() const;
     Q_INVOKABLE void reportThumbnailPresentation(const QString& owner, int generation,
-                                                  int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs);
+                                                  int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs, int animationCycles = -1);
     Q_INVOKABLE void reportThumbnailObservation(const QString& state, const QString& owner,
                                                  int generation, int count, qint64 elapsedMs);
     Q_INVOKABLE void setThumbnailViewport(const QString& owner, const QVariantList& entries, bool fast);

@@ -487,6 +487,29 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
                 }
                 return;
             }
+            if (performanceScenario == QStringLiteral("memory-revisit")) {
+                // Exercise the production visibility/cancellation path with stable URLs.
+                // The parser excludes revisits that perform any source/disk decode.
+                auto* timer = new QTimer(mainWindow);
+                timer->setInterval(400);
+                auto step = std::make_shared<int>(0);
+                auto sheets = std::make_shared<QList<QPointer<QObject>>>();
+                for (auto* item : mainWindow->findChildren<QObject*>()) {
+                    if ((item->objectName().startsWith(QStringLiteral("paneContactSheet-")) ||
+                         item->objectName() == QStringLiteral("galleryStrip")) && item->property("visible").toBool())
+                        sheets->append(item);
+                }
+                QObject::connect(timer, &QTimer::timeout, mainWindow, [timer, step, sheets] {
+                    ++*step;
+                    const bool shown = *step % 2 == 0;
+                    mvpview::performance::mark(QStringLiteral("scenario.memory_revisit"),
+                        {{"iteration", (*step + 1) / 2}, {"shown", shown}, {"panes", sheets->size()}});
+                    for (const auto& sheet : *sheets) if (sheet) sheet->setProperty("visible", shown);
+                    if (*step >= 10) { timer->stop(); timer->deleteLater(); }
+                });
+                timer->start();
+                return;
+            }
             if (performanceScenario == QStringLiteral("animated-scroll")) {
                 startAnimatedScroll(mainWindow);
                 return;

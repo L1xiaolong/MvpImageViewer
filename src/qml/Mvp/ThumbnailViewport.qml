@@ -32,6 +32,7 @@ QtObject {
     property double firstPresentationStarted: 0
     property bool firstPresented: false
     property double presentationStarted: 0
+    property int presentationFrame: 0
     property bool presentationPending: false
     property var visibleItems: []
     property bool wasMoving: false
@@ -50,7 +51,8 @@ QtObject {
                 root.presentationPending = false
                 root.controller.reportThumbnailPresentation(root.owner, root.presentationGeneration,
                     root.visibleItems.length, Math.max(0, Date.now() - root.presentationStarted),
-                    !root.firstPresented, Math.max(0, Date.now() - root.firstPresentationStarted))
+                    !root.firstPresented, Math.max(0, Date.now() - root.firstPresentationStarted),
+                    Math.max(1, root.frameSequence - root.presentationFrame + 1))
                 root.firstPresented = true
             }
             if (root.settlingPending && root.settlingGeneration === root.presentationGeneration) {
@@ -199,6 +201,7 @@ QtObject {
                 visibleSignature = signature
                 ++presentationGeneration
                 presentationStarted = now
+                presentationFrame = frameSequence
                 if (visible.length > 0 && firstPresentationStarted === 0) firstPresentationStarted = now
                 presentationPending = visible.length > 0
                 if (settlingPending && !moving && visible.length > 0) {

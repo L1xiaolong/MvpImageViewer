@@ -803,9 +803,9 @@ int BrowseController::thumbnailIndexForPath(const QString& path) const {
 bool BrowseController::performanceTracing() const { return performance::enabled(); }
 
 void BrowseController::reportThumbnailPresentation(const QString& owner, int generation,
-                                                    int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs) {
+                                                    int count, qint64 elapsedMs, bool first, qint64 firstElapsedMs, int animationCycles) {
     performance::mark(QStringLiteral("viewport.presented"),
-        {{"owner", owner}, {"generation", generation}, {"visible", count}, {"elapsedMs", elapsedMs}, {"first", first}, {"firstElapsedMs", firstElapsedMs}});
+        {{"owner", owner}, {"generation", generation}, {"visible", count}, {"elapsedMs", elapsedMs}, {"first", first}, {"firstElapsedMs", firstElapsedMs}, {"animationCycles", animationCycles}});
 }
 
 void BrowseController::reportThumbnailObservation(const QString& state, const QString& owner,

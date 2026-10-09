@@ -396,3 +396,18 @@ ThumbnailTile现先保留缓存区单元格几何，进入requestThumbnail候选
 - build/perf-results/lazy-menu-final-list：最终代码同环境四面板列表应用冷缓存单轮。12个停止视口补齐，停止补图P95为127ms，无失败和重复上报；交换信号P95为17.611ms，GUI通知间隔仍33ms，递送延迟20ms，运动GUI最大17.682ms。全程GUI最大121.649ms，工作集609964032字节。列表仍存在帧通知延迟，不能把Grid改善推广为全部视图达标；截图00.png已检查列表显示正常。
 
 本阶段消除每个委托的三个隐藏菜单成本并降低首批内容polish；首帧约98ms同步等待仍存在。完整50ms GUI门槛、两帧内存命中、纯磁盘200ms、全格式/慢盘30%及回退5%矩阵、Qt6.9独立构建和跨面板原子资源准入继续未完成。
+
+
+## 独立的同进程内存复访测量（2026-10-09）
+
+新增仅MVPVIEW_PERF启用的memory-revisit原生场景，使用生产Grid/List/Gallery视口的visible属性，400ms间隔隐藏/恢复，五次恢复。保持图像URL、尺寸、目录和后端，不清空解码内存缓存，不将磁盘暖启动叫作内存命中。按每个显示阶段统计新需求代次及同代次viewport.presented；旧代次、未补齐面板不计通过。只要阶段存在源解码、磁盘命中或loader.dispatched（即使结果晚于阶段返回），inProcessOnly即为false。stableViewport另记录每面板仅一个需求代次，排除扫描中视口变化的二帧推断。记录每阶段真实loader.memory_hit数量，允许Qt图片缓存也参与复访，而非强制改变生产缓存行为。
+
+viewport.presented新增animationCycles，记录真实afterAnimating计数相对需求发布帧的差加1；最小1表示同一动画周期准备。它由原GUI frameSwapped处理时查询，可能包含下一帧afterAnimating及信号递送延迟，属于保守GUI观察周期，不能当成渲染线程已交换帧数或屏幕实际呈现帧数。elapsedMs同样保留GUI观测口径。新增字段不替换现有计时或放宽两帧目标，尚需准确区分Image.Ready/纹理上传/交换信号之间的时间线。
+
+- build/perf-results/memory-revisit-grid：最终Release、Qt6.11、Windows默认OpenGL、100条目PNG单面板，两次独立应用冷启动，每进程五次同视口复访。10次均每阶段37次loader内存命中，源解码/磁盘命中/工作派发均0，同代次整屏补齐且stableViewport=true。补齐观测耗时首轮38/21/37/17/41ms，次轮35/40/18/15/37ms，观察周期2～4。存在超过60Hz两帧约33ms的GUI观察耗时，且周期并非全部≤2，不能宣布两帧显示门槛通过。每次进程实际启动阶段40次源调用、无失败；复访不重复解码。
+- build/perf-results/memory-revisit-four-panes：1万、100、10万、1000条目四目录应用冷启动单轮，每次恢复四个视口均补齐，观测28/44/30/28/29ms。第一阶段无工作派发但有五个需求代次（stableViewport=false）；后四阶段各有1/1/1/2次源解码与同数量派发（inProcessOnly=false），不能用作四面板稳定纯内存二帧验收。无解码失败和重复上报，整个进程47次源调用、142次内存命中。
+- build/perf-results/memory-revisit-list：同100条目单面板列表应用冷启动，五次复访各15次内存命中、0源/磁盘/派发，视口稳定且每次补齐。耗时25/6/17/7/9ms，观察周期2/2/3/2/2；GUI观测耗时均在约33ms内，但一次3周期说明计数/通知时序仍需进一步拆分，不能作完整两帧通过结论。整个进程20次源调用、无失败。
+
+新增tools/performance_revisit.py独立分类器及五个回归，覆盖纯内存、派发后晚完成、磁盘/源工作混入、旧代次或面板缺失及零面板、复访中代次变化，均通过。Python语法检查及git diff --check通过。首轮主程序链接曾Permission denied，只读进程核查没有存活查看器，原因未确定；已成功链接相同Release对象的独立文件，随后标准CMake重试成功。上述基准实际使用最终标准MVPImageViewer.exe，未使用失败链接或旧程序结果；两个CTest最终通过（10.89s）。Grid及四面板summary在同一原始事件文件上用最终分类器补充stableViewport字段，没有重写原始日志。
+
+本阶段建立此前缺失的可重复内存复访证据，未修改加载时序；实际物理二帧呈现、纯磁盘200ms矩阵、首帧GUI长等待、完整格式性能和资源联合准入继续未完成。
