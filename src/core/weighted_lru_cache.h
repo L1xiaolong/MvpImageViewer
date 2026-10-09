@@ -2,11 +2,13 @@
 
 #include <QHash>
 #include <QString>
+#include <QVector>
 
 #include <algorithm>
 #include <list>
 #include <memory>
 #include <functional>
+#include <limits>
 
 namespace mvpview {
 
@@ -56,6 +58,7 @@ template <typename T> class WeightedLruCache final {
         entries_.clear();
         order_.clear();
         currentCost_ = 0;
+        pruneNextKey_.clear();
     }
 
     [[nodiscard]] qsizetype evictLeastRecentlyUsed() {
@@ -70,6 +73,33 @@ template <typename T> class WeightedLruCache final {
     }
 
     [[nodiscard]] qsizetype cost() const { return currentCost_; }
+    struct PruneResult {
+        QVector<std::shared_ptr<const T>> retired;
+        qsizetype cost = 0;
+        qsizetype examined = 0;
+    };
+    // Incremental LRU walk, including past externally held entries. Return owners
+    // so the caller can release large allocations away from the GUI thread.
+    [[nodiscard]] PruneResult pruneUnused(qsizetype maximumExamined = 32,
+                                          qsizetype targetCost = std::numeric_limits<qsizetype>::max()) {
+        PruneResult result;
+        while (!order_.empty() && result.examined < maximumExamined && result.cost < targetCost) {
+            auto found = entries_.find(pruneNextKey_);
+            if (found == entries_.end()) found = entries_.find(order_.back());
+            const QString key = found.key();
+            const auto position = found->orderIterator;
+            const bool finished = position == order_.begin();
+            pruneNextKey_ = finished ? QString{} : *std::prev(position);
+            ++result.examined;
+            if (found->value.use_count() == 1) {
+                result.cost += found->cost;
+                result.retired.append(found->value);
+                erase(key);
+            }
+            if (finished) break;
+        }
+        return result;
+    }
     [[nodiscard]] qsizetype size() const { return entries_.size(); }
     [[nodiscard]] qsizetype maximumCost() const { return maximumCost_; }
     [[nodiscard]] bool contains(const QString& key) const { return entries_.contains(key); }
@@ -92,6 +122,7 @@ template <typename T> class WeightedLruCache final {
     std::list<QString> order_;
     QHash<QString, Entry> entries_;
     Observer observer_;
+    QString pruneNextKey_;
 };
 
 } // namespace mvpview

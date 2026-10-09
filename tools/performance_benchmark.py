@@ -95,6 +95,9 @@ for run in range(args.runs):
     summary[-1]['sourceDecodeCalls']=sum(bool(e.get('sourceDecode')) for e in completed)
     summary[-1]['diskHits']=sum(bool(e.get('diskHit')) for e in completed)
     summary[-1]['memoryHits']=sum(e['event']=='loader.memory_hit' for e in events)
+    retirement=[e for e in events if e['event']=='loader.resource_retirement']
+    summary[-1]['resourceRetirementBatches']=len(retirement)
+    summary[-1]['maxResourceRetirementGuiMs']=max([e['elapsedMs'] for e in retirement],default=None)
     summary[-1].update({'maxDecodeWorkingBytes':max([e['peakBytes'] for e in working],default=None),
                        'maxDecodeWorkingWaitMs':max([e['workingWaitMs'] for e in completed if 'workingWaitMs' in e],default=None),
                        'maxResidentPixelBytes':max([e.get('peakResidentPixelBytes',e['residentPixelBytes']) for e in events if 'residentPixelBytes' in e],default=None),

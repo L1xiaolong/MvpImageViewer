@@ -142,6 +142,47 @@ int main(int argc, char** argv) {
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
         {
+            WeightedLruCache<ImageFrame> cache(4096);QVector<ImageFramePtr> pinned;
+            for(int i=0;i<40;++i){auto frame=std::make_shared<ImageFrame>();
+                frame->storage=QImage(2,2,QImage::Format_RGBA8888);pinned.append(frame);
+                cache.put(QString::number(i),frame,16);}
+            auto unused=std::make_shared<ImageFrame>();unused->storage=QImage(2,2,QImage::Format_RGBA8888);
+            cache.put("unused",unused,16);unused.reset();
+            auto first=cache.pruneUnused(32,16);
+            require(first.examined==32 && first.retired.isEmpty(),"bounded prune evicted external owners or exceeded scan budget");
+            auto next=cache.pruneUnused(32,16);
+            require(next.examined==9 && next.cost==16 && next.retired.size()==1 && !cache.contains("unused") && cache.size()==40,
+                    "incremental prune could not advance beyond pinned LRU entries");
+            require(next.retired.first()->qImage()->size()==QSize(2,2),"prune destroyed buffers before external retirement");
+        }
+        {
+            auto ledger=std::make_shared<PixelMemoryLedger>();SourceFrameCache cache({},ledger);
+            auto first=std::make_shared<SourceFrame>();first->bytes=QByteArray(64,'x');cache.put("active",first);first.reset();
+            auto held=cache.get("active");
+            auto next=std::make_shared<SourceFrame>();next->bytes=QByteArray(48,'y');cache.put("unused",next);next.reset();
+            auto retired=cache.pruneUnused(32,48);
+            require(retired.cost==48 && cache.cost()==64 && ledger->bytes()==112,"source pruning lost active or deferred pixel ownership");
+            retired.retired.clear();require(ledger->bytes()==64,"retired source pixels did not release");
+            held.reset();retired=cache.pruneUnused(32,64);
+            require(cache.cost()==0 && ledger->bytes()==64,"source retirement freed pixels while its batch still owned them");
+            retired.retired.clear();require(ledger->bytes()==0,"last source retirement retained pixels");
+        }
+        {
+            auto probe=std::make_shared<SlowDecoder>();ImageLoader loader(probe);loader.setMemoryBudget(512);
+            ImageFramePtr active;int finished=0;
+            for(const auto& file:QStringList{a,b,c})loader.request(++finished,{file,DecodePurpose::Full},
+                [&](auto id,const auto& result){require(bool(result.frame),"pressure fixture decode");if(id==1)active=result.frame;});
+            pump([&]{return loader.cachedBytes()==192 && !loader.hasInteractiveWork();});
+            require(active && loader.residentPixelBytes()==192,"pressure fixture did not retain expected frames");
+            auto token=loader.accountImagePixels({});auto texture=std::make_unique<SizedTexture>(QSize(100,1));
+            AccountedTextureFactory::trackTexture(texture.get(),token.ledger());
+            pump([&]{return loader.cachedBytes()==64 && loader.residentPixelBytes()==64;});
+            require(loader.isCached({a,DecodePurpose::Full}) && !loader.isCached({b,DecodePurpose::Full}) &&
+                    active->qImage()->pixelColor(0,0)==Qt::red && loader.residentResourceBytes()==464,
+                    "resource reclamation evicted active session pixels or left inactive cache owners");
+            texture.reset();require(loader.residentResourceBytes()==64,"released GPU texture remained in combined pressure");
+        }
+        {
             const auto imagePath=temp.filePath("derived-p3.png");
             QImage image(8,4,QImage::Format_RGBA64);image.fill(QColor::fromRgbF(.1234,.3456,.789,.4));
             image.setColorSpace(QColorSpace(QColorSpace::DisplayP3));require(image.save(imagePath),"derived PNG fixture");

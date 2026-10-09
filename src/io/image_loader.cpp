@@ -7,6 +7,7 @@
 #include "io/thumbnail_disk_cache.h"
 
 #include <QFileInfo>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QImageReader>
 #include <QMetaObject>
@@ -85,11 +86,15 @@ ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* 
     dispatchWake_.setSingleShot(true);
     dispatchWake_.setInterval(0);
     connect(&dispatchWake_, &QTimer::timeout, this, &ImageLoader::dispatch);
+    resourceMaintenanceTimer_.setInterval(100);
+    connect(&resourceMaintenanceTimer_, &QTimer::timeout, this, &ImageLoader::reclaimInactiveResources);
+    resourceMaintenanceTimer_.start();
 }
 
 ImageLoader::~ImageLoader() {
     dispatchTimer_.stop();
     dispatchWake_.stop();
+    resourceMaintenanceTimer_.stop();
     for (auto& job : inFlight_) job.activeConsumers->store(-1);
     resultBufferBudget_->close(); // Wake workers before waiting for them on the GUI thread.
     decodeWorkingBudget_->close();
@@ -401,12 +406,14 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                                                   ? result.frame->rawParameters->validBits()
                                                   : result.frame->descriptor.validBits;
                         const QImage cacheImage = *image;
+                        PixelStorageFootprint writingPixels; writingPixels.add(cacheImage);
+                        const auto writeOwnership = residentAccounting->retain(std::move(writingPixels));
                         QMetaObject::invokeMethod(self, [self, diskCache, key, cacheImage,
-                                                         sourceSize, validBits, pendingWrites] {
+                                                         sourceSize, validBits, pendingWrites, writeOwnership] {
                             if (!self || pendingWrites->load() >= 64) return;
                             ++*pendingWrites;
                             self->writePool_.start([diskCache, key, cacheImage, sourceSize,
-                                                    validBits, pendingWrites] {
+                                                    validBits, pendingWrites, writeOwnership] {
                                 (void)diskCache->store(key, cacheImage, sourceSize, validBits);
                                 --*pendingWrites;
                             });
@@ -893,6 +900,44 @@ void ImageLoader::enforceMemoryBudget(DecodePurpose insertedPurpose) {
             break;
         }
     }
+}
+
+void ImageLoader::reclaimInactiveResources() {
+    if (retirementPending_->load() || residentResourceBytes() <= memoryBudget_) return;
+    for (const auto& handle : imagePrefetchHandles_) handle.cancel();
+    for (const auto& handle : rawPrefetchHandles_) handle.cancel();
+    const auto deficit = residentResourceBytes() - memoryBudget_;
+    QVector<std::shared_ptr<const void>> retired;
+    qsizetype retiredCost = 0, examined = 0;
+    QElapsedTimer timer;timer.start();
+    const auto collect = [&](auto result) {
+        examined += result.examined; retiredCost += result.cost;
+        for (auto& owner : result.retired) retired.append(std::move(owner));
+    };
+    for (auto* cache : {&fullCache_, &previewCache_, &thumbnailCache_}) {
+        if (timer.elapsed() >= 4 || retiredCost >= deficit) break;
+        collect(cache->pruneUnused(32,deficit-retiredCost));
+    }
+    if (timer.elapsed() < 4 && retiredCost < deficit)
+        collect(sourceCache_->pruneUnused(32,deficit-retiredCost));
+    if (retired.isEmpty()) return;
+    performance::mark(QStringLiteral("loader.resource_retirement"),
+        {{"owners", retired.size()}, {"examined", qint64(examined)}, {"elapsedMs", timer.elapsed()},
+         {"removedCacheCost", qint64(retiredCost)}, {"residentResourceBytes", qint64(residentResourceBytes())}});
+    retirementPending_->store(true);
+    const auto pending = retirementPending_;
+    const auto resident = residentAccounting_;
+    // Reuse the bounded single writer. One retirement batch may queue, ahead of
+    // pending compression tasks, without expanding ordinary decode concurrency.
+    writePool_.start([owners = std::move(retired), pending, resident]() mutable {
+        owners.clear();
+        performance::mark(QStringLiteral("loader.resource_released"),
+            {{"residentPixelBytes", qint64(resident->bytes())},
+             {"peakResidentPixelBytes", qint64(resident->peakBytes())},
+             {"nominalGpuPixelBytes", qint64(resident->gpuResources()->bytes())},
+             {"guiThread", QThread::currentThread() == QCoreApplication::instance()->thread()}});
+        pending->store(false);
+    },100);
 }
 
 WeightedLruCache<ImageFrame>& ImageLoader::cacheFor(DecodePurpose purpose) {
