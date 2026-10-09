@@ -808,9 +808,11 @@ void BrowseController::reportThumbnailPresentation(const QString& owner, int gen
 void BrowseController::reportThumbnailObservation(const QString& state, const QString& owner,
                                                    int generation, int count, qint64 elapsedMs) {
     if (state != QStringLiteral("demand") && state != QStringLiteral("stopped") &&
-        state != QStringLiteral("settled") && state != QStringLiteral("retargeted")) return;
+        state != QStringLiteral("settled") && state != QStringLiteral("retargeted") &&
+        state != QStringLiteral("report")) return;
     QJsonObject fields{{"owner", owner}, {"visible", count}, {"elapsedMs", elapsedMs}};
-    fields.insert(state == QStringLiteral("demand") ? QStringLiteral("generation") : QStringLiteral("stopId"), generation);
+    fields.insert(state == QStringLiteral("demand") ? QStringLiteral("generation") :
+                  state == QStringLiteral("report") ? QStringLiteral("frame") : QStringLiteral("stopId"), generation);
     performance::mark(QStringLiteral("viewport.") + state, fields);
 }
 

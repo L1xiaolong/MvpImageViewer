@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QHash>
 #include <QPointer>
 #include <QSet>
 
@@ -28,6 +29,20 @@ bool isDescendantPath(const QDir& root, const QString& candidate) {
 }
 
 constexpr int kScanBatchSize = 192;
+
+void prepareSortKeys(ImageFileRecord& record, QCollator& collator,
+                     QHash<QString, QCollatorSortKey>& typeKeys) {
+    record.nameSortKey = collator.sortKey(record.fileName);
+    auto type = typeKeys.constFind(record.fileType);
+    if (type == typeKeys.cend()) {
+        typeKeys.insert(record.fileType, collator.sortKey(record.fileType));
+        type = typeKeys.constFind(record.fileType);
+    }
+    // Extensions repeat throughout large folders. Share their immutable strings
+    // and collator keys rather than preparing an identical key for every entry.
+    record.fileType = type.key();
+    record.typeSortKey = type.value();
+}
 
 } // namespace
 
@@ -142,6 +157,7 @@ QVector<ImageFileRecord> DirectoryScanner::scanBatched(
     QCollator collator;
     collator.setNumericMode(true);
     collator.setCaseSensitivity(Qt::CaseInsensitive);
+    QHash<QString, QCollatorSortKey> typeKeys;
     QDirIterator iterator(directory,
                           QDir::AllEntries | QDir::Readable | QDir::NoDotAndDotDot |
                               QDir::NoSymLinks,
@@ -158,8 +174,7 @@ QVector<ImageFileRecord> DirectoryScanner::scanBatched(
                                {}};
         record.fileType = info.isDir() ? QStringLiteral("folder")
                                        : info.suffix().toCaseFolded();
-        record.nameSortKey = collator.sortKey(record.fileName);
-        record.typeSortKey = collator.sortKey(record.fileType);
+        prepareSortKeys(record, collator, typeKeys);
         result.push_back(record);
         if (publishBatch) {
             batch.push_back(std::move(record));
@@ -240,10 +255,10 @@ QVector<ImageFileRecord> DirectoryScanner::scanImageFoldersRecursively(
     QCollator collator;
     collator.setNumericMode(true);
     collator.setCaseSensitivity(Qt::CaseInsensitive);
+    QHash<QString, QCollatorSortKey> typeKeys;
     for (auto& record : result) {
         if (cancelled && cancelled->load(std::memory_order_relaxed)) return {};
-        record.nameSortKey = collator.sortKey(record.fileName);
-        record.typeSortKey = collator.sortKey(record.fileType);
+        prepareSortKeys(record, collator, typeKeys);
     }
     std::sort(result.begin(), result.end(), [&collator](const auto& left, const auto& right) {
         if (left.isDirectory != right.isDirectory) {

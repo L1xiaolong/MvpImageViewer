@@ -152,3 +152,31 @@ loader.completed的elapsedMs继续统计解码/准备时间，bufferWaitMs单独
 - build/perf-results/result-byte-budget-large：四张3072×3072 RGB16 PNG的合成渐变对比，单轮结果峰值113246208字节（108MiB），预算最长等待8ms，4个预览正常显示、无解码失败；截图已检查。进程峰值工作集738004992字节。合成渐变不代替真实超大PNG/全部格式的改善30%验收。
 
 该预算限制的是提交队列：解码器正在构造的帧、LibRaw/Qt临时分配、会话活动帧、Qt Image缓存和GPU纹理仍需联合统计与调度。工作线程数量提供在途结果的数量边界，但还没有这些资源统一的字节准入约束；保持该项未完成。
+
+## 视口随帧上报与大目录锚点（2026-10-09）
+
+移除可见视图持续运行的16ms Timer。几何变化标记dirty并请求一帧，afterAnimating中合并需求；不滚动且几何不变时不轮询。隐藏或窗口最小化立即撤销需求。GUI同步前的信号时序见[Qt QQuickWindow文档](https://doc.qt.io/qt-6/qquickwindow.html#afterAnimating)。性能观测新增viewport.report，按面板/GUI帧检查重复上报。
+
+排序优化后首先跑出的frame-demand-native-sort虽然运动帧间隔P95达到18/17ms，但两轮均有一个停止视口未补齐，因此未作为通过结果。检查发现旧锚点用尚未布局的indexAt计算，且每次插入都callLater恢复，未考虑GridView origin偏移。现在从真实可见委托保存文件路径，在本帧模型变化合并后只forceLayout一次，优先按同路径委托的实际y恢复，缺失时才使用含originY的行坐标。布局及origin规则见[Qt GridView](https://doc.qt.io/qt-6/qml-qtquick-gridview.html#forceLayout-method)、[Qt Flickable](https://doc.qt.io/qt-6/qml-qtquick-flickable.html#originY-prop)。
+
+最终build/perf-results/frame-anchor-fix：1万、100、10万、1000条目四个不同目录同时前滚、跳跃、反向和停止，两轮独立设置、默认OpenGL、Qt6.11，第一轮冷、第二轮复用磁盘缓存。每轮12个停止视口全部补齐，停止补图P95为100/78ms，运动帧间隔P95均17ms，重复上报0、解码失败0；十万目录分别在进程时间10560/10301ms完成入模。进程峰值工作集758976512/680452096字节，解码缓存峰值209350656/207507456字节。相较之前大量重复需求，完成请求降为437/431，但不把请求数量下降单独当作准确性证明。具体帧间锚点路径/像素偏移仍需更直接的自动回归。
+
+List/Gallery单面板一万条目冷缓存的frame-demand-list、frame-demand-gallery在最终锚点修复前检查：每轮3个停止视口全部补齐，停止补图P95为52/76ms，运动帧P95为12/15ms，重复上报0。100张PNG的frame-demand-startup三轮首屏143/119/122ms，不能宣称冷首屏改善30%。最终四面板日志的GUI心跳仍记录启动阶段70～290ms停顿；完整硬性验收没有通过。这些有限的合成PNG结果也不能推广到全部格式、Qt6.9或慢盘。
+
+## 大目录排序比较开销（2026-10-09）
+
+ThumbnailFilterProxyModel在设置源模型时保存安全的QPointer。ThumbnailModel路径直接比较ImageFileRecord字段和已准备排序键，减少每次比较中的qobject_cast、角色分发及QVariant构造；其他源模型继续走通用角色路径，缺失文件类型仍保留原有推断。相等类型键直接比较自然名称，不再重复调用类型collator。扫描线程在同一次扫描中共享重复扩展名的不可变字符串和类型键，名称键仍分别准备；缓存不跨collator/扫描会话。
+
+测试程序新增仅供内部使用的--sort-benchmark。100000条目同机Release内部前后单次对照（不是原始3a6d623基准）：
+
+| GUI模型操作 | 字段比较前 | 字段比较后 |
+|---|---:|---:|
+| 初始映射 | 39ms | 30ms |
+| 类型排序 | 40ms | 22ms |
+| 大小排序 | 43ms | 18ms |
+| 修改时间排序 | 42ms | 17ms |
+| 名称排序 | 31ms | 21ms |
+
+日志为build/perf-results/model-sort-before.log、model-sort-after.log。测试入口先同步准备扫描记录（8116/8296ms），该部分不包含在GUI排序表中；生产路径在DirectoryScanner工作线程扫描。复现命令：设置QT_QPA_PLATFORM=offscreen、QT_FORCE_STDERR_LOGGING=1后运行build/windows-msys2-release/mvpview_performance_tests.exe --sort-benchmark build/perf-fixtures/100000。不要将单次测试解读为完整P50/P95或其他指标不回退的证明。
+
+回归覆盖混合目录/扩展名、自然数字名称、准备键/缺失键和缺失类型的顺序一致，以及替换成通用QStandardItemModel后不使用旧源字段。最终Release构建、CTest通过（7.66s），Python基准脚本语法检查通过。

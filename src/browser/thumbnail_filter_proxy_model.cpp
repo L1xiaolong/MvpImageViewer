@@ -23,18 +23,47 @@ void ThumbnailFilterProxyModel::setSortMode(BrowserSortMode mode) {
     sort(0, Qt::AscendingOrder);
 }
 
+void ThumbnailFilterProxyModel::setSourceModel(QAbstractItemModel* model) {
+    thumbnailSource_ = qobject_cast<ThumbnailModel*>(model);
+    QSortFilterProxyModel::setSourceModel(model);
+}
+
 bool ThumbnailFilterProxyModel::naturalNameLessThan(const QModelIndex& left,
                                                     const QModelIndex& right) const {
-    if (const auto* model = qobject_cast<const ThumbnailModel*>(sourceModel())) {
-        const auto& a = model->files().at(left.row()).nameSortKey;
-        const auto& b = model->files().at(right.row()).nameSortKey;
-        if (a && b) return a->compare(*b) < 0;
-    }
     return collator_.compare(left.data(Qt::DisplayRole).toString(),
                              right.data(Qt::DisplayRole).toString()) < 0;
 }
 
 bool ThumbnailFilterProxyModel::lessThan(const QModelIndex& left, const QModelIndex& right) const {
+    if (const auto* model = thumbnailSource_.data()) {
+        const auto& a = model->files().at(left.row());
+        const auto& b = model->files().at(right.row());
+        if (a.isDirectory != b.isDirectory) return a.isDirectory;
+        switch (sortMode_) {
+        case BrowserSortMode::ModifiedTime:
+            if (a.modifiedAt != b.modifiedAt) return a.modifiedAt < b.modifiedAt;
+            break;
+        case BrowserSortMode::Size:
+            if (a.fileSize != b.fileSize) return a.fileSize < b.fileSize;
+            break;
+        case BrowserSortMode::Type: {
+            int comparison = 0;
+            if (a.typeSortKey && b.typeSortKey) comparison = a.typeSortKey->compare(*b.typeSortKey);
+            else {
+                const QString typeA = a.fileType.isEmpty() || a.isDirectory
+                    ? left.data(ThumbnailModel::TypeRole).toString() : a.fileType;
+                const QString typeB = b.fileType.isEmpty() || b.isDirectory
+                    ? right.data(ThumbnailModel::TypeRole).toString() : b.fileType;
+                comparison = collator_.compare(typeA, typeB);
+            }
+            if (comparison) return comparison < 0;
+            break;
+        }
+        case BrowserSortMode::Name: break;
+        }
+        return a.nameSortKey && b.nameSortKey
+            ? a.nameSortKey->compare(*b.nameSortKey) < 0 : collator_.compare(a.fileName, b.fileName) < 0;
+    }
     const bool leftDirectory = left.data(ThumbnailModel::DirectoryRole).toBool();
     const bool rightDirectory = right.data(ThumbnailModel::DirectoryRole).toBool();
     if (leftDirectory != rightDirectory) {
@@ -58,11 +87,6 @@ bool ThumbnailFilterProxyModel::lessThan(const QModelIndex& left, const QModelIn
         break;
     }
     case BrowserSortMode::Type: {
-        if (const auto* model = qobject_cast<const ThumbnailModel*>(sourceModel())) {
-            const auto& a = model->files().at(left.row()).typeSortKey;
-            const auto& b = model->files().at(right.row()).typeSortKey;
-            if (a && b) { const int comparison = a->compare(*b); if (comparison) return comparison < 0; }
-        }
         const int typeComparison =
             collator_.compare(left.data(ThumbnailModel::TypeRole).toString(),
                               right.data(ThumbnailModel::TypeRole).toString());

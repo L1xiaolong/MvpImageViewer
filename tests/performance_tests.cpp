@@ -20,6 +20,9 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QStandardItemModel>
 #include <future>
 #include <mutex>
 #include <stdexcept>
@@ -70,6 +73,26 @@ int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--export-dng"))
         return writeDngFixture(QString::fromLocal8Bit(argv[2])) ? 0 : 2;
+    if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--sort-benchmark")) {
+        QElapsedTimer scan; scan.start();
+        auto records=DirectoryScanner::scan(QString::fromLocal8Bit(argv[2]));
+        qInfo().noquote()<<QJsonDocument(QJsonObject{{"stage","scan"},{"elapsedMs",scan.elapsed()},
+            {"items",records.size()}}).toJson(QJsonDocument::Compact);
+        ImageLoader loader(std::make_shared<QtImageDecoder>()); ThumbnailModel model(&loader);
+        ThumbnailFilterProxyModel proxy; proxy.setSourceModel(&model);
+        QElapsedTimer initial; initial.start(); model.setFiles(std::move(records));
+        const int rows=proxy.rowCount();
+        qInfo().noquote()<<QJsonDocument(QJsonObject{{"stage","initial_mapping"},{"elapsedMs",initial.elapsed()},
+            {"items",rows}}).toJson(QJsonDocument::Compact);
+        for (auto mode : {BrowserSortMode::Type,BrowserSortMode::Size,BrowserSortMode::ModifiedTime,BrowserSortMode::Name}) {
+            QElapsedTimer timer; timer.start(); proxy.setSortMode(mode); const int count=proxy.rowCount();
+            qInfo().noquote()<<QJsonDocument(QJsonObject{{"stage","sort"},{"mode",int(mode)},
+                {"elapsedMs",timer.elapsed()},{"items",count},
+                {"first",proxy.index(0,0).data().toString()},
+                {"last",proxy.index(count-1,0).data().toString()}}).toJson(QJsonDocument::Compact);
+        }
+        return rows ? 0 : 1;
+    }
     try {
         QTemporaryDir temp(QDir::currentPath() + "/performance-test-XXXXXX"); require(temp.isValid(), "temporary directory");
         auto path = [&](QString name) { auto p=temp.filePath(name); QFile f(p); require(f.open(QIODevice::WriteOnly),"create file"); f.write("data"); return p; };
@@ -365,6 +388,31 @@ int main(int argc, char** argv) {
             ImageLoader loader(std::make_shared<QtImageDecoder>()); ThumbnailModel model(&loader); ThumbnailFilterProxyModel proxy;
             proxy.setSourceModel(&model); model.appendFiles(records);
             require(proxy.index(2,0).data().toString()=="image2.png","natural sorting");
+            proxy.setSortMode(BrowserSortMode::Type);
+            require(proxy.index(2,0).data().toString()=="image2.png","equal prepared types lost natural order");
+            const auto types=temp.filePath("sort-types"); QDir().mkpath(types);
+            for (const auto& name : {"image10.png","image2.png","image10.jpg","image2.jpg"}) {
+                QFile file(types+"/"+name); require(file.open(QIODevice::WriteOnly),"type sort fixture");
+            }
+            QDir().mkpath(types+"/folder10"); QDir().mkpath(types+"/folder2");
+            auto mixed=DirectoryScanner::scan(types); model.setFiles(mixed);
+            const QStringList expected{"folder2","folder10","image2.jpg","image10.jpg","image2.png","image10.png"};
+            for (int i=0;i<expected.size();++i)
+                require(proxy.index(i,0).data().toString()==expected.at(i),"prepared mixed-type ordering");
+            for (auto& record : mixed) {record.nameSortKey.reset();record.typeSortKey.reset();record.fileType.clear();}
+            model.setFiles(mixed);
+            for (int i=0;i<expected.size();++i)
+                require(proxy.index(i,0).data().toString()==expected.at(i),"prepared ordering differs from uncached collation");
+            QStandardItemModel generic;
+            for (const auto& record : mixed) {
+                auto* item=new QStandardItem(record.fileName);
+                item->setData(record.isDirectory,ThumbnailModel::DirectoryRole);
+                item->setData(record.isDirectory ? QStringLiteral("Folder") : QFileInfo(record.fileName).suffix(),ThumbnailModel::TypeRole);
+                generic.appendRow(item);
+            }
+            proxy.setSourceModel(&generic);
+            for (int i=0;i<expected.size();++i)
+                require(proxy.index(i,0).data().toString()==expected.at(i),"source replacement retained stale thumbnail fields");
         }
         {
             const auto root=temp.filePath("recursive");
