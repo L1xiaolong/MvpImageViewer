@@ -138,6 +138,8 @@ struct ImageFrame {
     // Set by decoders when the frame is a bounded proxy whose exact source samples (RAW/YUV
     // planes, camera RAW mosaic) only arrive with a full decode.
     bool sourceSamplesPending = false;
+    // Registered after immutable pixel preparation; retained by cache/session/upload owners.
+    PixelMemoryOwnership pixelOwnership;
 
     [[nodiscard]] const QImage* qImage() const {
         if (const auto* image = std::get_if<QImage>(&storage)) {

@@ -250,10 +250,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const auto pendingWrites = pendingWrites_;
     const auto resultBufferBudget = resultBufferBudget_;
     const auto decodeWorkingBudget = decodeWorkingBudget_;
+    const auto residentAccounting = residentAccounting_;
     const auto workingPriority = inFlight_[key].workingPriority;
     inFlight_[key].work =
         [self, decoder, diskCache, request = std::move(request), key, keyPrefix, decoderIdentity, generation,
-         activeConsumers, pendingWrites, resultBufferBudget, decodeWorkingBudget, workingPriority]() mutable {
+         activeConsumers, pendingWrites, resultBufferBudget, decodeWorkingBudget, workingPriority, residentAccounting]() mutable {
             std::shared_ptr<ResultBufferBudget::Reservation> workingReservation;
             qint64 workingWaitMs = 0;
             request.reserveWorkingMemory = [&](qsizetype bytes) {
@@ -370,6 +371,12 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                 result.frame = std::move(prepared);
             }
             const qint64 decodeElapsedMs = qMax<qint64>(0, decodeTimer.elapsed() - workingWaitMs);
+            if (result.frame && !request.isCancelled()) {
+                auto tracked = std::make_shared<ImageFrame>(*result.frame);
+                PixelStorageFootprint footprint; tracked->appendPixelStorage(footprint);
+                tracked->pixelOwnership.attach(residentAccounting, std::move(footprint));
+                result.frame = std::move(tracked);
+            }
             QElapsedTimer resultWait; resultWait.start();
             std::shared_ptr<ResultBufferBudget::Reservation> resultReservation;
             if (result.frame && !request.metadataSource) {
@@ -415,7 +422,9 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                         if (!metadataOnly) self->cacheFor(purpose).put(frameKey, result.frame, result.frame->byteSize());
                         self->enforceMemoryBudget(purpose);
                         performance::mark(QStringLiteral("loader.cache_state"),
-                            {{"cachedBytes", qint64(self->cachedBytes())}, {"sourceBytes", qint64(self->sourceCache_->cost())}});
+                            {{"cachedBytes", qint64(self->cachedBytes())}, {"residentPixelBytes", qint64(self->residentPixelBytes())},
+                             {"peakResidentPixelBytes", qint64(self->residentAccounting_->peakBytes())},
+                             {"sourceBytes", qint64(self->sourceCache_->cost())}});
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
                                                          ? result.frame->metadata.sourceSize
@@ -572,7 +581,7 @@ void ImageLoader::dispatch() {
 void ImageLoader::prefetchAdjacentImages(const QStringList& paths, int index, const QSize& size) {
     for (const auto& handle : imagePrefetchHandles_) handle.cancel();
     imagePrefetchHandles_.clear();
-    if (fastScrolling() || hasInteractiveWork() || cachedBytes() > memoryBudget_ * 3 / 4) return;
+    if (fastScrolling() || hasInteractiveWork() || residentPixelBytes() > memoryBudget_ * 3 / 4) return;
     for (const int delta : {1, -1}) {
         if (index + delta < 0 || index + delta >= paths.size()) continue;
         imagePrefetchHandles_.append(request(0, {paths.at(index + delta), DecodePurpose::Preview, size},
@@ -585,7 +594,7 @@ void ImageLoader::prefetchAdjacentRawFrames(const QString& path, const RawImageP
                                             const QSize& previewSize) {
     for (const auto& handle : rawPrefetchHandles_) handle.cancel();
     rawPrefetchHandles_.clear();
-    if (fastScrolling() || hasInteractiveWork()) return;
+    if (fastScrolling() || hasInteractiveWork() || residentPixelBytes() > memoryBudget_ * 3 / 4) return;
     const int frameCount = availableFrameCount(QFileInfo(path).size(), current);
     const int adjacentCount =
         (current.frameIndex > 0 ? 1 : 0) + (current.frameIndex + 1 < frameCount ? 1 : 0);
@@ -698,6 +707,10 @@ qsizetype ImageLoader::cachedBytes() const {
     return cacheAccounting_->bytes();
 }
 
+qsizetype ImageLoader::residentPixelBytes() const {
+    return residentAccounting_->bytes();
+}
+
 void ImageLoader::setMemoryBudget(qsizetype bytes) {
     Q_ASSERT(thread() == QThread::currentThread());
     memoryBudget_ = std::max<qsizetype>(bytes, 1);
@@ -728,7 +741,7 @@ qsizetype ImageLoader::estimatedFullFrameCost(const ImageFrame& preview) {
 
 bool ImageLoader::canAutomaticallyLoadFull(
     const QVector<ImageFramePtr>& previewFrames) const {
-    if (fastScrolling() || hasInteractiveWork()) return false;
+    if (fastScrolling() || hasInteractiveWork() || residentPixelBytes() > memoryBudget_) return false;
     qsizetype total = 0;
     for (const ImageFramePtr& frame : previewFrames) {
         if (!frame) {

@@ -109,6 +109,48 @@ int main(int argc, char** argv) {
         const auto a=path("a.png"), b=path("b.png"), c=path("c.png");
         auto decoder=std::make_shared<SlowDecoder>();
         {
+            auto tiny=std::make_shared<SlowDecoder>(); ImageLoader loader(tiny);loader.setMemoryBudget(100);
+            QVector<ImageFramePtr> retained; int completed=0;
+            for (const auto& file:QStringList{a,b,c}) loader.request(++completed,
+                {file,DecodePurpose::Full},[&](auto,const auto& result){retained.append(result.frame);});
+            pump([&]{return retained.size()==3;});
+            require(loader.cachedBytes()==64 && loader.residentPixelBytes()==192,
+                    "active frames were lost after LRU eviction");
+            require(!loader.canAutomaticallyLoadFull({retained.first()}),
+                    "automatic full ignored active resident pressure");
+            const auto starts=tiny->order().size();
+            loader.prefetchAdjacentImages({a,b,c},1,{32,32});
+            const auto rawPath=temp.filePath("pressure.raw");QFile rawFile(rawPath);
+            require(rawFile.open(QIODevice::WriteOnly) && rawFile.write(QByteArray(16,'x'))==16,"pressure RAW fixture");
+            rawFile.close();RawImageParameters adjacent;adjacent.size={2,2};adjacent.format=RawPixelFormat::Raw16;
+            loader.prefetchAdjacentRawFrames(rawPath,adjacent,{32,32});
+            QElapsedTimer idle;idle.start();
+            while (idle.elapsed()<50) { QCoreApplication::processEvents();QThread::msleep(1); }
+            require(tiny->order().size()==starts,"prefetch ignored retained pixel pressure");
+            loader.clearCache();retained.clear();
+            require(loader.residentPixelBytes()==0,"session references did not release pixels");
+        }
+        {
+            auto ledger=std::make_shared<PixelMemoryLedger>();
+            auto frame=std::make_shared<ImageFrame>();
+            frame->storage=QImage(2,2,QImage::Format_RGBA8888);
+            PixelStorageFootprint first;frame->appendPixelStorage(first);
+            frame->pixelOwnership.attach(ledger,std::move(first));
+            auto changed=std::make_shared<ImageFrame>(*frame);
+            changed->storage=QImage(2,2,QImage::Format_RGBA64);
+            PixelStorageFootprint next;changed->appendPixelStorage(next);
+            changed->pixelOwnership.attach(ledger,std::move(next));
+            require(ledger->bytes()==48,"copied frame inherited stale pixel ownership");
+            frame.reset(); require(ledger->bytes()==32,"released source frame retained its pixels");
+            auto metadata=std::make_shared<ImageFrame>(*changed);
+            PixelStorageFootprint same;metadata->appendPixelStorage(same);
+            metadata->pixelOwnership.attach(ledger,std::move(same));
+            changed.reset(); require(ledger->bytes()==32,"metadata frame lost shared resident pixels");
+            std::weak_ptr<PixelMemoryLedger> alive=ledger;ledger.reset();
+            require(!alive.expired(),"pixel owner did not preserve ledger lifetime");
+            metadata.reset();require(alive.expired(),"last pixel owner retained its ledger");
+        }
+        {
             auto ledger=std::make_shared<PixelMemoryLedger>();
             auto sourceCache=std::make_unique<SourceFrameCache>(ledger);
             auto source=std::make_shared<SourceFrame>(); source->bytes=QByteArray(64,'x');
@@ -333,6 +375,12 @@ int main(int argc, char** argv) {
                         "loader counted shared NV12 source bytes twice or evicted the frame");
                 require(loader.isCached({raw,DecodePurpose::Full,{},parameters}),
                         "deduplicated RAW cache did not retain its admissible frame");
+                require(loader.residentPixelBytes()==88,"resident source/display bytes counted twice");
+                loader.clearCache();
+                require(loader.cachedBytes()==0 && loader.residentPixelBytes()==88,
+                        "evicted active frame disappeared from resident pixels");
+                retained.reset();
+                require(loader.residentPixelBytes()==0,"released active frame retained resident pixels");
             }
             require(DisplayHistogramAnalyzer::analyze(*result.frame).isValid(),"display histogram");
             require(!DisplayHistogramAnalyzer::analyze(*result.frame, 10000, []{return true;}).isValid(),"display analysis cancellation");

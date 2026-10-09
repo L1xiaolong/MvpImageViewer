@@ -73,6 +73,7 @@ class ImageLoader final : public QObject {
     [[nodiscard]] std::optional<RawImageParameters> rawParameters(const QString& path) const;
     [[nodiscard]] bool isCached(DecodeRequest request) const;
     [[nodiscard]] qsizetype cachedBytes() const;
+    [[nodiscard]] qsizetype residentPixelBytes() const;
     [[nodiscard]] qsizetype memoryBudget() const { return memoryBudget_; }
     void setMemoryBudget(qsizetype bytes);
     [[nodiscard]] bool
@@ -146,7 +147,8 @@ class ImageLoader final : public QObject {
     int parallelRunning_ = 0;
     int serializedRunning_ = 0;
     std::shared_ptr<PixelMemoryLedger> cacheAccounting_ = std::make_shared<PixelMemoryLedger>();
-    std::shared_ptr<SourceFrameCache> sourceCache_ = std::make_shared<SourceFrameCache>(cacheAccounting_);
+    std::shared_ptr<PixelMemoryLedger> residentAccounting_ = std::make_shared<PixelMemoryLedger>();
+    std::shared_ptr<SourceFrameCache> sourceCache_ = std::make_shared<SourceFrameCache>(cacheAccounting_, residentAccounting_);
     std::shared_ptr<const IImageDecoder> decoder_;
     std::shared_ptr<ThumbnailDiskCache> diskCache_;
     static constexpr qsizetype kDefaultMemoryBudget = 384LL * 1024 * 1024;
