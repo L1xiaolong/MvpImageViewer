@@ -32,6 +32,11 @@ int priorityFor(const RequestOptions& options) {
     return base + options.priorityAdjustment;
 }
 
+bool isHeaderlessImage(const QString& path) {
+    const auto suffix = QFileInfo(path).suffix().toLower();
+    return suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv");
+}
+
 QString cacheKeyPrefix(const DecodeRequest& request, const QFileInfo& info) {
     return info.absoluteFilePath() + QLatin1Char('|') + QString::number(info.size()) +
         QLatin1Char('|') + QString::number(info.lastModified().toMSecsSinceEpoch()) +
@@ -476,9 +481,11 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
 
                     diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
                         QStringLiteral("loader.completed"),
-                        {{"elapsedMs", elapsedMs}, {"diskHit", diskHit},
+                        {{"file", diagnostics::fileId(sourcePath)}, {"generation", qint64(generation)},
+                         {"elapsedMs", elapsedMs}, {"diskHit", diskHit},
+                         {"succeeded", result.succeeded()}, {"error", result.error},
                          {"cancelled", activeConsumers->load() <= 0},
-                         {"cachedBytes", qint64(self->cachedBytes())}}, false);
+                         {"cachedBytes", qint64(self->cachedBytes())}}, isHeaderlessImage(sourcePath));
                     const auto currentGeneration = self->inFlight_.constFind(key);
                     if (currentGeneration == self->inFlight_.cend() || currentGeneration->generation != generation) return;
                     if (result.frame && activeConsumers->load(std::memory_order_relaxed) > 0) {
@@ -648,8 +655,9 @@ void ImageLoader::dispatch() {
 
         diagnostics::event(diagnostics::Level::Debug, diagnostics::decode(),
             QStringLiteral("loader.dispatched"),
-            {{"queueMs", best->queuedAt.elapsed()}, {"priority", best->priority},
-             {"pending", inFlight_.size()}}, false);
+            {{"file", diagnostics::fileId(best->path)}, {"generation", qint64(best->generation)},
+             {"queueMs", best->queuedAt.elapsed()}, {"priority", best->priority},
+             {"pending", inFlight_.size()}}, isHeaderlessImage(best->path));
         if (best->serialized) { ++serializedRunning_; serializedPool_.start(std::move(best->work)); }
         else { ++parallelRunning_; pool_.start(std::move(best->work)); }
     }

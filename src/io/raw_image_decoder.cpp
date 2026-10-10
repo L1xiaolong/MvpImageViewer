@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <new>
 
 namespace mvpview {
 namespace {
@@ -147,6 +148,9 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     };
 
     QImage image(outputSize, QImage::Format_RGBA8888);
+    // QImage reports allocation failure with a null image. Never write scanlines
+    // until storage exists, especially for full-resolution YUV display requests.
+    if (image.isNull()) return {};
     const bool fullSize = outputSize == parameters.size;
     for (int y = 0; y < outputSize.height(); ++y) {
         if (cancelled && cancelled()) return {};
@@ -194,7 +198,7 @@ bool RawImageDecoder::canDecode(const QString& path) const {
     return suffix == QStringLiteral("yuv") || suffix == QStringLiteral("raw");
 }
 
-DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
+DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const try {
     if (!request.rawParameters) {
         return {{}, QStringLiteral("RAW/YUV parameters are required")};
     }
@@ -363,6 +367,10 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const {
         frame->storage = std::shared_ptr<const PlaneBufferSet>(std::move(planes));
     }
     return {std::move(frame), {}};
+} catch (const std::bad_alloc&) {
+    // QByteArray and source-cache allocations may throw rather than return null.
+    // Let the loader deliver a failed image instead of terminating its worker.
+    return {{}, QStringLiteral("Not enough memory to decode RAW/YUV frame")};
 }
 
 std::optional<quint16> RawImageDecoder::bayerValueAt(const ImageFrame& frame, int x, int y) {

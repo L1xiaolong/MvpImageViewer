@@ -39,7 +39,12 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     // Qt defaults to D3D11 on Windows. Some Intel drivers crash while Qt Quick creates
     // or migrates RHI resources during full-screen and cross-monitor transitions.
     // OpenGL avoids that driver path while preserving hardware-accelerated rendering.
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+    // Honor Qt's backend override for driver troubleshooting. An explicit C++
+    // API request takes precedence over QSG_RHI_BACKEND in Qt.
+    if (qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND") &&
+        qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND")) {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+    }
 #endif
     QGuiApplication::setQuitOnLastWindowClosed(false);
     QCoreApplication::setApplicationName(QStringLiteral("MVP Image Viewer"));
@@ -312,6 +317,9 @@ int main(int argc, char* argv[]) {
         diagnosticOptions.level = mvpview::diagnostics::parseLevel(diagnosticSettings.value(QStringLiteral("diagnostics/logLevel"), QStringLiteral("Info")).toString());
         mvpview::diagnostics::Service diagnosticService(diagnosticOptions);
         diagnosticService.startCrashCapture({});
+        mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::startup(),
+            QStringLiteral("crash_capture.started"),
+            {{"status", diagnosticService.crashStatus()}, {"error", diagnosticService.error()}}, true);
         mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::startup(), QStringLiteral("application.start"), {}, true);
         result = runApplication(argc, argv, diagnosticService);
         diagnosticService.markCleanExit();

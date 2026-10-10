@@ -49,13 +49,23 @@ DecodeResult ImageDecoderRegistry::decode(const DecodeRequest& request) const {
         }
         using namespace diagnostics;
         const QString operation = operationId();
-        const bool breadcrumb = request.purpose != DecodePurpose::Thumbnail;
+        // Large headerless frames can fail while browsing, before any image is
+        // opened. Keep their decode context even at the default Info log level.
+        const bool breadcrumb = request.purpose != DecodePurpose::Thumbnail ||
+                                request.rawParameters.has_value();
         QJsonObject context{
             {QStringLiteral("operation"), operation},
             {QStringLiteral("file"), fileId(request.path)},
             {QStringLiteral("format"), QFileInfo(request.path).suffix().toLower()},
             {QStringLiteral("decoder"), decoder->cacheIdentity()},
             {QStringLiteral("purpose"), static_cast<int>(request.purpose)}};
+        if (request.rawParameters) {
+            const auto& parameters = *request.rawParameters;
+            context.insert(QStringLiteral("sourceWidth"), parameters.size.width());
+            context.insert(QStringLiteral("sourceHeight"), parameters.size.height());
+            context.insert(QStringLiteral("pixelFormat"), rawPixelFormatName(parameters.format));
+            context.insert(QStringLiteral("sourceBytes"), qint64(frameByteSize(parameters)));
+        }
         event(Level::Debug, diagnostics::decode(), QStringLiteral("decode.begin"), context,
               breadcrumb);
         QElapsedTimer timer;
