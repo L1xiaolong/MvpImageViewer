@@ -354,7 +354,9 @@ Rectangle {
 
             NavigationTree {
                 visible: root.platformName !== "windows"
-                model: visible ? root.controller.folderTree : null
+                // Effective visibility also follows the browse page during full-screen viewing.
+                // Keep the model attached while hidden so TreeView retains expanded folders.
+                model: root.platformName !== "windows" ? root.controller.folderTree : null
             }
 
         }
