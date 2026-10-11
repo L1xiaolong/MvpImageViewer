@@ -54,10 +54,11 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
   public:
     ThumbnailImageResponse(ImageLoader* loader, QString id, QSize requestedSize)
         : loader_(loader), id_(std::move(id)), requestedSize_(requestedSize) {
-        const QPointer<ThumbnailImageResponse> self(this);
-        QMetaObject::invokeMethod(loader_, [self] {
-            if (self) self->start();
-        }, Qt::QueuedConnection);
+        // Qt creates responses on its image-reader thread, but the loader and
+        // callbacks run on the GUI thread. Keep deletion on that same thread:
+        // QPointer alone cannot protect a GUI callback from concurrent deletion.
+        moveToThread(loader->thread());
+        QMetaObject::invokeMethod(this, [this] { start(); }, Qt::QueuedConnection);
     }
 
     QQuickTextureFactory* textureFactory() const override {
@@ -73,11 +74,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
             const QMutexLocker lock(&mutex_);
             handle_.cancel();
         }
-        const QPointer<ThumbnailImageResponse> self(this);
-        QMetaObject::invokeMethod(loader_, [self] {
-            if (!self) return;
-            self->finish();
-        }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, [this] { finish(); }, Qt::QueuedConnection);
     }
 
     [[nodiscard]] QImage image() const {
@@ -88,6 +85,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
   private:
     void start() {
         if (cancelled_.load(std::memory_order_relaxed)) { finish(); return; }
+        if (!loader_) { finish(); return; }
         const QString path = QUrl::fromPercentEncoding(
             id_.section(QLatin1Char('?'), 0, 0).toUtf8());
         std::optional<RawImageParameters> parameters = loader_->rawParameters(path);
@@ -119,17 +117,13 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
         auto handle = loader_->request(
             ++requestCounter_, std::move(request),
             [self](quint64, const DecodeResult& result) {
-                if (!self || self->cancelled_.load(std::memory_order_relaxed)) return;
-                QImage image;
-                if (result.frame && result.frame->qImage()) image = *result.frame->qImage();
-                if (image.isNull()) image = placeholder(QStringLiteral("Preview unavailable"),
-                                                        self->requestedSize_);
-                {
-                    const QMutexLocker lock(&self->mutex_);
-                    self->image_ = std::move(image);
-                    self->imageOwnership_ = self->loader_->accountImagePixels(self->image_);
-                }
-                self->finish();
+                if (!self) return;
+                // Cache hits and validation errors call back inside request().
+                // Publish the handle and leave start() before emitting finished:
+                // the engine can reclaim the response as soon as it receives it.
+                QMetaObject::invokeMethod(self, [self, result] {
+                    if (self) self->complete(result);
+                }, Qt::QueuedConnection);
             },
             RequestOptions{category, 0, navigation ? QStringLiteral("qml-navigation") : QStringLiteral("qml-thumbnail"), !navigation});
         const QMutexLocker lock(&mutex_);
@@ -139,9 +133,22 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
         if (cancelled_.load(std::memory_order_relaxed)) handle_.cancel();
     }
 
+    void complete(const DecodeResult& result) {
+        if (finished_ || cancelled_.load(std::memory_order_relaxed)) return;
+        QImage image;
+        if (result.frame && result.frame->qImage()) image = *result.frame->qImage();
+        if (image.isNull()) image = placeholder(QStringLiteral("Preview unavailable"), requestedSize_);
+        {
+            const QMutexLocker lock(&mutex_);
+            image_ = std::move(image);
+            if (loader_) imageOwnership_ = loader_->accountImagePixels(image_);
+        }
+        finish(); // Final access to this response; finished() permits its destruction.
+    }
+
     void finish() { if (!finished_) { finished_ = true; emit finished(); } }
     bool finished_ = false;
-    ImageLoader* loader_ = nullptr;
+    QPointer<ImageLoader> loader_;
     QString id_;
     QSize requestedSize_;
     LoadHandle handle_;
@@ -178,7 +185,7 @@ QImage ThumbnailImageProvider::requestImage(const QString& id, QSize* size,
     loop.exec();
     QImage image = response->image();
     if (size) *size = image.size();
-    delete response;
+    response->deleteLater(); // Response lifetime belongs to the loader's thread.
     return image;
 }
 

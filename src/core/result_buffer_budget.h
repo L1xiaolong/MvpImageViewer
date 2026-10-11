@@ -24,7 +24,7 @@ public:
     public:
         Reservation(const Reservation&) = delete;
         Reservation& operator=(const Reservation&) = delete;
-        ~Reservation() { owner_->release(bytes_); }
+        ~Reservation() { if (bytes_ > 0) owner_->release(bytes_); }
     private:
         friend class ResultBufferBudget;
         Reservation(std::shared_ptr<ResultBufferBudget> owner, qsizetype bytes)
@@ -37,6 +37,9 @@ public:
     std::shared_ptr<Reservation> reserve(qsizetype bytes, const std::function<bool()>& cancelled,
                                          std::function<int()> priority = [] { return 0; }) {
         bytes = qMax<qsizetype>(0, bytes);
+        // Allocate the token/control block before admitting bytes. If allocation
+        // throws under pressure, no credits are leaked and future work can run.
+        auto reservation = std::shared_ptr<Reservation>(new Reservation(shared_from_this(), 0));
         QMutexLocker lock(&mutex_);
         Waiter waiter{std::move(priority)};
         queue_.push_back(&waiter);
@@ -61,7 +64,8 @@ public:
         if (closed_ || cancelled()) return {};
         bytes_ += bytes;
         peakBytes_ = qMax(peakBytes_, bytes_);
-        return std::shared_ptr<Reservation>(new Reservation(shared_from_this(), bytes));
+        reservation->bytes_ = bytes;
+        return reservation;
     }
     Snapshot snapshot() const {
         QMutexLocker lock(&mutex_);
@@ -69,6 +73,11 @@ public:
     }
     void wakeWaiters() {
         QMutexLocker lock(&mutex_);
+        changed_.wakeAll();
+    }
+    void setMaximumBytes(qsizetype bytes) {
+        QMutexLocker lock(&mutex_);
+        maximumBytes_ = qMax<qsizetype>(1, bytes);
         changed_.wakeAll();
     }
     void close() {
@@ -84,7 +93,7 @@ private:
         bytes_ -= bytes;
         changed_.wakeAll();
     }
-    const qsizetype maximumBytes_;
+    qsizetype maximumBytes_;
     mutable QMutex mutex_;
     QWaitCondition changed_;
     qsizetype bytes_ = 0;

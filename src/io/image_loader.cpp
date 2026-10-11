@@ -16,6 +16,8 @@
 #include <QThreadPool>
 
 #include <limits>
+#include <new>
+#include <exception>
 
 namespace mvpview {
 namespace {
@@ -70,9 +72,10 @@ bool LoadHandle::isCancelled() const {
     return state_ && state_->cancelled.load(std::memory_order_relaxed);
 }
 
-ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* parent)
+ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* parent,
+                         std::shared_ptr<ThumbnailDiskCache> diskCache)
     : QObject(parent), decoder_(std::move(decoder)),
-      diskCache_(std::make_shared<ThumbnailDiskCache>()) {
+      diskCache_(diskCache ? std::move(diskCache) : std::make_shared<ThumbnailDiskCache>()) {
     Q_ASSERT(decoder_);
     const auto cacheObserver = [ledger = cacheAccounting_](const ImageFramePtr& frame, bool added) {
         PixelStorageFootprint footprint; frame->appendPixelStorage(footprint);
@@ -88,6 +91,7 @@ ImageLoader::ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* 
     previewCache_.setRetirer(cacheRetirer);
     fullCache_.setRetirer(cacheRetirer);
     sourceCache_->setRetirer(cacheRetirer);
+    setMemoryBudget(kDefaultMemoryBudget);
     pool_.setMaxThreadCount(qBound(2, QThread::idealThreadCount() - 1, 6));
     pool_.setExpiryTimeout(10'000);
     serializedPool_.setMaxThreadCount(1);
@@ -328,144 +332,152 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             };
             DecodeResult result;
             const bool abandoned = request.isCancelled();
-            if (!abandoned && !thumbnailSource && request.purpose == DecodePurpose::Thumbnail) {
-                QImage cachedImage = diskCache->load(key);
-                if (!cachedImage.isNull()) {
-                    const QFileInfo info(request.path);
-                    auto frame = std::make_shared<ImageFrame>();
-                    frame->descriptor.size = cachedImage.size();
-                    frame->metadata.path = info.absoluteFilePath();
-                    frame->metadata.fileName = info.fileName();
-                    frame->metadata.format = info.suffix().toUpper();
-                    frame->metadata.fileSize = info.size();
-                    frame->metadata.modifiedAt = info.lastModified();
-                    frame->descriptor.validBits = request.rawParameters
-                                                      ? request.rawParameters->validBits()
-                                                      : cachedImage
-                                                            .text(QStringLiteral(
-                                                                "mvpview.validBits"))
-                                                            .toInt();
-                    if (frame->descriptor.validBits <= 0) {
-                        frame->descriptor.validBits = 8;
-                    }
-                    if (request.rawParameters && request.rawParameters->size.isValid()) {
-                        frame->metadata.sourceSize = request.rawParameters->size;
-                    } else {
-                        const QSize cachedSourceSize(
-                            cachedImage.text(QStringLiteral("mvpview.sourceWidth")).toInt(),
-                            cachedImage.text(QStringLiteral("mvpview.sourceHeight")).toInt());
-                        if (cachedSourceSize.isValid()) {
-                            frame->metadata.sourceSize = cachedSourceSize;
-                        }
-                        // The disk cache stores only preview pixels. Probe the original header on
-                        // this worker thread so legacy cache entries still report source dimensions
-                        // instead of the cached 160×120 bitmap size.
-                        if (!frame->metadata.sourceSize.isValid()) {
-                            QImageReader sourceReader(request.path);
-                            frame->metadata.sourceSize = sourceReader.size();
-                        }
-                    }
-                    if (frame->metadata.sourceSize.isValid()) {
-                        frame->storage = std::move(cachedImage);
-                        result.frame = std::move(frame);
-                    }
-                    // Formats such as DNG are not understood by QImageReader. When the source
-                    // size is unavailable, leave the cache result empty so the decoder rebuilds
-                    // the frame with its source metadata and RAW parameters.
-                }
-            }
+            std::shared_ptr<ResultBufferBudget::Reservation> resultReservation;
             QElapsedTimer decodeTimer;
-            decodeTimer.start();
-            const bool diskHit = bool(result.frame);
-            if (!abandoned && !request.isCancelled() && !result.frame) {
-                if (thumbnailSource) {
-                    const auto* source = thumbnailSource->qImage();
-                    const auto estimate = addedAllocationBytes(estimatedPixelBytes(source->size(),16),
-                        estimatedPixelBytes(request.maximumSize,32));
-                    if (request.prepareAllocation(estimate)) {
-                        QImage image = *source;
-                        if (image.width() > request.maximumSize.width() || image.height() > request.maximumSize.height())
-                            image = image.scaled(request.maximumSize,Qt::KeepAspectRatio,Qt::SmoothTransformation);
-                        if (!request.isCancelled()) {
-                            auto frame = std::make_shared<ImageFrame>();
-                            frame->metadata = thumbnailSource->metadata;
-                            frame->descriptor = thumbnailSource->descriptor;
-                            frame->descriptor.size = image.size();
-                            frame->descriptor.layout = PixelLayout::Interleaved;
-                            frame->descriptor.channelOrder = ChannelOrder::RGBA;
-                            frame->descriptor.storageBits = image.format() == QImage::Format_RGBA32FPx4
-                                ? 32 : image.depth() > 32 ? 16 : 8;
-                            frame->descriptor.sampleType = image.format() == QImage::Format_RGBA16FPx4 ||
-                                image.format() == QImage::Format_RGBA32FPx4 ? SampleType::Float : SampleType::UInt;
-                            frame->rawParameters = thumbnailSource->rawParameters;
-                            frame->sourceSamplesPending = true;
-                            frame->storage = std::move(image);
+            bool diskHit = false;
+            qint64 decodeElapsedMs = 0;
+            try {
+                if (!abandoned && !thumbnailSource && request.purpose == DecodePurpose::Thumbnail) {
+                    QImage cachedImage = diskCache->load(key);
+                    if (!cachedImage.isNull()) {
+                        const QFileInfo info(request.path);
+                        auto frame = std::make_shared<ImageFrame>();
+                        frame->descriptor.size = cachedImage.size();
+                        frame->metadata.path = info.absoluteFilePath();
+                        frame->metadata.fileName = info.fileName();
+                        frame->metadata.format = info.suffix().toUpper();
+                        frame->metadata.fileSize = info.size();
+                        frame->metadata.modifiedAt = info.lastModified();
+                        frame->descriptor.validBits = request.rawParameters
+                                                          ? request.rawParameters->validBits()
+                                                          : cachedImage
+                                                                .text(QStringLiteral(
+                                                                    "mvpview.validBits"))
+                                                                .toInt();
+                        if (frame->descriptor.validBits <= 0) {
+                            frame->descriptor.validBits = 8;
+                        }
+                        if (request.rawParameters && request.rawParameters->size.isValid()) {
+                            frame->metadata.sourceSize = request.rawParameters->size;
+                        } else {
+                            const QSize cachedSourceSize(
+                                cachedImage.text(QStringLiteral("mvpview.sourceWidth")).toInt(),
+                                cachedImage.text(QStringLiteral("mvpview.sourceHeight")).toInt());
+                            if (cachedSourceSize.isValid()) {
+                                frame->metadata.sourceSize = cachedSourceSize;
+                            }
+                            // The disk cache stores only preview pixels. Probe the original header on
+                            // this worker thread so legacy cache entries still report source dimensions
+                            // instead of the cached 160×120 bitmap size.
+                            if (!frame->metadata.sourceSize.isValid()) {
+                                QImageReader sourceReader(request.path);
+                                frame->metadata.sourceSize = sourceReader.size();
+                            }
+                        }
+                        if (frame->metadata.sourceSize.isValid()) {
+                            frame->storage = std::move(cachedImage);
                             result.frame = std::move(frame);
                         }
-                    } else result.error = QStringLiteral("Cancelled");
-                    thumbnailSource.reset(); // Do not pin the source through result delivery.
-                } else if (request.metadataSource) {
-                    auto frame = std::make_shared<ImageFrame>(*request.metadataSource);
-                    MetadataReader::enrich(request.path, frame->metadata);
-                    result.frame = std::move(frame);
-                } else { result = decoder->decode(request); }
-                if (result.frame && request.purpose == DecodePurpose::Thumbnail &&
-                    activeConsumers->load(std::memory_order_relaxed) > 0) {
-                    if (const QImage* image = result.frame->qImage()) {
-                        const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
-                                                     ? result.frame->metadata.sourceSize
-                                                     : result.frame->descriptor.size;
-                        const int validBits = result.frame->rawParameters
-                                                  ? result.frame->rawParameters->validBits()
-                                                  : result.frame->descriptor.validBits;
-                        const QImage cacheImage = *image;
-                        PixelStorageFootprint writingPixels; writingPixels.add(cacheImage);
-                        const auto writeOwnership = residentAccounting->retain(std::move(writingPixels));
-                        QMetaObject::invokeMethod(self, [self, diskCache, key, cacheImage,
-                                                         sourceSize, validBits, pendingWrites, writeOwnership] {
-                            if (!self || pendingWrites->load() >= 64) return;
-                            ++*pendingWrites;
-                            self->writePool_.start([diskCache, key, cacheImage, sourceSize,
-                                                    validBits, pendingWrites, writeOwnership] {
-                                (void)diskCache->store(key, cacheImage, sourceSize, validBits);
-                                --*pendingWrites;
-                            });
-                        }, Qt::QueuedConnection);
+                        // Formats such as DNG are not understood by QImageReader. When the source
+                        // size is unavailable, leave the cache result empty so the decoder rebuilds
+                        // the frame with its source metadata and RAW parameters.
                     }
                 }
-            }
-            if (result.frame && !request.isCancelled() && request.purpose != DecodePurpose::Thumbnail &&
-                !request.metadataSource && !request.requireDisplayImage) {
-                auto prepared = std::make_shared<ImageFrame>(*result.frame);
-                if (const auto* image = prepared->qImage(); image && image->format() == QImage::Format_RGBA64)
-                    prepared->uploadImage = image->convertedTo(QImage::Format_RGBA16FPx4);
-                if (prepared->rawParameters && prepared->rawParameters->format == RawPixelFormat::P010 &&
-                    !prepared->rawParameters->littleEndian) {
-                    if (const auto* planes = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&prepared->storage)) {
-                        auto normalized = std::make_shared<PlaneBufferSet>(**planes);
-                        normalized->displayImage = {};
-                        normalized->storage.detach();
-                        for (qsizetype i = 0; i + 1 < normalized->storage.size(); i += 2) {
-                            if ((i % (1024 * 1024)) == 0 && request.isCancelled()) break;
-                            std::swap(normalized->storage[i], normalized->storage[i + 1]);
+                decodeTimer.start();
+                diskHit = bool(result.frame);
+                if (!abandoned && !request.isCancelled() && !result.frame) {
+                    if (thumbnailSource) {
+                        const auto* source = thumbnailSource->qImage();
+                        const auto estimate = addedAllocationBytes(estimatedPixelBytes(source->size(),16),
+                            estimatedPixelBytes(request.maximumSize,32));
+                        if (request.prepareAllocation(estimate)) {
+                            QImage image = *source;
+                            if (image.width() > request.maximumSize.width() || image.height() > request.maximumSize.height())
+                                image = image.scaled(request.maximumSize,Qt::KeepAspectRatio,Qt::SmoothTransformation);
+                            if (!request.isCancelled()) {
+                                auto frame = std::make_shared<ImageFrame>();
+                                frame->metadata = thumbnailSource->metadata;
+                                frame->descriptor = thumbnailSource->descriptor;
+                                frame->descriptor.size = image.size();
+                                frame->descriptor.layout = PixelLayout::Interleaved;
+                                frame->descriptor.channelOrder = ChannelOrder::RGBA;
+                                frame->descriptor.storageBits = image.format() == QImage::Format_RGBA32FPx4
+                                    ? 32 : image.depth() > 32 ? 16 : 8;
+                                frame->descriptor.sampleType = image.format() == QImage::Format_RGBA16FPx4 ||
+                                    image.format() == QImage::Format_RGBA32FPx4 ? SampleType::Float : SampleType::UInt;
+                                frame->rawParameters = thumbnailSource->rawParameters;
+                                frame->sourceSamplesPending = true;
+                                frame->storage = std::move(image);
+                                result.frame = std::move(frame);
+                            }
+                        } else result.error = QStringLiteral("Cancelled");
+                        thumbnailSource.reset(); // Do not pin the source through result delivery.
+                    } else if (request.metadataSource) {
+                        auto frame = std::make_shared<ImageFrame>(*request.metadataSource);
+                        MetadataReader::enrich(request.path, frame->metadata);
+                        result.frame = std::move(frame);
+                    } else { result = decoder->decode(request); }
+                    if (result.frame && request.purpose == DecodePurpose::Thumbnail &&
+                        activeConsumers->load(std::memory_order_relaxed) > 0) {
+                        if (const QImage* image = result.frame->qImage()) {
+                            const QSize sourceSize = result.frame->metadata.sourceSize.isValid()
+                                                         ? result.frame->metadata.sourceSize
+                                                         : result.frame->descriptor.size;
+                            const int validBits = result.frame->rawParameters
+                                                      ? result.frame->rawParameters->validBits()
+                                                      : result.frame->descriptor.validBits;
+                            const QImage cacheImage = *image;
+                            PixelStorageFootprint writingPixels; writingPixels.add(cacheImage);
+                            const auto writeOwnership = residentAccounting->retain(std::move(writingPixels));
+                            QMetaObject::invokeMethod(self, [self, diskCache, key, cacheImage,
+                                                             sourceSize, validBits, pendingWrites, writeOwnership] {
+                                if (!self || pendingWrites->load() >= 64) return;
+                                ++*pendingWrites;
+                                self->writePool_.start([diskCache, key, cacheImage, sourceSize,
+                                                        validBits, pendingWrites, writeOwnership] {
+                                    (void)diskCache->store(key, cacheImage, sourceSize, validBits);
+                                    --*pendingWrites;
+                                });
+                            }, Qt::QueuedConnection);
                         }
-                        prepared->uploadPlanes = std::move(normalized);
                     }
                 }
-                result.frame = std::move(prepared);
-            }
-            const qint64 decodeElapsedMs = qMax<qint64>(0, decodeTimer.elapsed() - workingWaitMs);
-            if (result.frame && !request.isCancelled()) {
-                auto tracked = std::make_shared<ImageFrame>(*result.frame);
-                PixelStorageFootprint footprint; tracked->appendPixelStorage(footprint);
-                tracked->pixelOwnership.attach(residentAccounting, std::move(footprint));
-                result.frame = std::move(tracked);
-            }
-            std::shared_ptr<ResultBufferBudget::Reservation> resultReservation;
-            if (result.frame && !request.metadataSource) {
-                resultReservation = resultBufferBudget->reserve(result.frame->byteSize(),
-                    [&request] { return request.isCancelled(); });
-                if (!resultReservation) result = {{}, QStringLiteral("Cancelled")};
+                if (result.frame && !request.isCancelled() && request.purpose != DecodePurpose::Thumbnail &&
+                    !request.metadataSource && !request.requireDisplayImage) {
+                    auto prepared = std::make_shared<ImageFrame>(*result.frame);
+                    if (const auto* image = prepared->qImage(); image && image->format() == QImage::Format_RGBA64)
+                        prepared->uploadImage = image->convertedTo(QImage::Format_RGBA16FPx4);
+                    if (prepared->rawParameters && prepared->rawParameters->format == RawPixelFormat::P010 &&
+                        !prepared->rawParameters->littleEndian) {
+                        if (const auto* planes = std::get_if<std::shared_ptr<const PlaneBufferSet>>(&prepared->storage)) {
+                            auto normalized = std::make_shared<PlaneBufferSet>(**planes);
+                            normalized->displayImage = {};
+                            normalized->storage.detach();
+                            for (qsizetype i = 0; i + 1 < normalized->storage.size(); i += 2) {
+                                if ((i % (1024 * 1024)) == 0 && request.isCancelled()) break;
+                                std::swap(normalized->storage[i], normalized->storage[i + 1]);
+                            }
+                            prepared->uploadPlanes = std::move(normalized);
+                        }
+                    }
+                    result.frame = std::move(prepared);
+                }
+                decodeElapsedMs = qMax<qint64>(0, decodeTimer.elapsed() - workingWaitMs);
+                if (result.frame && !request.isCancelled()) {
+                    auto tracked = std::make_shared<ImageFrame>(*result.frame);
+                    PixelStorageFootprint footprint; tracked->appendPixelStorage(footprint);
+                    tracked->pixelOwnership.attach(residentAccounting, std::move(footprint));
+                    result.frame = std::move(tracked);
+                }
+                if (result.frame && !request.metadataSource) {
+                    resultReservation = resultBufferBudget->reserve(result.frame->byteSize(),
+                        [&request] { return request.isCancelled(); });
+                    if (!resultReservation) result = {{}, QStringLiteral("Cancelled")};
+                }
+            } catch (const std::bad_alloc&) {
+                result = {{}, QStringLiteral("Not enough memory to prepare image")};
+            } catch (const std::exception&) {
+                result = {{}, QStringLiteral("Image decoding failed")};
             }
             workingReservation.reset(); // Result credits now own the submission phase.
             request.reserveWorkingMemory = {};
@@ -819,6 +831,10 @@ PixelMemoryOwnership ImageLoader::accountImagePixels(const QImage& image) const 
 void ImageLoader::setMemoryBudget(qsizetype bytes) {
     Q_ASSERT(thread() == QThread::currentThread());
     memoryBudget_ = std::max<qsizetype>(bytes, 1);
+    // Resident caches, in-progress decodes and queued results all consume memory.
+    // The per-worker admission limits must follow a reduced loader budget too.
+    decodeWorkingBudget_->setMaximumBytes(memoryBudget_ / 2);
+    resultBufferBudget_->setMaximumBytes(memoryBudget_ / 4);
     sourceCache_->setBudget(std::min<qsizetype>(96LL * 1024 * 1024, memoryBudget_ / 4));
     automaticFullLoadBudget_ =
         std::min<qsizetype>(256LL * 1024LL * 1024LL, memoryBudget_);

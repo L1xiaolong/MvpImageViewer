@@ -56,7 +56,8 @@ class ImageLoader final : public QObject {
   public:
     using Callback = std::function<void(quint64, const DecodeResult&)>;
 
-    explicit ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* parent = nullptr);
+    explicit ImageLoader(std::shared_ptr<const IImageDecoder> decoder, QObject* parent = nullptr,
+                         std::shared_ptr<ThumbnailDiskCache> diskCache = {});
 
     ~ImageLoader() override;
 

@@ -54,14 +54,78 @@ qsizetype chromaStride(const RawImageParameters& parameters) {
     return minimumChromaRowStride(parameters);
 }
 
-QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
+// Reduced YUV images need only a few source rows at a time. In particular, do not
+// allocate/cache a 72 MB source frame for each 256 px thumbnail in a cold folder.
+// Read active row bytes only; large user-specified padding is not pixel storage.
+class YuvSampleSource final {
+  public:
+    YuvSampleSource(const QByteArray& bytes, const RawImageParameters& parameters,
+                    QFile* file = nullptr, qsizetype frameOffset = 0)
+        : bytes_(bytes), parameters_(parameters), file_(file), frameOffset_(frameOffset) {}
+
+    static qsizetype workingBytes(const RawImageParameters& parameters) {
+        const auto chroma = minimumChromaRowStride(parameters);
+        return addedAllocationBytes(minimumRowStride(parameters) * 4,
+            chroma * (parameters.format == RawPixelFormat::I420 ? 8 : 4));
+    }
+
+    int sample(int plane, int x, int y) {
+        const bool high = parameters_.format == RawPixelFormat::P010;
+        const qsizetype stride = plane == 0 ? rowStride(parameters_) : chromaStride(parameters_);
+        const qsizetype planeOffset = plane == 0 ? 0 : rowStride(parameters_) * parameters_.size.height() +
+            (plane == 2 ? stride * ((parameters_.size.height() + 1) / 2) : 0);
+        const char* data = nullptr;
+        if (!file_) {
+            data = bytes_.constData() + planeOffset + y * stride;
+        } else {
+            auto& rows = rows_[static_cast<std::size_t>(plane)];
+            for (const auto& row : rows) {
+                if (row.index == y) { data = row.bytes.constData(); break; }
+            }
+            if (!data && error_.isEmpty()) {
+                auto& next = nextRow_[static_cast<std::size_t>(plane)];
+                auto& row = rows[next++ % rows.size()];
+                row.index = -1;
+                const qsizetype count = plane == 0 ? minimumRowStride(parameters_)
+                                                 : minimumChromaRowStride(parameters_);
+                row.bytes.resize(count);
+                if (!file_->seek(frameOffset_ + planeOffset + y * stride)) {
+                    error_ = QStringLiteral("Could not seek to a YUV source row");
+                } else {
+                    qsizetype read = 0;
+                    while (read < count) {
+                        const qint64 received = file_->read(row.bytes.data() + read, count - read);
+                        if (received <= 0) break;
+                        read += received;
+                    }
+                    if (read != count) error_ = QStringLiteral("Could not read a complete YUV source row");
+                    else { row.index = y; data = row.bytes.constData(); }
+                }
+            }
+        }
+        if (!data) return 0; // Conversion reports the read error before delivering pixels.
+        if (!high) return static_cast<uchar>(data[x]);
+        const quint16 value = read16(data + x * 2, parameters_.littleEndian);
+        return parameters_.msbAligned ? value >> 6 : value & 0x03FF;
+    }
+
+    const QString& error() const { return error_; }
+
+  private:
+    struct Row { int index = -1; QByteArray bytes; };
+    const QByteArray& bytes_;
+    const RawImageParameters& parameters_;
+    QFile* file_;
+    qsizetype frameOffset_;
+    std::array<std::array<Row, 4>, 3> rows_;
+    std::array<std::size_t, 3> nextRow_{};
+    QString error_;
+};
+
+QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
                   const QSize& outputSize, const std::function<bool()>& cancelled) {
     const int width = parameters.size.width();
     const int height = parameters.size.height();
-    const qsizetype yStride = rowStride(parameters);
-    const qsizetype uvStride = chromaStride(parameters);
-    const qsizetype yBytes = yStride * height;
-    const qsizetype chromaPlaneBytes = uvStride * ((height + 1) / 2);
     const auto matrix = yuvCoefficients(parameters.yuvMatrix);
     const int bits = parameters.format == RawPixelFormat::P010 ? 10 : 8;
     const double maximum = static_cast<double>((1 << bits) - 1);
@@ -73,15 +137,6 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     const double cScale =
         parameters.range == QuantizationRange::Limited ? 224.0 * (1 << (bits - 8)) : maximum;
 
-    auto sample = [&](qsizetype offset) -> int {
-        if (bits == 8) {
-            return static_cast<uchar>(bytes.at(offset));
-        }
-        quint16 value = read16(bytes.constData() + offset, parameters.littleEndian);
-        return parameters.msbAligned ? value >> 6 : value & 0x03FF;
-    };
-
-    const qsizetype sampleBytes = bits == 8 ? 1 : 2;
     const int chromaWidth = (width + 1) / 2;
     const int chromaHeight = (height + 1) / 2;
     auto chromaAt = [&](int chromaX, int chromaY) {
@@ -90,13 +145,11 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
         int uValue = 0;
         int vValue = 0;
         if (parameters.format == RawPixelFormat::I420) {
-            uValue = sample(yBytes + chromaY * uvStride + chromaX);
-            vValue = sample(yBytes + chromaPlaneBytes + chromaY * uvStride + chromaX);
+            uValue = source.sample(1, chromaX, chromaY);
+            vValue = source.sample(2, chromaX, chromaY);
         } else {
-            const qsizetype pair =
-                yBytes + chromaY * uvStride + chromaX * sampleBytes * 2;
-            const int first = sample(pair);
-            const int second = sample(pair + sampleBytes);
+            const int first = source.sample(1, chromaX * 2, chromaY);
+            const int second = source.sample(1, chromaX * 2 + 1, chromaY);
             const bool vu = parameters.format == RawPixelFormat::NV21;
             uValue = vu ? second : first;
             vValue = vu ? first : second;
@@ -105,8 +158,7 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
                                      static_cast<double>(vValue)};
     };
     auto rgbAt = [&](int x, int y) {
-        const qsizetype yOffsetBytes = y * yStride + x * sampleBytes;
-        const int yValue = sample(yOffsetBytes);
+        const int yValue = source.sample(0, x, y);
         const double chromaX = std::clamp(
             parameters.chromaLocation == ChromaLocation::Left
                 ? static_cast<double>(x) * chromaWidth / width
@@ -153,7 +205,7 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
     if (image.isNull()) return {};
     const bool fullSize = outputSize == parameters.size;
     for (int y = 0; y < outputSize.height(); ++y) {
-        if (cancelled && cancelled()) return {};
+        if ((cancelled && cancelled()) || !source.error().isEmpty()) return {};
         auto* destination = image.scanLine(y);
         for (int x = 0; x < outputSize.width(); ++x) {
             if (fullSize) {
@@ -183,6 +235,7 @@ QImage convertYuv(const QByteArray& bytes, const RawImageParameters& parameters,
             writePixel(destination + x * 4, interpolated);
         }
     }
+    if (!source.error().isEmpty()) return {};
     image.setColorSpace(displayQColorSpace(currentDisplayColorSpace()));
     return image;
 }
@@ -246,32 +299,36 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const try {
     if (!plannedMaximum.isEmpty() && (plannedOutput.width() > plannedMaximum.width() ||
                                      plannedOutput.height() > plannedMaximum.height()))
         plannedOutput = plannedOutput.scaled(plannedMaximum, Qt::KeepAspectRatio);
-    const qsizetype sourceCost = cachedSource ? 0 : frameSize;
+    const bool streamYuv = parameters.isYuv() && request.purpose != DecodePurpose::Full && !cachedSource;
+    const qsizetype sourceCost = cachedSource ? 0 : streamYuv ? YuvSampleSource::workingBytes(parameters) : frameSize;
     if (!request.prepareAllocation(addedAllocationBytes(
-            addedAllocationBytes(sourceCost, frameSize), estimatedPixelBytes(plannedOutput, 32))))
+            addedAllocationBytes(sourceCost, streamYuv ? 0 : frameSize), estimatedPixelBytes(plannedOutput, 32))))
         return {{}, QStringLiteral("Cancelled")};
     QByteArray bytes = cachedSource ? cachedSource->bytes : QByteArray{};
 
+    QFile file(request.path);
     if (!cachedSource) {
-        QFile file(request.path);
         if (!file.open(QIODevice::ReadOnly)) return {{}, file.errorString()};
         qsizetype currentOffset = 0;
         if (!checkedFrameOffset(parameters, frameSize, file.size(), currentOffset) ||
             currentOffset != offset || !file.seek(offset))
             return {{}, QStringLiteral("RAW/YUV parameters exceed the file bounds")};
-        bytes.resize(frameSize);
-        for (qsizetype read = 0; read < frameSize;) {
-            if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
-            const qint64 count = file.read(bytes.data() + read, std::min<qsizetype>(1024 * 1024, frameSize - read));
-            if (count <= 0) return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
-            read += count;
-        }
-        if (request.sourceCache && !request.isCancelled()) {
-            auto source = std::make_shared<SourceFrame>(); source->bytes = bytes;
-            request.sourceCache->put(sourceKey, std::move(source));
+        if (!streamYuv) {
+            bytes.resize(frameSize);
+            for (qsizetype read = 0; read < frameSize;) {
+                if (request.isCancelled()) return {{}, QStringLiteral("Cancelled")};
+                const qint64 count = file.read(bytes.data() + read,
+                    std::min<qsizetype>(1024 * 1024, frameSize - read));
+                if (count <= 0) return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
+                read += count;
+            }
+            if (request.sourceCache && !request.isCancelled()) {
+                auto source = std::make_shared<SourceFrame>(); source->bytes = bytes;
+                request.sourceCache->put(sourceKey, std::move(source));
+            }
         }
     }
-    if (bytes.size() != frameSize) {
+    if (!streamYuv && bytes.size() != frameSize) {
         return {{}, QStringLiteral("Could not read a complete RAW/YUV frame")};
     }
 
@@ -286,11 +343,13 @@ DecodeResult RawImageDecoder::decode(const DecodeRequest& request) const try {
     }
     const QSize sourceOutputSize = orientedImageSize(outputSize, parameters.orientation);
     const auto cancelled = [&request] { return request.isCancelled(); };
-    QImage display = parameters.isYuv() ? convertYuv(bytes, parameters, sourceOutputSize, cancelled)
+    YuvSampleSource yuvSource(bytes, parameters, streamYuv ? &file : nullptr, offset);
+    QImage display = parameters.isYuv() ? convertYuv(yuvSource, parameters, sourceOutputSize, cancelled)
                                         : renderBayerImage(bytes, parameters, sourceOutputSize, cancelled);
     display = orientedImage(std::move(display), parameters.orientation);
     if (display.isNull()) {
-        return {{}, QStringLiteral("RAW/YUV conversion failed")};
+        return {{}, request.isCancelled() ? QStringLiteral("Cancelled") :
+            !yuvSource.error().isEmpty() ? yuvSource.error() : QStringLiteral("RAW/YUV conversion failed")};
     }
     const QFileInfo info(request.path);
     auto frame = std::make_shared<ImageFrame>();

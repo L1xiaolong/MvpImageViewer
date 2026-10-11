@@ -31,6 +31,7 @@
 #include <QSettings>
 #include <QTimer>
 #include <QUrl>
+#include <rhi/qrhi.h>
 
 static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service& diagnosticService) {
     QGuiApplication app(argc, argv);
@@ -195,8 +196,17 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
         return 1;
     }
     QObject::connect(mainWindow, &QQuickWindow::sceneGraphInitialized, mainWindow, [mainWindow] {
+        const auto* renderer = mainWindow->rendererInterface();
+        auto* rhi = static_cast<QRhi*>(renderer->getResource(mainWindow, QSGRendererInterface::RhiResource));
+        QJsonObject context{{"graphicsApi", static_cast<int>(renderer->graphicsApi())}};
+        if (rhi) {
+            const auto driver = rhi->driverInfo();
+            context.insert(QStringLiteral("device"), QString::fromUtf8(driver.deviceName));
+            context.insert(QStringLiteral("deviceType"), static_cast<int>(driver.deviceType));
+            context.insert(QStringLiteral("textureSizeMax"), rhi->resourceLimit(QRhi::TextureSizeMax));
+        }
         mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::render(), QStringLiteral("scenegraph.initialized"),
-            {{"graphicsApi", static_cast<int>(mainWindow->rendererInterface()->graphicsApi())}}, true);
+            context, true);
     }, Qt::DirectConnection);
     // The canvas buffer is interpreted in the colour space the platform reports for the window
     // surface, so "auto" has to follow it. The report is only populated once the platform window
