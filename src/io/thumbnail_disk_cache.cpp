@@ -3,7 +3,7 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
-#include <QSaveFile>
+#include <QBuffer>
 #include <QDateTime>
 #include <QScopeGuard>
 #include <QFileInfo>
@@ -13,6 +13,18 @@
 #include <algorithm>
 
 namespace mvpview {
+namespace {
+QImage readCacheImage(const QString& path, const char* format) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    const QByteArray bytes = file.readAll();
+    static const QByteArray pngTrailer = QByteArray::fromHex("0000000049454e44ae426082");
+    static const QByteArray jpegTrailer = QByteArray::fromHex("ffd9");
+    if (!bytes.endsWith(format[0] == 'P' ? pngTrailer : jpegTrailer)) return {};
+    QImage image;
+    return image.loadFromData(bytes, format) ? image : QImage{};
+}
+} // namespace
 
 ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
     : rootDirectory_(std::move(rootDirectory)) {
@@ -25,12 +37,17 @@ ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
 }
 
 QImage ThumbnailDiskCache::load(const QString& key) const {
-    QImage image;
+    // A writer publishes a new immutable entry directly. Do not decode its
+    // unfinished bytes, including when another process is filling this cache.
+    const QMutexLocker lock(&writeKeysMutex_);
+    if (writingKeys_.contains(key)) return {};
     const QString base = pathForKey(key);
-    if (!image.load(base + QStringLiteral(".png"), "PNG")) {
-        image.load(base + QStringLiteral(".jpg"), "JPEG");
+    for (const auto* format : {"PNG", "JPEG"}) {
+        const QImage image = readCacheImage(
+            base + (format[0] == 'P' ? QStringLiteral(".png") : QStringLiteral(".jpg")), format);
+        if (!image.isNull()) return image;
     }
-    return image;
+    return {};
 }
 
 bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
@@ -76,11 +93,23 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     }
     const QString suffix = hasTransparency ? QStringLiteral(".png") : QStringLiteral(".jpg");
     const QString path = pathForKey(key) + suffix;
-    QSaveFile file(path);
     const char* format = hasTransparency ? "PNG" : "JPEG";
     const int quality = hasTransparency ? 20 : 85;
-    if (!file.open(QIODevice::WriteOnly)) return false;
-    if (!storedImage.save(&file, format, quality) || !file.commit()) return false;
+    QByteArray encoded;
+    QBuffer buffer(&encoded);
+    if (!buffer.open(QIODevice::WriteOnly) || !storedImage.save(&buffer, format, quality)) return false;
+    // These files are disposable, content-addressed cache entries. Replacing
+    // hundreds of them through QSaveFile triggers process termination on some
+    // Windows installations. Create each key once without temporary-file renames;
+    // a partial entry is rejected by load() and the source is decoded normally.
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) return !readCacheImage(path, format).isNull();
+    if (file.write(encoded) != encoded.size() || !file.flush()) {
+        file.close();
+        (void)file.remove();
+        return false;
+    }
+    file.close();
     if ((++storeCount_ % 64U) == 0U) {
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
         qint64 previous = lastTrimMs_.load();
