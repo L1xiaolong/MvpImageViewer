@@ -23,3 +23,10 @@ TopToolbar 1.0 TopToolbar.ui.qml
 ThumbnailTile 1.0 ThumbnailTile.qml
 
 ThumbnailViewport 1.0 ThumbnailViewport.qml
+
+SettingsButton 1.0 SettingsButton.qml
+SettingsToggle 1.0 SettingsToggle.qml
+SettingsRow 1.0 SettingsRow.qml
+SettingsHeading 1.0 SettingsHeading.qml
+SettingsNotice 1.0 SettingsNotice.qml
+SettingsComboBox 1.0 SettingsComboBox.qml

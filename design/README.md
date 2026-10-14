@@ -52,3 +52,23 @@ their signals to the runtime controller:
 
 Saved changes under `src/qml` are therefore production changes by definition. Do not manually edit
 `*.qtds` files; they are Qt Design Studio session metadata.
+
+## Settings preview and UI regression coverage
+
+`SettingsPreview.qml` hosts the production `SettingsCard.qml`; it contains no duplicate page
+visuals. `MockSettingsController.qml` and `MockDiagnosticsController.qml` supply deterministic
+update and diagnostic states. The automated tests replace settings with the real C++
+`AppSettings` backed by a temporary INI store for persistence, translation, shortcut capture,
+conflict, reset, and cancellation checks. Destructive actions use the mock controller only.
+
+```sh
+cmake -S . -B build/macos-preset-release -DMVPVIEW_BUILD_TESTS=ON
+cmake --build build/macos-preset-release --target settings_ui_regression -j 8
+ctest --test-dir build/macos-preset-release -R settings_ui_regression --output-on-failure
+```
+
+The test exports five light and five dark PNGs, plus shortcut conflict, update download,
+and diagnostic restart states, to `build/macos-preset-release/settings-ui/`. Long-page exports
+expand the production popup vertically just for the image; layout checks use the normal
+scrolling popup at 980 × 640 and 1440 × 900. Offline update and diagnostic fixtures never
+contact a release server, export real user data, or delete application data.

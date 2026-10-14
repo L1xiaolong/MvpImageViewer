@@ -11,6 +11,7 @@ Item {
     required property var controller
     property var propertiesController: null
     property var settingsController: null
+    property bool externalModalVisible: false
     property bool smoothDisplay: (!settingsController ||
                                   settingsController.smoothDisplay === undefined)
                                  ? true : settingsController.smoothDisplay
@@ -331,8 +332,8 @@ Item {
         onConfirmed: complete(root.controller.moveCurrentToTrash())
     }
 
-    Shortcut { sequence: "PageUp"; onActivated: root.controller.showPrevious() }
-    Shortcut { sequence: "PageDown"; onActivated: root.controller.showNext() }
-    Shortcut { sequences: [StandardKey.Copy]; onActivated: root.controller.copyCurrent(false) }
-    Shortcut { sequences: [StandardKey.Cut]; onActivated: root.controller.copyCurrent(true) }
+    Shortcut { enabled: root.visible && !root.externalModalVisible; sequence: "PageUp"; onActivated: root.controller.showPrevious() }
+    Shortcut { enabled: root.visible && !root.externalModalVisible; sequence: "PageDown"; onActivated: root.controller.showNext() }
+    Shortcut { enabled: root.visible && !root.externalModalVisible; sequences: [StandardKey.Copy]; onActivated: root.controller.copyCurrent(false) }
+    Shortcut { enabled: root.visible && !root.externalModalVisible; sequences: [StandardKey.Cut]; onActivated: root.controller.copyCurrent(true) }
 }

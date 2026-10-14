@@ -34,6 +34,7 @@ ApplicationWindow {
     property var settingsCard: settingsLoader.item
     property var pendingComparePaths: []
     property int pendingSettingsSection: 0
+    property var settingsReturnFocus: null
     function openCompare(paths) {
         pendingComparePaths = paths
         showingCompare = true
@@ -41,6 +42,9 @@ ApplicationWindow {
         if (comparePage) { comparePage.open(paths); pendingComparePaths = [] }
     }
     function openSettings(section) {
+        if (settingsCard && settingsCard.visible)
+            return
+        settingsReturnFocus = window.activeFocusItem
         pendingSettingsSection = section === undefined ? 0 : section
         settingsLoader.active = true
         if (settingsCard) { settingsCard.currentSection = pendingSettingsSection; settingsCard.open() }
@@ -294,6 +298,7 @@ ApplicationWindow {
         sourceComponent: Component {
     FullScreenPage {
         controller: fullScreenController
+        externalModalVisible: window.settingsCard ? window.settingsCard.visible : false
         propertiesController: imagePropertiesController
         settingsController: appSettings
         messageParent: window.contentItem
@@ -349,7 +354,7 @@ ApplicationWindow {
                 spacing: 8
                 Button {
                     text: qsTr("Diagnostics / Export")
-                    onClicked: { window.openSettings(6); diagnosticNotice.dismissed = true }
+                    onClicked: { window.openSettings(4); diagnosticNotice.dismissed = true }
                 }
                 Button { text: qsTr("Dismiss"); onClicked: diagnosticNotice.dismissed = true }
             }
@@ -365,12 +370,17 @@ ApplicationWindow {
             SettingsCard {
                 parent: Overlay.overlay
                 settingsController: appSettings
+                onClosed: {
+                    if (window.settingsReturnFocus)
+                        window.settingsReturnFocus.forceActiveFocus()
+                }
                 diagnostics: typeof diagnosticsController !== "undefined" ? diagnosticsController : null
             }
         }
     }
 
     Shortcut {
+        enabled: !window.settingsCard || !window.settingsCard.visible
         sequence: {
             const revision = appSettings.shortcutsRevision
             return appSettings.shortcutFor("settings")

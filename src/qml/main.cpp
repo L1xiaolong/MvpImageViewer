@@ -88,22 +88,19 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
             showSettings = true;
         } else if (arguments.at(i) == QStringLiteral("--show-diagnostics-settings")) {
             showSettings = true;
-            settingsStartupSection = 6;
+            settingsStartupSection = 4;
         } else if (arguments.at(i) == QStringLiteral("--show-appearance-settings")) {
             showSettings = true;
             settingsStartupSection = 1;
         } else if (arguments.at(i) == QStringLiteral("--show-shortcuts-settings")) {
             showSettings = true;
-            settingsStartupSection = 3;
+            settingsStartupSection = 2;
         } else if (arguments.at(i) == QStringLiteral("--show-color-settings")) {
             showSettings = true;
-            settingsStartupSection = 2;
+            settingsStartupSection = 1;
         } else if (arguments.at(i) == QStringLiteral("--show-update-settings")) {
             showSettings = true;
-            settingsStartupSection = 4;
-        } else if (arguments.at(i) == QStringLiteral("--show-help-settings")) {
-            showSettings = true;
-            settingsStartupSection = 5;
+            settingsStartupSection = 3;
         } else if (arguments.at(i) == QStringLiteral("--select") && i + 1 < arguments.size()) {
             selectedPath = QFileInfo(arguments.at(++i)).absoluteFilePath();
         } else if (arguments.at(i) == QStringLiteral("--display-mode") &&

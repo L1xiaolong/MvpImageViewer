@@ -113,6 +113,7 @@ class AppSettings final : public QObject {
     void setCanvasBackground(const QString& background);
     void setSmoothDisplay(bool enabled);
 
+    Q_INVOKABLE QVariantMap shortcutSequenceForKey(int key, int modifiers) const;
     Q_INVOKABLE QString shortcutFor(const QString& action) const;
     Q_INVOKABLE QString setShortcut(const QString& action, const QString& sequence);
     Q_INVOKABLE void resetShortcuts();
@@ -122,7 +123,7 @@ class AppSettings final : public QObject {
     Q_INVOKABLE void cancelUpdateDownload();
     Q_INVOKABLE void installUpdate();
     Q_INVOKABLE void openReleasePage() const;
-    Q_INVOKABLE void openUserGuide() const;
+    Q_INVOKABLE void openRepository() const;
     Q_INVOKABLE void restoreDefaults();
     // A full local reset is finalized only after the application and diagnostics service have
     // stopped, so active log files and cache handles cannot survive the deletion.

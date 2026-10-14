@@ -381,6 +381,18 @@ QString AppSettings::shortcutFor(const QString& action) const {
     return {};
 }
 
+QVariantMap AppSettings::shortcutSequenceForKey(int key, int modifiers) const {
+    if (key <= 0 || key == Qt::Key_unknown || key == Qt::Key_Escape ||
+        key == Qt::Key_Shift || key == Qt::Key_Control || key == Qt::Key_Meta ||
+        key == Qt::Key_Alt || key == Qt::Key_AltGr)
+        return {};
+    const auto keyboardModifiers = Qt::KeyboardModifiers(modifiers) &
+        (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::KeypadModifier);
+    const QKeySequence sequence(QKeyCombination(keyboardModifiers, static_cast<Qt::Key>(key)));
+    return {{QStringLiteral("sequence"), sequence.toString(QKeySequence::PortableText)},
+            {QStringLiteral("nativeSequence"), sequence.toString(QKeySequence::NativeText)}};
+}
+
 QString AppSettings::setShortcut(const QString& action, const QString& sequence) {
     if (!shortcutDefinition(action))
         return QStringLiteral("unknown");
@@ -686,9 +698,8 @@ void AppSettings::openReleasePage() const {
         QDesktopServices::openUrl(url);
 }
 
-void AppSettings::openUserGuide() const {
+void AppSettings::openRepository() const {
     QUrl url = repositoryUrl();
-    url.setFragment(QStringLiteral("readme"));
     if (url.isValid())
         QDesktopServices::openUrl(url);
 }

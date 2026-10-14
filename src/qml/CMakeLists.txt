@@ -31,6 +31,12 @@ qt_add_qml_module(MVPImageViewerQml
     QML_FILES
         Main.qml
         Mvp/Theme.qml
+        Mvp/SettingsButton.qml
+        Mvp/SettingsToggle.qml
+        Mvp/SettingsRow.qml
+        Mvp/SettingsHeading.qml
+        Mvp/SettingsNotice.qml
+        Mvp/SettingsComboBox.qml
         Mvp/SettingsCard.qml
         Mvp/DiagnosticsPage.qml
         Mvp/AppIconButton.qml

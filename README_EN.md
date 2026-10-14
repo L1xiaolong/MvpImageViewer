@@ -80,7 +80,7 @@ Synchronize zoom and pan across two to four images, or use split inspection and 
 - Per-pane file information, EXIF data, luma histogram, and pixel overlays
 - One-to-four-pane multi-folder workspace with cross-directory selection
 - Copy, cut, paste, rename, drag and drop, file-manager reveal, and system Trash integration
-- Settings for language, light/dark appearance, custom shortcuts, daily update checks, and an in-app guide
+- Settings for language, display and theme, custom shortcuts, daily update checks, and a GitHub project link; changes save automatically
 - Optional RAW/YUV interpretation, source-plane pixel inspection, histograms, and ROI statistics
 - Optional camera RAW, EXIF/IPTC/XMP metadata, and ICC conversion; the display colour space follows the display by default (or can be pinned to sRGB, Display P3, Adobe RGB (1998), or BT.2020), with ICC destinations, panel readouts, and decode caches following it
 
@@ -115,7 +115,7 @@ The app checks GitHub Releases at most once every 24 hours when automatic checks
 | EXIF / IPTC / XMP | Built in | Packages include Exiv2 0.28+ |
 | Embedded RGB ICC | Optional | Requires LittleCMS 2.x; 8-bit, 16-bit, and floating-point RGB are converted into the display interchange space |
 
-The display interchange space offers four encodings: **sRGB, Display P3, Adobe RGB (1998), and BT.2020**, plus **Auto (follow display)**, which is the default: it reads the colour space the platform reports for the window surface and picks the matching encoding, falling back to sRGB when it cannot be recognised. Switch it at any time under Settings → Color & display; the card shows the space that is actually in effect. The selected space decides how YUV and Bayer frames are encoded for the canvas, the destination of embedded ICC conversion, the colour space tagged on decoded frames, and the colour readouts of the histogram and pixel probe. Decode caches are invalidated per space, so frames from different spaces are never mixed.
+The display interchange space offers four encodings: **sRGB, Display P3, Adobe RGB (1998), and BT.2020**, plus **Auto (follow display)**, which is the default: it reads the colour space the platform reports for the window surface and picks the matching encoding, falling back to sRGB when it cannot be recognised. Switch it at any time under Settings → Display; the card shows the space that is actually in effect. The selected space decides how YUV and Bayer frames are encoded for the canvas, the destination of embedded ICC conversion, the colour space tagged on decoded frames, and the colour readouts of the histogram and pixel probe. Decode caches are invalidated per space, so frames from different spaces are never mixed.
 
 Auto is the default because the compositor interprets the canvas buffer in the colour space the platform tags the window surface with, and that space follows the display configuration (Display P3 on a P3 panel, for example). Following it keeps on-screen colours consistent with the colour-managed reference; pinning sRGB or another space instead makes the presented result drift on a display that does not match it (see the limitations below).
 

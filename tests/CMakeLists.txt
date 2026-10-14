@@ -31,3 +31,30 @@ mvpview_enable_warnings(thumbnail_response_regression)
 add_test(NAME thumbnail_response_regression COMMAND thumbnail_response_regression)
 set_tests_properties(thumbnail_response_regression PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Exercise the real settings QML and AppSettings with a temporary QSettings store.
+find_package(Qt6 6.9 REQUIRED COMPONENTS QuickTest)
+add_executable(settings_ui_regression settings_ui_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/app_settings.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/app_settings.h)
+target_link_libraries(settings_ui_regression PRIVATE
+    mvpview_io Qt6::QuickTest Qt6::QuickControls2 Qt6::Network)
+target_compile_definitions(settings_ui_regression PRIVATE
+    QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml"
+    SETTINGS_ARTIFACT_DIR="${PROJECT_BINARY_DIR}/settings-ui"
+    MVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY}")
+foreach(_variant ui ui-dark)
+    set(_settings_icons)
+    foreach(_icon chevron-down)
+        list(APPEND _settings_icons "${PROJECT_SOURCE_DIR}/assets/icons/${_variant}/${_icon}.svg")
+    endforeach()
+    qt_add_resources(settings_ui_regression "settings_test_${_variant}"
+        PREFIX "/icons/${_variant}" BASE "${PROJECT_SOURCE_DIR}/assets/icons/${_variant}" FILES ${_settings_icons})
+endforeach()
+qt_add_resources(settings_ui_regression settings_test_translations
+    PREFIX "/i18n" BASE "${PROJECT_BINARY_DIR}/src/qml"
+    FILES "${PROJECT_BINARY_DIR}/src/qml/mvpimageviewer_zh_CN.qm")
+add_dependencies(settings_ui_regression MVPImageViewerQml)
+add_test(NAME settings_ui_regression COMMAND settings_ui_regression)
+set_tests_properties(settings_ui_regression PROPERTIES TIMEOUT 90
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
