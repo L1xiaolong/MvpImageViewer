@@ -50,12 +50,19 @@ qt_add_qml_module(MVPImageViewerQml
         Mvp/DesignCompareCanvas.qml
         Mvp/DesignFullScreenCanvas.qml
         Mvp/FolderNavigator.qml
+        Mvp/InspectorHeader.qml
+        Mvp/InspectorTabs.qml
+        Mvp/ImagePropertiesContent.qml
+        Mvp/ImagePropertiesPanel.qml
         Mvp/ImagePropertiesDialog.qml
         Mvp/ImageResizeDialog.qml
         Mvp/PropertiesHistogram.qml
         Mvp/PropertyFieldList.qml
         Mvp/RawNumberField.qml
         Mvp/RawParameterComboBox.qml
+        Mvp/RawParameterRow.qml
+        Mvp/RawParametersContent.qml
+        Mvp/RawParametersPanel.qml
         Mvp/RawParametersDialog.qml
         Mvp/ProductionCompareCanvas.qml
         Mvp/ProductionFullScreenCanvas.qml

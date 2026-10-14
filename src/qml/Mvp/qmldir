@@ -11,6 +11,8 @@ CompareLumaHistogram 1.0 CompareLumaHistogram.qml
 DesignCompareCanvas 1.0 DesignCompareCanvas.qml
 DesignFullScreenCanvas 1.0 DesignFullScreenCanvas.qml
 FolderNavigator 1.0 FolderNavigator.qml
+ImagePropertiesContent 1.0 ImagePropertiesContent.qml
+ImagePropertiesPanel 1.0 ImagePropertiesPanel.qml
 ImagePropertiesDialog 1.0 ImagePropertiesDialog.qml
 PropertiesHistogram 1.0 PropertiesHistogram.qml
 PropertyFieldList 1.0 PropertyFieldList.qml
@@ -30,3 +32,9 @@ SettingsRow 1.0 SettingsRow.qml
 SettingsHeading 1.0 SettingsHeading.qml
 SettingsNotice 1.0 SettingsNotice.qml
 SettingsComboBox 1.0 SettingsComboBox.qml
+
+InspectorHeader 1.0 InspectorHeader.qml
+InspectorTabs 1.0 InspectorTabs.qml
+RawParameterRow 1.0 RawParameterRow.qml
+RawParametersContent 1.0 RawParametersContent.qml
+RawParametersPanel 1.0 RawParametersPanel.qml

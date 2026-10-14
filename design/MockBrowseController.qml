@@ -35,6 +35,8 @@ QtObject {
     property bool galleryImageReady: true
     property bool galleryFullResolution: false
     property string galleryInfoText: "4000 × 3000  8-bit  JPG  13.89 MiB"
+    property bool canTransform: selectionCount === 1
+    property bool canRestoreSelected: false
     property bool canEditRaw: selectionCount === 1 &&
                               (selectedPaths[0].toLowerCase().endsWith(".raw") ||
                                selectedPaths[0].toLowerCase().endsWith(".yuv"))

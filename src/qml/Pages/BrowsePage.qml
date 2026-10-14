@@ -19,6 +19,32 @@ Rectangle {
     property bool smoothDisplay: (!settingsController ||
                                   settingsController.smoothDisplay === undefined)
                                  ? true : settingsController.smoothDisplay
+    property string inspectorMode: ""
+    readonly property bool propertiesVisible: inspectorMode === "properties"
+    readonly property bool rawParametersVisible: inspectorMode === "raw"
+    readonly property bool inspectorVisible: inspectorMode.length > 0
+    property real inspectorWidth: 360
+    readonly property real inspectorMaximumWidth: Math.min(480, Math.max(320,
+        width - 418 - (navigatorVisible ? 200 : 0)))
+    readonly property real effectiveInspectorWidth: inspectorVisible
+        ? Math.min(inspectorWidth, inspectorMaximumWidth) : 0
+    function showProperties() {
+        rawParametersPanel.finishEditing()
+        inspectorMode = "properties"
+        propertiesPanel.synchronize()
+    }
+    function showRawParameters() {
+        inspectorMode = "raw"
+        rawParametersPanel.synchronize()
+    }
+    function closeInspector() {
+        rawParametersPanel.finishEditing()
+        inspectorMode = ""
+        const pane = paneLayoutLoader.item
+        if (pane) pane.forceActiveFocus()
+        else root.forceActiveFocus()
+    }
+    function closeProperties() { closeInspector() }
     property bool navigatorVisible: true
     property real navigatorWidth: Theme.sidebarWidth
     property real galleryStripWidth: 280
@@ -32,8 +58,7 @@ Rectangle {
     // Use visible, not opened: block input throughout popup enter/exit transitions.
     property bool externalModalVisible: false
     readonly property bool contentInteractionEnabled: root.visible && !externalModalVisible &&
-                                                       !propertiesDialog.visible &&
-                                                       !rawParametersDialog.visible &&
+                                                       !rawParametersPanel.blockingPopupVisible &&
                                                        !imageResizeDialog.visible &&
                                                        !newFolderDialog.visible &&
                                                        !renameDialog.visible &&
@@ -43,6 +68,8 @@ Rectangle {
     readonly property bool fileShortcutsEnabled: (workspaceController.hasActivePane === undefined ||
                                                   workspaceController.hasActivePane) &&
                                                   !toolbar.searchControl.activeFocus &&
+                                                  !propertiesPanel.textSelectionActive &&
+                                                  !(root.rawParametersVisible && rawParametersPanel.inputFocused) &&
                                                   root.contentInteractionEnabled
     function pathIsRaw(path) {
         const lowered = path.toLowerCase();
@@ -260,10 +287,11 @@ Rectangle {
         anchors.left: parent.left
         anchors.top: toolbar.bottom
         anchors.bottom: statusRail.top
-        width: root.navigatorVisible ? root.navigatorWidth : 0
+        width: root.navigatorVisible ? Math.min(root.navigatorWidth,
+            Math.max(200, root.width - root.effectiveInspectorWidth - 418)) : 0
         opacity: root.navigatorVisible ? 1 : 0
         Behavior on width {
-            enabled: !resizeMouse.pressed
+            enabled: !resizeMouse.pressed && !root.inspectorVisible
             NumberAnimation {
                 duration: Theme.normal
                 easing.type: Easing.OutCubic
@@ -319,7 +347,7 @@ Rectangle {
         enabled: root.contentInteractionEnabled
         visible: root.displayMode !== 2 || root.workspaceController.paneCount !== 1
         anchors.left: gutter.right
-        anchors.right: parent.right
+        anchors.right: inspectorResizeHandle.left
         anchors.top: toolbar.bottom
         anchors.bottom: statusRail.top
         anchors.margins: 8
@@ -673,10 +701,10 @@ Rectangle {
         visible: root.displayMode === 2 && root.workspaceController.paneCount === 1
         onVisibleChanged: root.controller.setGalleryPath(visible ? currentPreviewPath : "")
         anchors.left: gutter.right
-        anchors.right: parent.right
+        anchors.right: inspectorResizeHandle.left
         anchors.top: toolbar.bottom
         anchors.bottom: statusRail.top
-        anchors.margins: 16
+        anchors.margins: root.inspectorVisible ? 8 : 16
 
         Rectangle {
             anchors.left: parent.left
@@ -1246,7 +1274,7 @@ Rectangle {
         enabled: root.displayMode === 2 && root.workspaceController.paneCount === 1
         property bool externalDragActive: false
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: inspectorResizeHandle.left
         anchors.top: toolbar.bottom
         anchors.bottom: statusRail.top
         z: 80
@@ -1535,18 +1563,66 @@ Rectangle {
         }
     }
 
-    ImagePropertiesDialog {
-        id: propertiesDialog
-        parent: root
-        controller: root.propertiesController
-        iconPrefix: root.iconPrefix
+    Item {
+        id: inspectorArea
+        anchors.right: parent.right
+        anchors.top: toolbar.bottom
+        anchors.bottom: statusRail.top
+        width: root.effectiveInspectorWidth
+        ImagePropertiesPanel {
+            id: propertiesPanel
+            anchors.fill: parent
+            visible: root.propertiesVisible
+            inspectionActive: visible && root.visible
+            browseController: root.controller
+            hasActivePane: root.workspaceController.hasActivePane === undefined || root.workspaceController.hasActivePane
+            controller: root.propertiesController
+            iconPrefix: root.iconPrefix
+            enabled: !root.externalModalVisible
+            onCloseRequested: root.closeInspector()
+        }
+        RawParametersPanel {
+            id: rawParametersPanel
+            anchors.fill: parent
+            visible: root.rawParametersVisible
+            inspectionActive: visible && root.visible
+            browseController: root.controller
+            hasActivePane: root.workspaceController.hasActivePane === undefined || root.workspaceController.hasActivePane
+            controller: root.rawController
+            modalParent: root
+            iconPrefix: root.iconPrefix
+            enabled: !root.externalModalVisible
+            onCloseRequested: root.closeInspector()
+        }
     }
-
-    RawParametersDialog {
-        id: rawParametersDialog
-        parent: root
-        controller: root.rawController
-        iconPrefix: root.iconPrefix
+    Rectangle {
+        id: inspectorResizeHandle
+        objectName: "inspectorResizeHandle"
+        anchors.right: inspectorArea.left
+        anchors.top: toolbar.bottom
+        anchors.bottom: statusRail.top
+        width: root.inspectorVisible ? 1 : 0
+        color: inspectorResizeMouse.containsMouse || inspectorResizeMouse.pressed ? Theme.probeBlue : Theme.opticalGray
+        z: 25
+        MouseArea {
+            id: inspectorResizeMouse
+            anchors.centerIn: parent
+            width: 9; height: parent.height
+            enabled: root.inspectorVisible && !root.externalModalVisible
+            hoverEnabled: true
+            cursorShape: Qt.SizeHorCursor
+            property real startX: 0
+            property real startWidth: 360
+            onPressed: function(mouse) {
+                startX = mapToItem(root, mouse.x, mouse.y).x
+                startWidth = root.effectiveInspectorWidth
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed) return
+                root.inspectorWidth = Math.max(320, Math.min(root.inspectorMaximumWidth,
+                    startWidth + startX - mapToItem(root, mouse.x, mouse.y).x))
+            }
+        }
     }
 
     Connections {
@@ -1578,7 +1654,7 @@ Rectangle {
         }
 
         function onPropertiesRequested(path) {
-            propertiesDialog.openForPath(path)
+            root.showProperties()
         }
 
         function onFullScreenRequested(paths, initialIndex) {
@@ -1586,7 +1662,7 @@ Rectangle {
         }
 
         function onRawParametersRequested(path) {
-            rawParametersDialog.openForPath(path)
+            root.showRawParameters()
         }
     }
 

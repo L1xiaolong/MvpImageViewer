@@ -79,7 +79,7 @@ public slots:
         engine->rootContext()->setContextProperty(QStringLiteral("testArtifactDir"), QStringLiteral(SETTINGS_ARTIFACT_DIR));
     }
 private:
-    QTemporaryDir directory_;
+    QTemporaryDir directory_{QDir::currentPath() + QStringLiteral("/settings-ui-settings-XXXXXX")};
     mvpview::AppSettings* settings_ = nullptr;
 };
 QUICK_TEST_MAIN_WITH_SETUP(settings_ui, SettingsTestSetup)

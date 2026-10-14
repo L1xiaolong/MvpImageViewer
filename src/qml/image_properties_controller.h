@@ -7,6 +7,7 @@
 #include <QSet>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QTimer>
 
 namespace mvpview {
 
@@ -20,30 +21,35 @@ class ImagePropertiesController final : public QObject {
     Q_PROPERTY(bool directory READ directory NOTIFY stateChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY stateChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY stateChanged)
-    Q_PROPERTY(QVariantList basicFields READ basicFields NOTIFY stateChanged)
-    Q_PROPERTY(QVariantList exifFields READ exifFields NOTIFY stateChanged)
-    Q_PROPERTY(QVariantList rawFields READ rawFields NOTIFY stateChanged)
-    Q_PROPERTY(bool hasRawParameters READ hasRawParameters NOTIFY stateChanged)
+    Q_PROPERTY(bool metadataLoading READ metadataLoading NOTIFY stateChanged)
+    Q_PROPERTY(QVariantList overviewGroups READ overviewGroups NOTIFY stateChanged)
+    Q_PROPERTY(QVariantList advancedGroups READ advancedGroups NOTIFY stateChanged)
+    Q_PROPERTY(QStringList warnings READ warnings NOTIFY stateChanged)
     Q_PROPERTY(bool hasHistogramSource READ hasHistogramSource NOTIFY stateChanged)
     Q_PROPERTY(int histogramRevision READ histogramRevision NOTIFY histogramRevisionChanged)
 
   public:
     explicit ImagePropertiesController(ImageLoader* loader, QObject* parent = nullptr);
+    ~ImagePropertiesController() override;
 
     [[nodiscard]] QString path() const { return path_; }
     [[nodiscard]] QString fileName() const { return fileName_; }
     [[nodiscard]] bool directory() const { return directory_; }
     [[nodiscard]] bool loading() const { return loading_; }
     [[nodiscard]] QString errorText() const { return errorText_; }
-    [[nodiscard]] QVariantList basicFields() const { return basicFields_; }
-    [[nodiscard]] QVariantList exifFields() const { return exifFields_; }
-    [[nodiscard]] QVariantList rawFields() const { return rawFields_; }
-    [[nodiscard]] bool hasRawParameters() const { return !rawFields_.isEmpty(); }
+    [[nodiscard]] bool metadataLoading() const { return metadataLoading_; }
+    [[nodiscard]] QVariantList overviewGroups() const { return overviewGroups_; }
+    [[nodiscard]] QVariantList advancedGroups() const { return advancedGroups_; }
+    [[nodiscard]] QStringList warnings() const { return warnings_; }
     [[nodiscard]] bool hasHistogramSource() const;
     [[nodiscard]] int histogramRevision() const { return histogramRevision_; }
 
-    Q_INVOKABLE void loadPath(const QString& path);
-    // source 0 is the rendered display; source 1 is the original RAW/YUV planes.
+    Q_INVOKABLE void loadPath(const QString& path, bool deferred = false);
+    Q_INVOKABLE void clear();
+    Q_INVOKABLE void reload();
+    Q_INVOKABLE void retranslate();
+    // The inspector always requests source 1: native file channels (RGB/Gray/Bayer/YUV).
+    // Source 0 remains available for existing display-analysis consumers.
     Q_INVOKABLE void requestHistogram(int source);
     Q_INVOKABLE QVariantMap histogram(int source) const;
 
@@ -54,6 +60,8 @@ class ImagePropertiesController final : public QObject {
 
   private:
     void setFrame(ImageFramePtr frame);
+    void startLoading();
+    void rebuildFields();
     void setHistogram(int source, quint64 generation, QVariantMap value);
     void resetHistograms();
 
@@ -63,9 +71,12 @@ class ImagePropertiesController final : public QObject {
     bool directory_ = false;
     bool loading_ = false;
     QString errorText_;
-    QVariantList basicFields_;
-    QVariantList exifFields_;
-    QVariantList rawFields_;
+    bool metadataLoading_ = false;
+    QVariantList overviewGroups_;
+    QVariantList advancedGroups_;
+    QStringList warnings_;
+    QString metadataError_;
+    QTimer loadTimer_;
     ImageFramePtr frame_;
     quint64 loadGeneration_ = 0;
     quint64 displayHistogramGeneration_ = 0;

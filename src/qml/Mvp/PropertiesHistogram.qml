@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-
 import QtQuick
 import QtQuick.Controls
 import "."
@@ -7,128 +6,81 @@ import "."
 Item {
     id: root
     objectName: "propertiesHistogram"
-
     property var controller: null
-    property int source: 0
+    property bool active: false
     property int selectedChannel: 0
+    property string observedPath: controller ? controller.path : ""
     property var histogramData: {
         const revision = controller ? controller.histogramRevision : 0
-        return controller ? controller.histogram(source) : ({})
+        return controller ? controller.histogram(1) : ({})
     }
     readonly property var channels: histogramData.channels || []
-
-    implicitHeight: 408
-
-    function requestCurrentSource() {
-        if (controller)
-            controller.requestHistogram(source)
+    readonly property var selectedChannelData: selectedChannel >= 0 && selectedChannel < channels.length
+        ? channels[selectedChannel] : null
+    readonly property string pendingLabel: qsTr("Analyzing…")
+    readonly property string unavailableLabel: qsTr("Histogram unavailable")
+    readonly property var statistics: !selectedChannelData ? [] : [
+        { id: "histogram-mean", label: qsTr("Mean"), value: Number(selectedChannelData.mean).toFixed(2), mono: true },
+        { id: "histogram-variance", label: qsTr("Variance"), value: Number(selectedChannelData.variance).toFixed(2), mono: true },
+        { id: "histogram-min", label: qsTr("Min"), value: String(selectedChannelData.min), mono: true },
+        { id: "histogram-max", label: qsTr("Max"), value: String(selectedChannelData.max), mono: true },
+        { id: "histogram-median", label: qsTr("Median"), value: Number(selectedChannelData.median).toFixed(1), mono: true }
+    ]
+    onPendingLabelChanged: graph.requestPaint()
+    onUnavailableLabelChanged: graph.requestPaint()
+    onSelectedChannelChanged: graph.requestPaint()
+    implicitHeight: layout.implicitHeight
+    function channelName(channel) { return channel.name || "" }
+    function requestHistogram() {
+        if (active && controller && controller.path.length > 0) controller.requestHistogram(1)
     }
-
-    onSourceChanged: {
-        selectedChannel = 0
-        requestCurrentSource()
-        graph.requestPaint()
+    onActiveChanged: requestHistogram()
+    onObservedPathChanged: { selectedChannel = 0; requestHistogram() }
+    onChannelsChanged: if (selectedChannel >= channels.length) selectedChannel = 0
+    onHistogramDataChanged: graph.requestPaint()
+    Connections {
+        target: Theme
+        function onDarkModeChanged() { graph.requestPaint() }
     }
-    onHistogramDataChanged: {
-        if (selectedChannel >= channels.length)
-            selectedChannel = 0
-        graph.requestPaint()
-    }
-    Component.onCompleted: requestCurrentSource()
+    Component.onCompleted: requestHistogram()
 
     Column {
-        anchors.fill: parent
-        spacing: 8
-
-        Row {
+        id: layout
+        width: parent.width
+        spacing: 12
+        Item {
             width: parent.width
-            height: 26
-            spacing: 6
-
-            Repeater {
-                model: ["RGB (0–255)", "Source data"]
-                delegate: Button {
-                    id: sourceButton
-                    required property int index
-                    required property string modelData
-                    width: index === 0 ? 104 : 116
-                    height: 26
-                    text: modelData
-                    enabled: index === 0 || (root.controller && root.controller.hasHistogramSource)
-                    onClicked: root.source = index
-                    contentItem: Text {
-                        text: sourceButton.text
-                        color: !sourceButton.enabled ? Theme.faintInk
-                              : root.source === sourceButton.index ? Theme.probeBlue : Theme.mutedInk
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        font.family: Theme.uiFont
-                        font.pixelSize: 10
-                        font.weight: root.source === sourceButton.index ? Font.DemiBold : Font.Medium
-                    }
-                    background: Rectangle {
-                        radius: 5
-                        color: root.source === sourceButton.index ? Theme.explorerSelectionBg
-                              : sourceButton.hovered ? Theme.softHover : "transparent"
-                        border.width: root.source === sourceButton.index ? 1 : 0
-                        border.color: Theme.accentBorder
-                    }
-                }
+            height: 32
+            Text {
+                id: channelLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: qsTr("Channel")
+                font.family: Theme.uiFont
+                font.pixelSize: 12
+                color: Theme.mutedInk
             }
-
-            Item { width: 8; height: 1 }
-
-            Repeater {
-                model: root.channels
-                delegate: Button {
-                    id: channelButton
-                    required property int index
-                    required property var modelData
-                    height: 26
-                    width: Math.max(48, channelName.implicitWidth + 22)
-                    onClicked: {
-                        root.selectedChannel = index
-                        graph.requestPaint()
-                    }
-                    contentItem: Row {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Rectangle {
-                            width: 6
-                            height: 6
-                            radius: 3
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: channelButton.modelData.color || Theme.mutedInk
-                        }
-                        Text {
-                            id: channelName
-                            text: channelButton.modelData.name || ""
-                            color: root.selectedChannel === channelButton.index
-                                   ? Theme.graphiteInk : Theme.mutedInk
-                            font.family: Theme.uiFont
-                            font.pixelSize: 10
-                            font.weight: root.selectedChannel === channelButton.index
-                                         ? Font.DemiBold : Font.Normal
-                        }
-                    }
-                    background: Rectangle {
-                        radius: 5
-                        color: root.selectedChannel === channelButton.index ? Theme.softHover
-                              : channelButton.hovered ? Theme.softHover : "transparent"
-                    }
-                }
+            SettingsComboBox {
+                id: channelSelector
+                objectName: "histogramChannelSelector"
+                anchors.left: channelLabel.right
+                anchors.leftMargin: 12
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                model: root.channels.map(function(channel) { return root.channelName(channel) })
+                currentIndex: root.channels.length > 0 ? root.selectedChannel : -1
+                enabled: root.histogramData.valid === true && root.channels.length > 0
+                Accessible.name: channelLabel.text
+                onActivated: function(index) { root.selectedChannel = index }
             }
         }
-
         Rectangle {
             width: parent.width
-            height: 180
-            radius: 6
+            height: 190
+            radius: Theme.radius
             color: Theme.raisedSurface
-            border.width: 1
             border.color: Theme.opticalGray
             clip: true
-
             Canvas {
                 id: graph
                 objectName: "propertiesHistogramGraph"
@@ -143,7 +95,7 @@ Item {
                     context.reset()
                     const left = 28
                     const top = 8
-                    const right = width - 4
+                    const right = width - 24
                     const bottom = height - 22
 
                     context.strokeStyle = Theme.opticalGray
@@ -156,7 +108,7 @@ Item {
                         context.stroke()
                     }
                     context.fillStyle = Theme.mutedInk
-                    context.font = "9px " + Theme.monoFont
+                    context.font = "12px \"" + (Theme.uiFont || "sans-serif") + "\""
                     context.textAlign = "center"
                     const domain = Number(root.histogramData.maximumValue || 255)
                     for (let tick = 0; tick <= 4; ++tick) {
@@ -166,16 +118,16 @@ Item {
 
                     if (root.histogramData.loading === true) {
                         context.fillStyle = Theme.mutedInk
-                        context.font = "11px " + Theme.uiFont
-                        context.fillText("Analyzing…", (left + right) / 2, (top + bottom) / 2)
+                        context.font = "12px \"" + (Theme.uiFont || "sans-serif") + "\""
+                        context.fillText(root.pendingLabel, (left + right) / 2, (top + bottom) / 2)
                         return
                     }
                     const channel = root.channels.length > root.selectedChannel
                                   ? root.channels[root.selectedChannel] : null
                     if (!channel || !channel.bins || channel.bins.length < 2) {
                         context.fillStyle = Theme.faintInk
-                        context.font = "11px " + Theme.uiFont
-                        context.fillText(root.histogramData.message || "No histogram",
+                        context.font = "12px \"" + (Theme.uiFont || "sans-serif") + "\""
+                        context.fillText(root.unavailableLabel,
                                          (left + right) / 2, (top + bottom) / 2)
                         return
                     }
@@ -212,85 +164,21 @@ Item {
                     context.stroke()
                 }
             }
-        }
 
-        Text {
-            width: parent.width
-            height: 18
-            text: root.histogramData.summary || root.histogramData.message || ""
-            color: Theme.mutedInk
-            font.family: Theme.monoFont
-            font.pixelSize: 10
-            elide: Text.ElideRight
-        }
 
+        }
         Rectangle {
             width: parent.width
-            height: 22 + Math.max(1, root.channels.length) * 24
-            radius: 6
+            height: visible ? statisticsFields.implicitHeight : 0
+            visible: root.statistics.length > 0
+            radius: Theme.radius
             color: Theme.raisedSurface
-            border.width: 1
             border.color: Theme.opticalGray
-            clip: true
-
-            Column {
-                anchors.fill: parent
-                Rectangle {
-                    width: parent.width
-                    height: 22
-                    color: Theme.softHover
-                    Row {
-                        anchors.fill: parent
-                        Repeater {
-                            model: ["Channel", "Mean", "Variance", "Min", "Max", "Median"]
-                            delegate: Text {
-                                required property string modelData
-                                width: parent.width / 6
-                                height: parent.height
-                                text: modelData
-                                color: Theme.mutedInk
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.family: Theme.uiFont
-                                font.pixelSize: 9
-                                font.weight: Font.DemiBold
-                            }
-                        }
-                    }
-                }
-                Repeater {
-                    model: root.channels
-                    delegate: Rectangle {
-                        id: channelRow
-                        required property int index
-                        required property var modelData
-                        width: parent.width
-                        height: 24
-                        color: index % 2 === 0 ? Theme.raisedSurface : Theme.softHover
-                        Row {
-                            anchors.fill: parent
-                            Repeater {
-                                model: [channelRow.modelData.name || "",
-                                    Number(channelRow.modelData.mean || 0).toFixed(2),
-                                    Number(channelRow.modelData.variance || 0).toFixed(2),
-                                    String(channelRow.modelData.min ?? ""),
-                                    String(channelRow.modelData.max ?? ""),
-                                    Number(channelRow.modelData.median || 0).toFixed(1)]
-                                delegate: Text {
-                                    required property string modelData
-                                    width: parent.width / 6
-                                    height: parent.height
-                                    text: modelData
-                                    color: Theme.graphiteInk
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    font.family: Theme.monoFont
-                                    font.pixelSize: 9
-                                }
-                            }
-                        }
-                    }
-                }
+            PropertyFieldList {
+                id: statisticsFields
+                objectName: "histogramStatistics"
+                width: parent.width
+                fields: root.statistics
             }
         }
     }

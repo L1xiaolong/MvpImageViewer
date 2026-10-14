@@ -13,7 +13,7 @@ QtObject {
     readonly property var allPanes: [pane0, pane1, pane2, pane3]
     property var paneOrder: [pane0, pane1, pane2, pane3]
     readonly property var panes: paneOrder.slice(0, paneCount)
-    readonly property var activePane: hasActivePane ? panes[activePaneIndex] : emptyPane
+    readonly property var activePane: hasActivePane ? (panes[activePaneIndex] || emptyPane) : emptyPane
     readonly property var workspaceSelectedPaths: collectSelectedPaths()
     readonly property int workspaceSelectionCount: workspaceSelectedPaths.length
     readonly property bool canCompare: workspaceSelectionCount >= 2 && workspaceSelectionCount <= 4

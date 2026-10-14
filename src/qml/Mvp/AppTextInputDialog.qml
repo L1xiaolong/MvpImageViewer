@@ -48,7 +48,7 @@ Dialog {
     }
 
     Overlay.modal: Rectangle {
-        color: "#330E1820"
+        color: Theme.overlay
     }
 
     background: Rectangle {

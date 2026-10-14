@@ -256,7 +256,7 @@ Rectangle {
         objectName: "browserSearchField"
         x: root.width - width - 18
         anchors.verticalCenter: parent.verticalCenter
-        width: 236
+        width: Math.max(140, Math.min(236, root.width - (brandDivider.x + 482)))
         height: root.toolbarButtonSize
         placeholderText: qsTr("Search files")
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable

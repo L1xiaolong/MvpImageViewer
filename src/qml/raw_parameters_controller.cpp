@@ -84,11 +84,27 @@ QString RawParametersController::suggestedPresetName() const {
 }
 
 void RawParametersController::loadPath(const QString& requestedPath) {
+    finishPendingChanges();
+    if (requestedPath.isEmpty()) { clear(); return; }
     path_ = QFileInfo(requestedPath).absoluteFilePath();
     std::optional<RawImageParameters> value = loader_->rawParameters(path_);
     if (!value) value = RawPresetStore::loadForFile(path_);
     if (!value) value = RawPresetStore::inferFromFileName(path_);
     setParameters(value.value_or(RawImageParameters{}));
+}
+
+void RawParametersController::finishPendingChanges() {
+    if (!changeTimer_->isActive()) return;
+    changeTimer_->stop();
+    applyEditedParameters();
+}
+
+void RawParametersController::clear() {
+    finishPendingChanges();
+    path_.clear();
+    values_.clear();
+    selectedPreset_.clear();
+    emit stateChanged();
 }
 
 void RawParametersController::setValue(const QString& key, const QVariant& value) {
@@ -115,7 +131,7 @@ void RawParametersController::selectPreset(const QString& name) {
     }
     const auto preset = RawPresetStore::loadNamedPreset(name);
     if (!preset) {
-        emit notificationRequested(QStringLiteral("Unable to load configuration: %1").arg(name),
+        emit notificationRequested(tr("Unable to load configuration: %1").arg(name),
                                    true);
         return;
     }
@@ -125,10 +141,11 @@ void RawParametersController::selectPreset(const QString& name) {
 
 QString RawParametersController::savePreset(const QString& requestedName,
                                             bool applyToFolderAfter) {
+    finishPendingChanges();
     const QString name = requestedName.trimmed();
-    if (name.isEmpty()) return QStringLiteral("Enter a configuration name.");
+    if (name.isEmpty()) return tr("Enter a configuration name.");
     if (!RawPresetStore::saveNamedPreset(name, parameters()))
-        return QStringLiteral("The configuration is incomplete or invalid.");
+        return tr("The configuration is incomplete or invalid.");
     refreshPresets();
     selectedPreset_ = name;
     emit stateChanged();
@@ -136,28 +153,29 @@ QString RawParametersController::savePreset(const QString& requestedName,
         const QString error = applyToFolder();
         if (!error.isEmpty()) return error;
     }
-    emit notificationRequested(QStringLiteral("Configuration saved: %1").arg(name), false);
+    emit notificationRequested(tr("Configuration saved: %1").arg(name), false);
     return {};
 }
 
 QString RawParametersController::deleteSelectedPreset() {
-    if (selectedPreset_.isEmpty()) return QStringLiteral("Select a saved configuration.");
+    if (selectedPreset_.isEmpty()) return tr("Select a saved configuration.");
     const QString name = selectedPreset_;
     if (!RawPresetStore::removeNamedPreset(name))
-        return QStringLiteral("Unable to delete configuration: %1").arg(name);
+        return tr("Unable to delete configuration: %1").arg(name);
     selectedPreset_.clear();
     refreshPresets();
     emit stateChanged();
-    emit notificationRequested(QStringLiteral("Configuration deleted: %1").arg(name), false);
+    emit notificationRequested(tr("Configuration deleted: %1").arg(name), false);
     return {};
 }
 
 QString RawParametersController::applyToFolder() {
-    if (path_.isEmpty()) return QStringLiteral("No RAW/YUV file is selected.");
+    finishPendingChanges();
+    if (path_.isEmpty()) return tr("No RAW/YUV file is selected.");
     RawImageParameters value = parameters();
     value.frameIndex = 0;
     if (availableFrameCount(QFileInfo(path_).size(), value) <= 0)
-        return QStringLiteral("The parameters do not describe one complete frame.");
+        return tr("The parameters do not describe one complete frame.");
     RawPresetStore::saveForFile(path_, value);
     const QFileInfo source(path_);
     const QFileInfoList candidates = source.dir().entryInfoList(
@@ -170,7 +188,7 @@ QString RawParametersController::applyToFolder() {
     }
     emit parametersApplied(path_);
     emit notificationRequested(
-        QStringLiteral("Configuration applied to %1 %2 file(s) in this folder")
+        tr("Configuration applied to %1 %2 file(s) in this folder")
             .arg(appliedCount).arg(source.suffix().toUpper()), false);
     return {};
 }
@@ -231,7 +249,7 @@ void RawParametersController::applyEditedParameters() {
     RawImageParameters value = parameters();
     if (availableFrameCount(QFileInfo(path_).size(), value) <= 0) {
         emit notificationRequested(
-            QStringLiteral("RAW/YUV parameters do not describe one complete frame"), true);
+            tr("RAW/YUV parameters do not describe one complete frame"), true);
         return;
     }
     loader_->setRawParameters(path_, value);

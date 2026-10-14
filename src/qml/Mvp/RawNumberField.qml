@@ -8,6 +8,7 @@ TextField {
     property var controller: null
     property string parameterKey: ""
     property int listIndex: -1
+    property string editingPath: ""
     property real parameterValue: 0
     property int decimals: 0
     property real minimumValue: 0
@@ -18,7 +19,8 @@ TextField {
                             : String(Math.round(Number(parameterValue)))
     }
     function commit() {
-        if (!acceptableInput || !controller)
+        if (!acceptableInput || !controller ||
+                (editingPath.length > 0 && editingPath !== controller.path))
             return
         const number = Number(text)
         if (listIndex >= 0)
@@ -28,14 +30,16 @@ TextField {
     }
 
     text: formattedValue()
-    height: 28
+    implicitHeight: 32
+    height: implicitHeight
     leftPadding: 8
     rightPadding: 8
     selectByMouse: true
     color: Theme.graphiteInk
-    font.family: Theme.monoFont
-    font.pixelSize: 10
+    font.family: Theme.uiFont
+    font.pixelSize: 12
     validator: decimals > 0 ? doubleValidator : integerValidator
+    onActiveFocusChanged: if (activeFocus) editingPath = controller ? controller.path : ""
     onEditingFinished: commit()
     onAccepted: commit()
     background: Rectangle {
@@ -54,6 +58,7 @@ TextField {
     }
     DoubleValidator {
         id: doubleValidator
+        locale: "C"
         bottom: root.minimumValue
         top: root.maximumValue
         decimals: root.decimals

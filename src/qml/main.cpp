@@ -139,6 +139,7 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
         browseController.addFileManagerPane();
     mvpview::CompareController compareController(browseController.loader());
     mvpview::ImagePropertiesController imagePropertiesController(browseController.loader());
+    mvpview::ImagePropertiesController fullScreenPropertiesController(browseController.loader());
     mvpview::FullScreenController fullScreenController(browseController.loader());
     mvpview::FullScreenPresentationController fullScreenPresentationController;
     mvpview::RawParametersController rawParametersController(browseController.loader());
@@ -155,6 +156,11 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     QQmlApplicationEngine engine;
     QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
                      &engine, &QQmlApplicationEngine::retranslate);
+    QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
+                     &imagePropertiesController, &mvpview::ImagePropertiesController::retranslate);
+    QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
+                     &fullScreenPropertiesController, &mvpview::ImagePropertiesController::retranslate);
+    engine.rootContext()->setContextProperty(QStringLiteral("fullScreenPropertiesController"), &fullScreenPropertiesController);
     engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), &appSettings);
     engine.rootContext()->setContextProperty(QStringLiteral("diagnosticsController"), &diagnosticsController);
     engine.rootContext()->setContextProperty(QStringLiteral("systemUiFontFamily"),

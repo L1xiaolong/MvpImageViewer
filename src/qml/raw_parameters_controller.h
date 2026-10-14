@@ -42,6 +42,8 @@ class RawParametersController final : public QObject {
     [[nodiscard]] QString suggestedPresetName() const;
 
     Q_INVOKABLE void loadPath(const QString& path);
+    Q_INVOKABLE void clear();
+    Q_INVOKABLE void finishPendingChanges();
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
     Q_INVOKABLE void setListValue(const QString& key, int index, const QVariant& value);
     Q_INVOKABLE void selectPreset(const QString& name);

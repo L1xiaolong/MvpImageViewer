@@ -21,6 +21,11 @@ QtObject {
     })
     property var presetNames: ["6236_4178_MIPI_RAW10", "Reference daylight"]
     property string selectedPreset: ""
+    property var edits: []
+    property int flushCount: 0
+    property int appliedFolderCount: 0
+    function finishPendingChanges() { flushCount += 1 }
+    function clear() { path = ""; fileName = ""; selectedPreset = ""; stateChanged() }
     readonly property bool yuvFormat: Number(values.format) <= 3
     readonly property bool raw16Format: Number(values.format) === 6
     readonly property bool endianControlsVisible: Number(values.format) === 3 || raw16Format
@@ -32,6 +37,7 @@ QtObject {
         stateChanged()
     }
     function setValue(key, value) {
+        edits = edits.concat([{path: path, key: key, value: value}])
         const copy = Object.assign({}, values)
         copy[key] = value
         values = copy
@@ -49,11 +55,13 @@ QtObject {
         selectedPreset = name.trim()
         if (presetNames.indexOf(selectedPreset) < 0)
             presetNames = presetNames.concat([selectedPreset])
+        if (applyAfter) applyToFolder()
         notificationRequested("Configuration saved: " + selectedPreset, false)
         return ""
     }
-    function deleteSelectedPreset() { selectedPreset = ""; return "" }
+    function deleteSelectedPreset() { presetNames = presetNames.filter(function(name) { return name !== root.selectedPreset }); selectedPreset = ""; return "" }
     function applyToFolder() {
+        appliedFolderCount += 1
         notificationRequested("Configuration applied to 8 RAW file(s) in this folder", false)
         return ""
     }

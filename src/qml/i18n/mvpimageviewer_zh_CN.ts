@@ -2294,4 +2294,906 @@ Choose another folder or drop images here</source>
         <translation type="vanished">正在导出。</translation>
     </message>
 </context>
+<context>
+        <name>ImageProperties</name>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="61" />
+            <location filename="../image_properties_controller.cpp" line="78" />
+            <source>Normal</source>
+            <translation>正常</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="62" />
+            <source>Mirror horizontal</source>
+            <translation>水平镜像</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="63" />
+            <location filename="../image_properties_controller.cpp" line="80" />
+            <source>Rotate 180°</source>
+            <translation>旋转 180°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="64" />
+            <source>Mirror vertical</source>
+            <translation>垂直镜像</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="66" />
+            <source>Mirror horizontal, rotate 270° CW</source>
+            <translation>水平镜像，顺时针旋转 270°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="67" />
+            <source>Rotate 90° CW</source>
+            <translation>顺时针旋转 90°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="69" />
+            <source>Mirror horizontal, rotate 90° CW</source>
+            <translation>水平镜像，顺时针旋转 90°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="70" />
+            <source>Rotate 270° CW</source>
+            <translation>顺时针旋转 270°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="79" />
+            <source>Rotate 90° clockwise</source>
+            <translation>顺时针旋转 90°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="81" />
+            <source>Rotate 270° clockwise</source>
+            <translation>顺时针旋转 270°</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="103" />
+            <location filename="../image_properties_controller.cpp" line="385" />
+            <source>Format</source>
+            <translation>格式</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="104" />
+            <location filename="../image_properties_controller.cpp" line="386" />
+            <source>Dimensions</source>
+            <translation>尺寸</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="105" />
+            <source>Header offset (bytes)</source>
+            <translation>文件头偏移（字节）</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="106" />
+            <source>Row stride (bytes; 0 = auto)</source>
+            <translation>行步长（字节；0 为自动）</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="107" />
+            <location filename="../image_properties_controller.cpp" line="442" />
+            <source>Orientation</source>
+            <translation>方向</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="109" />
+            <source>Chroma stride (bytes; 0 = auto)</source>
+            <translation>色度步长（字节；0 为自动）</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="110" />
+            <source>YUV matrix</source>
+            <translation>YUV 矩阵</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="111" />
+            <source>Color primaries</source>
+            <translation>色彩原色</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="112" />
+            <source>Transfer function</source>
+            <translation>传递函数</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="113" />
+            <location filename="../image_properties_controller.cpp" line="398" />
+            <source>Chroma location</source>
+            <translation>色度位置</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="114" />
+            <source>YUV range</source>
+            <translation>YUV 范围</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="114" />
+            <location filename="../image_properties_controller.cpp" line="397" />
+            <source>Full</source>
+            <translation>全范围</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="114" />
+            <location filename="../image_properties_controller.cpp" line="397" />
+            <source>Limited</source>
+            <translation>有限范围</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="116" />
+            <source>Valid bits</source>
+            <translation>有效位数</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="117" />
+            <source>Bayer pattern</source>
+            <translation>Bayer 排列</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="118" />
+            <source>CFA sampling</source>
+            <translation>CFA 采样</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="119" />
+            <source>Demosaic</source>
+            <translation>去马赛克</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="119" />
+            <source>Yes</source>
+            <translation>是</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="119" />
+            <source>No</source>
+            <translation>否</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="120" />
+            <source>Black level</source>
+            <translation>黑电平</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="121" />
+            <source>White level (0 = maximum)</source>
+            <translation>白电平（0 为最大值）</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="122" />
+            <source>White balance gains</source>
+            <translation>白平衡增益</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="125" />
+            <source>Color correction matrix</source>
+            <translation>色彩校正矩阵</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="130" />
+            <source>Display gamma</source>
+            <translation>显示 Gamma</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="133" />
+            <source>Byte order</source>
+            <translation>字节序</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="133" />
+            <source>Little endian</source>
+            <translation>小端</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="133" />
+            <source>Big endian</source>
+            <translation>大端</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="134" />
+            <source>Bit alignment</source>
+            <translation>位对齐</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="134" />
+            <source>MSB aligned</source>
+            <translation>高位对齐</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="134" />
+            <source>LSB aligned</source>
+            <translation>低位对齐</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="367" />
+            <source>Name</source>
+            <translation>名称</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="368" />
+            <source>Type</source>
+            <translation>类型</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="368" />
+            <location filename="../image_properties_controller.cpp" line="374" />
+            <source>Folder</source>
+            <translation>文件夹</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="370" />
+            <source>File size</source>
+            <translation>文件大小</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="372" />
+            <source>Full path</source>
+            <translation>完整路径</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="373" />
+            <source>Modified</source>
+            <translation>修改时间</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="374" />
+            <source>File</source>
+            <translation>文件</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="378" />
+            <location filename="../image_properties_controller.cpp" line="444" />
+            <location filename="../image_properties_controller.cpp" line="445" />
+            <source>RAW / YUV parameters</source>
+            <translation>RAW / YUV 参数</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="387" />
+            <source>Bit depth</source>
+            <translation>位深</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="387" />
+            <source>%1-bit valid / %2-bit storage</source>
+            <translation>%1 位有效 / %2 位存储</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="388" />
+            <source>Source color space</source>
+            <translation>源色彩空间</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="389" />
+            <source>Display color space</source>
+            <translation>显示色彩空间</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="391" />
+            <source>Image</source>
+            <translation>图像</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="394" />
+            <source>Source primaries</source>
+            <translation>源原色</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="395" />
+            <source>Source transfer</source>
+            <translation>源传递函数</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="396" />
+            <source>Source matrix</source>
+            <translation>源矩阵</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="397" />
+            <source>Source range</source>
+            <translation>源范围</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="399" />
+            <source>Display primaries</source>
+            <translation>显示原色</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="400" />
+            <source>Display transfer</source>
+            <translation>显示传递函数</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="401" />
+            <source>Color</source>
+            <translation>色彩</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="405" />
+            <source>Source profile</source>
+            <translation>源配置文件</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="406" />
+            <source>Profile fingerprint</source>
+            <translation>配置文件指纹</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="407" />
+            <source>Profile destination</source>
+            <translation>转换目标</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="408" />
+            <source>Transform engine</source>
+            <translation>转换引擎</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="409" />
+            <source>Rendering intent</source>
+            <translation>渲染意图</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="410" />
+            <source>Conversion status</source>
+            <translation>转换状态</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="410" />
+            <source>Converted</source>
+            <translation>已转换</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="410" />
+            <source>Not converted</source>
+            <translation>未转换</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="411" />
+            <source>ICC profile</source>
+            <translation>ICC 配置文件</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="416" />
+            <source>Camera</source>
+            <translation>相机</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="417" />
+            <source>Lens</source>
+            <translation>镜头</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="418" />
+            <source>Exposure time</source>
+            <translation>曝光时间</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="419" />
+            <source>Aperture</source>
+            <translation>光圈</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="420" />
+            <source>ISO</source>
+            <translation>ISO</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="421" />
+            <source>Focal length</source>
+            <translation>焦距</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="422" />
+            <source>Captured at</source>
+            <translation>拍摄时间</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="423" />
+            <source>Make</source>
+            <translation>制造商</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="424" />
+            <source>Model</source>
+            <translation>型号</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="425" />
+            <source>Software</source>
+            <translation>软件</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="426" />
+            <source>Exposure program</source>
+            <translation>曝光程序</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="427" />
+            <source>Metering mode</source>
+            <translation>测光模式</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="428" />
+            <source>Exposure compensation</source>
+            <translation>曝光补偿</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="429" />
+            <source>Flash</source>
+            <translation>闪光灯</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="430" />
+            <source>GPS</source>
+            <translation>GPS</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="431" />
+            <source>Raw sensor dimensions (px)</source>
+            <translation>原始传感器尺寸（px）</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="433" />
+            <source>Capture</source>
+            <translation>拍摄信息</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="436" />
+            <source>Title</source>
+            <translation>标题</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="437" />
+            <source>Creator</source>
+            <translation>作者</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="438" />
+            <location filename="../image_properties_controller.cpp" line="440" />
+            <source>Description</source>
+            <translation>描述</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="439" />
+            <source>Copyright</source>
+            <translation>版权</translation>
+        </message>
+        <message>
+            <location filename="../image_properties_controller.cpp" line="443" />
+            <source>Metadata</source>
+            <translation>元数据</translation>
+        </message>
+        <message>
+            <source>Luma</source>
+            <translation>亮度</translation>
+        </message>
+        <message>
+            <source>Red</source>
+            <translation>红</translation>
+        </message>
+        <message>
+            <source>Green</source>
+            <translation>绿</translation>
+        </message>
+        <message>
+            <source>Blue</source>
+            <translation>蓝</translation>
+        </message>
+        <message>
+        <source>Gray</source>
+        <translation>灰度</translation>
+    </message>
+</context>
+<context>
+        <name>ImagePropertiesContent</name>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="48" />
+            <source>Properties</source>
+            <translation>属性</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="57" />
+            <source>No item selected</source>
+            <translation>未选择项目</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="73" />
+            <source>Close properties</source>
+            <translation>关闭属性</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="86" />
+            <source>Overview</source>
+            <translation>概览</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="86" />
+            <source>Histogram</source>
+            <translation>直方图</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="86" />
+            <source>Advanced</source>
+            <translation>高级</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="146" />
+            <source>%1 items selected. Select one item to view its properties.</source>
+            <translation>已选择 %1 个项目，请选择单个项目查看属性。</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="147" />
+            <source>Select an item to view its properties.</source>
+            <translation>选择一个项目查看属性。</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="156" />
+            <source>Loading image…</source>
+            <translation>正在加载图像…</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="156" />
+            <source>Reading metadata…</source>
+            <translation>正在读取元数据…</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="176" />
+            <source>Retry</source>
+            <translation>重试</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="183" />
+            <source>Color or metadata warnings (%1)</source>
+            <translation>色彩或元数据警告（%1）</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/ImagePropertiesContent.qml" line="224" />
+            <source>No capture or descriptive metadata is available.</source>
+            <translation>此图像没有拍摄或描述元数据。</translation>
+        </message>
+        </context>
+<context>
+        <name>PropertiesHistogram</name>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="19" />
+            <source>Mean</source>
+            <translation>均值</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="19" />
+            <source>Variance</source>
+            <translation>方差</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="19" />
+            <source>Min</source>
+            <translation>最小值</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="19" />
+            <source>Max</source>
+            <translation>最大值</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="19" />
+            <source>Median</source>
+            <translation>中位数</translation>
+        </message>
+                            <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="138" />
+            <source>Analyzing…</source>
+            <translation>正在分析…</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="146" />
+            <source>Histogram unavailable</source>
+            <translation>直方图不可用</translation>
+        </message>
+        <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="187" />
+            <source>X: sample value · Y: relative frequency (peak = 100%)</source>
+            <translation>横轴：采样值 · 纵轴：相对频数（峰值为 100%）</translation>
+        </message>
+                <message>
+            <location filename="../Mvp/PropertiesHistogram.qml" line="258" />
+            <source>Channel</source>
+            <translation>通道</translation>
+        </message>
+        <message>
+        <source>%1 · %2-bit · %3 × %4 · %5 samples</source>
+        <translation>%1 · %2 位 · %3 × %4 · %5 个样本</translation>
+    </message>
+</context>
+<context>
+        <name>PropertyFieldList</name>
+                    </context>
+<context>
+    <name>RawParametersContent</name>
+    <message>
+        <source>%1 items selected. Select one RAW or YUV file to edit its parameters.</source>
+        <translation>已选择 %1 个项目，请选择单个 RAW 或 YUV 文件设置参数。</translation>
+    </message>
+    <message>
+        <source>2 × 2 Bayer</source>
+        <translation>2 × 2 Bayer</translation>
+    </message>
+    <message>
+        <source>4 × 4 Quad Bayer</source>
+        <translation>4 × 4 四像素 Bayer</translation>
+    </message>
+    <message>
+        <source>Apply to folder</source>
+        <translation>应用到文件夹</translation>
+    </message>
+    <message>
+        <source>Bayer development</source>
+        <translation>Bayer 处理</translation>
+    </message>
+    <message>
+        <source>Bayer pattern</source>
+        <translation>Bayer 排列</translation>
+    </message>
+    <message>
+        <source>Big endian</source>
+        <translation>大端</translation>
+    </message>
+    <message>
+        <source>Bit alignment</source>
+        <translation>位对齐</translation>
+    </message>
+    <message>
+        <source>Black level</source>
+        <translation>黑电平</translation>
+    </message>
+    <message>
+        <source>Byte order</source>
+        <translation>字节序</translation>
+    </message>
+    <message>
+        <source>CFA sampling</source>
+        <translation>CFA 采样结构</translation>
+    </message>
+    <message>
+        <source>Center</source>
+        <translation>居中</translation>
+    </message>
+    <message>
+        <source>Choose a reusable configuration name</source>
+        <translation>输入一个可复用的配置名称</translation>
+    </message>
+    <message>
+        <source>Chroma location</source>
+        <translation>色度位置</translation>
+    </message>
+    <message>
+        <source>Chroma stride (bytes; 0 = auto)</source>
+        <translation>色度步长（字节；0 为自动）</translation>
+    </message>
+    <message>
+        <source>Close parameters</source>
+        <translation>关闭参数设置</translation>
+    </message>
+    <message>
+        <source>Color correction matrix</source>
+        <translation>颜色校正矩阵</translation>
+    </message>
+    <message>
+        <source>Color matrix</source>
+        <translation>颜色矩阵</translation>
+    </message>
+    <message>
+        <source>Color primaries</source>
+        <translation>色彩原色</translation>
+    </message>
+    <message>
+        <source>Delete preset</source>
+        <translation>删除预设</translation>
+    </message>
+    <message>
+        <source>Demosaic</source>
+        <translation>去马赛克</translation>
+    </message>
+    <message>
+        <source>Display gamma</source>
+        <translation>显示 Gamma</translation>
+    </message>
+    <message>
+        <source>Format</source>
+        <translation>格式</translation>
+    </message>
+    <message>
+        <source>Frame layout</source>
+        <translation>帧布局</translation>
+    </message>
+    <message>
+        <source>Full</source>
+        <translation>全范围</translation>
+    </message>
+    <message>
+        <source>Header offset (bytes)</source>
+        <translation>文件头偏移（字节）</translation>
+    </message>
+    <message>
+        <source>Height (px)</source>
+        <translation>高度（px）</translation>
+    </message>
+    <message>
+        <source>LSB aligned</source>
+        <translation>低位对齐</translation>
+    </message>
+    <message>
+        <source>Layout</source>
+        <translation>布局</translation>
+    </message>
+    <message>
+        <source>Left / cosited</source>
+        <translation>左对齐 / 共点</translation>
+    </message>
+    <message>
+        <source>Limited</source>
+        <translation>有限范围</translation>
+    </message>
+    <message>
+        <source>Little endian</source>
+        <translation>小端序</translation>
+    </message>
+    <message>
+        <source>MSB aligned</source>
+        <translation>高位对齐</translation>
+    </message>
+    <message>
+        <source>No item selected</source>
+        <translation>未选择项目</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>无</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>正常</translation>
+    </message>
+    <message>
+        <source>Orientation</source>
+        <translation>方向</translation>
+    </message>
+    <message>
+        <source>Presets</source>
+        <translation>预设</translation>
+    </message>
+    <message>
+        <source>Processing</source>
+        <translation>处理</translation>
+    </message>
+    <message>
+        <source>Quantization range</source>
+        <translation>量化范围</translation>
+    </message>
+    <message>
+        <source>RAW / YUV parameters</source>
+        <translation>RAW / YUV 参数</translation>
+    </message>
+    <message>
+        <source>Rotate 180°</source>
+        <translation>旋转 180°</translation>
+    </message>
+    <message>
+        <source>Rotate 270° clockwise</source>
+        <translation>顺时针旋转 270°</translation>
+    </message>
+    <message>
+        <source>Rotate 90° clockwise</source>
+        <translation>顺时针旋转 90°</translation>
+    </message>
+    <message>
+        <source>Row stride (bytes; 0 = auto)</source>
+        <translation>行步长（字节；0 为自动）</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>保存</translation>
+    </message>
+    <message>
+        <source>Save + folder…</source>
+        <translation>保存并关联文件夹…</translation>
+    </message>
+    <message>
+        <source>Save configuration</source>
+        <translation>保存配置</translation>
+    </message>
+    <message>
+        <source>Save preset…</source>
+        <translation>保存预设…</translation>
+    </message>
+    <message>
+        <source>Save this configuration, then apply it to matching files in the folder</source>
+        <translation>保存配置，并应用到文件夹中相同格式的文件</translation>
+    </message>
+    <message>
+        <source>Select a RAW or YUV file to edit its parameters.</source>
+        <translation>选择一个 RAW 或 YUV 文件设置参数。</translation>
+    </message>
+    <message>
+        <source>Storage</source>
+        <translation>存储布局</translation>
+    </message>
+    <message>
+        <source>Transfer function</source>
+        <translation>传递函数</translation>
+    </message>
+    <message>
+        <source>Valid bits (0 = default)</source>
+        <translation>有效位数（0 = 默认）</translation>
+    </message>
+    <message>
+        <source>White balance gains</source>
+        <translation>白平衡增益</translation>
+    </message>
+    <message>
+        <source>White level (0 = maximum)</source>
+        <translation>白电平（0 = 最大值）</translation>
+    </message>
+    <message>
+        <source>Width (px)</source>
+        <translation>宽度（px）</translation>
+    </message>
+    <message>
+        <source>YUV interpretation</source>
+        <translation>YUV 解释</translation>
+    </message>
+</context>
+<context>
+    <name>InspectorHeader</name>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
+    <name>mvpview::RawParametersController</name>
+    <message>
+        <source>Configuration applied to %1 %2 file(s) in this folder</source>
+        <translation>已将配置应用到此文件夹中的 %1 个 %2 文件</translation>
+    </message>
+    <message>
+        <source>Configuration deleted: %1</source>
+        <translation>已删除配置：%1</translation>
+    </message>
+    <message>
+        <source>Configuration saved: %1</source>
+        <translation>已保存配置：%1</translation>
+    </message>
+    <message>
+        <source>Enter a configuration name.</source>
+        <translation>请输入配置名称。</translation>
+    </message>
+    <message>
+        <source>No RAW/YUV file is selected.</source>
+        <translation>未选择 RAW/YUV 文件。</translation>
+    </message>
+    <message>
+        <source>RAW/YUV parameters do not describe one complete frame</source>
+        <translation>RAW/YUV 参数无法描述一个完整帧</translation>
+    </message>
+    <message>
+        <source>Select a saved configuration.</source>
+        <translation>请选择已保存的配置。</translation>
+    </message>
+    <message>
+        <source>The configuration is incomplete or invalid.</source>
+        <translation>配置不完整或无效。</translation>
+    </message>
+    <message>
+        <source>The parameters do not describe one complete frame.</source>
+        <translation>这些参数无法描述一个完整帧。</translation>
+    </message>
+    <message>
+        <source>Unable to delete configuration: %1</source>
+        <translation>无法删除配置：%1</translation>
+    </message>
+    <message>
+        <source>Unable to load configuration: %1</source>
+        <translation>无法加载配置：%1</translation>
+    </message>
+</context>
 </TS>

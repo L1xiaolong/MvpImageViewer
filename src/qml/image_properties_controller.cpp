@@ -6,6 +6,8 @@
 #include "io/image_loader.h"
 
 #include <QDir>
+#include <QCoreApplication>
+#include <QImageReader>
 #include <QFileInfo>
 #include <QLocale>
 #include <QMetaObject>
@@ -18,13 +20,24 @@
 namespace mvpview {
 namespace {
 
-QVariantMap field(const QString& label, const QString& value) {
-    return {{QStringLiteral("label"), label}, {QStringLiteral("value"), value}};
+QString text(const char* source) {
+    return QCoreApplication::translate("ImageProperties", source);
 }
 
-void appendField(QVariantList& fields, const QString& label, const QString& value,
-                 bool keepEmpty = false) {
-    if (keepEmpty || !value.isEmpty()) fields.append(field(label, value));
+QVariantMap field(const QString& id, const char* label, const QString& value, bool mono = false) {
+    return {{QStringLiteral("id"), id}, {QStringLiteral("label"), text(label)},
+            {QStringLiteral("value"), value}, {QStringLiteral("mono"), mono}};
+}
+
+void appendField(QVariantList& fields, const QString& id, const char* label,
+                 const QString& value, bool mono = false) {
+    if (!value.isEmpty()) fields.append(field(id, label, value, mono));
+}
+
+void appendGroup(QVariantList& groups, const QString& id, const char* title,
+                 const QVariantList& fields) {
+    if (!fields.isEmpty()) groups.append(QVariantMap{{QStringLiteral("id"), id},
+        {QStringLiteral("title"), text(title)}, {QStringLiteral("fields"), fields}});
 }
 
 QString byteSizeText(qint64 bytes) {
@@ -44,16 +57,16 @@ QString exposureText(double seconds) {
 
 QString metadataOrientationText(ImageMetadata::Orientation orientation) {
     switch (orientation) {
-    case ImageMetadata::Orientation::Normal: return QStringLiteral("Normal");
-    case ImageMetadata::Orientation::MirrorHorizontal: return QStringLiteral("Mirror horizontal");
-    case ImageMetadata::Orientation::Rotate180: return QStringLiteral("Rotate 180°");
-    case ImageMetadata::Orientation::MirrorVertical: return QStringLiteral("Mirror vertical");
+    case ImageMetadata::Orientation::Normal: return text(QT_TRANSLATE_NOOP("ImageProperties", "Normal"));
+    case ImageMetadata::Orientation::MirrorHorizontal: return text(QT_TRANSLATE_NOOP("ImageProperties", "Mirror horizontal"));
+    case ImageMetadata::Orientation::Rotate180: return text(QT_TRANSLATE_NOOP("ImageProperties", "Rotate 180°"));
+    case ImageMetadata::Orientation::MirrorVertical: return text(QT_TRANSLATE_NOOP("ImageProperties", "Mirror vertical"));
     case ImageMetadata::Orientation::MirrorHorizontalRotate270:
-        return QStringLiteral("Mirror horizontal, rotate 270° CW");
-    case ImageMetadata::Orientation::Rotate90: return QStringLiteral("Rotate 90° CW");
+        return text(QT_TRANSLATE_NOOP("ImageProperties", "Mirror horizontal, rotate 270° CW"));
+    case ImageMetadata::Orientation::Rotate90: return text(QT_TRANSLATE_NOOP("ImageProperties", "Rotate 90° CW"));
     case ImageMetadata::Orientation::MirrorHorizontalRotate90:
-        return QStringLiteral("Mirror horizontal, rotate 90° CW");
-    case ImageMetadata::Orientation::Rotate270: return QStringLiteral("Rotate 270° CW");
+        return text(QT_TRANSLATE_NOOP("ImageProperties", "Mirror horizontal, rotate 90° CW"));
+    case ImageMetadata::Orientation::Rotate270: return text(QT_TRANSLATE_NOOP("ImageProperties", "Rotate 270° CW"));
     case ImageMetadata::Orientation::Unspecified: return {};
     }
     return {};
@@ -61,10 +74,10 @@ QString metadataOrientationText(ImageMetadata::Orientation orientation) {
 
 QString rawOrientationText(ImageOrientation orientation) {
     switch (orientation) {
-    case ImageOrientation::Normal: return QStringLiteral("Normal");
-    case ImageOrientation::Rotate90Clockwise: return QStringLiteral("Rotate 90° clockwise");
-    case ImageOrientation::Rotate180: return QStringLiteral("Rotate 180°");
-    case ImageOrientation::Rotate270Clockwise: return QStringLiteral("Rotate 270° clockwise");
+    case ImageOrientation::Normal: return text(QT_TRANSLATE_NOOP("ImageProperties", "Normal"));
+    case ImageOrientation::Rotate90Clockwise: return text(QT_TRANSLATE_NOOP("ImageProperties", "Rotate 90° clockwise"));
+    case ImageOrientation::Rotate180: return text(QT_TRANSLATE_NOOP("ImageProperties", "Rotate 180°"));
+    case ImageOrientation::Rotate270Clockwise: return text(QT_TRANSLATE_NOOP("ImageProperties", "Rotate 270° clockwise"));
     }
     return {};
 }
@@ -81,51 +94,43 @@ QString matrixText(const std::array<double, 9>& matrix) {
     return rows.join(QStringLiteral("  |  "));
 }
 
-QVariantList rawFieldRows(const RawImageParameters& parameters) {
+QVariantList rawFieldRows(const RawImageParameters& p) {
     QVariantList result;
-    appendField(result, QStringLiteral("Format"), rawPixelFormatName(parameters.format));
-    appendField(result, QStringLiteral("Dimensions"),
-                QStringLiteral("%1 × %2").arg(parameters.size.width()).arg(parameters.size.height()));
-    appendField(result, QStringLiteral("Header Offset"), QString::number(parameters.headerOffset));
-    appendField(result, QStringLiteral("Row Stride"), QString::number(parameters.rowStride));
-    appendField(result, QStringLiteral("Orientation"), rawOrientationText(parameters.orientation));
-    if (parameters.isYuv()) {
-        appendField(result, QStringLiteral("Chroma Stride"), QString::number(parameters.chromaStride));
-        appendField(result, QStringLiteral("YUV Matrix"), yuvMatrixName(parameters.yuvMatrix));
-        appendField(result, QStringLiteral("Color Primaries"),
-                    yuvPrimariesName(parameters.yuvPrimaries));
-        appendField(result, QStringLiteral("Transfer Function"),
-                    yuvTransferName(parameters.yuvTransfer));
-        appendField(result, QStringLiteral("Chroma Location"),
-                    chromaLocationName(parameters.chromaLocation));
-        appendField(result, QStringLiteral("YUV Range"),
-                    parameters.range == QuantizationRange::Full ? QStringLiteral("Full")
-                                                                : QStringLiteral("Limited"));
+    auto add = [&](const char* id, const char* label, const QString& value, bool mono = true) {
+        appendField(result, QLatin1String(id), label, value, mono);
+    };
+    add("raw-format", QT_TRANSLATE_NOOP("ImageProperties", "Format"), rawPixelFormatName(p.format), false);
+    add("raw-dimensions", QT_TRANSLATE_NOOP("ImageProperties", "Dimensions"), QStringLiteral("%1 × %2 px").arg(p.size.width()).arg(p.size.height()));
+    add("header-offset", QT_TRANSLATE_NOOP("ImageProperties", "Header offset (bytes)"), QString::number(p.headerOffset));
+    add("row-stride", QT_TRANSLATE_NOOP("ImageProperties", "Row stride (bytes; 0 = auto)"), QString::number(p.rowStride));
+    add("raw-orientation", QT_TRANSLATE_NOOP("ImageProperties", "Orientation"), rawOrientationText(p.orientation), false);
+    if (p.isYuv()) {
+        add("chroma-stride", QT_TRANSLATE_NOOP("ImageProperties", "Chroma stride (bytes; 0 = auto)"), QString::number(p.chromaStride));
+        add("yuv-matrix", QT_TRANSLATE_NOOP("ImageProperties", "YUV matrix"), yuvMatrixName(p.yuvMatrix), false);
+        add("yuv-primaries", QT_TRANSLATE_NOOP("ImageProperties", "Color primaries"), yuvPrimariesName(p.yuvPrimaries), false);
+        add("yuv-transfer", QT_TRANSLATE_NOOP("ImageProperties", "Transfer function"), yuvTransferName(p.yuvTransfer), false);
+        add("yuv-chroma", QT_TRANSLATE_NOOP("ImageProperties", "Chroma location"), chromaLocationName(p.chromaLocation), false);
+        add("yuv-range", QT_TRANSLATE_NOOP("ImageProperties", "YUV range"), text(p.range == QuantizationRange::Full ? QT_TRANSLATE_NOOP("ImageProperties", "Full") : QT_TRANSLATE_NOOP("ImageProperties", "Limited")), false);
     } else {
-        appendField(result, QStringLiteral("Valid Bits"), QString::number(parameters.validBits()));
-        appendField(result, QStringLiteral("Bayer Pattern"), bayerPatternName(parameters.bayerPattern));
-        appendField(result, QStringLiteral("CFA Sampling"),
-                    bayerSamplingName(parameters.bayerSampling));
-        appendField(result, QStringLiteral("Demosaic"),
-                    parameters.demosaic ? QStringLiteral("Yes") : QStringLiteral("No"));
-        appendField(result, QStringLiteral("Black Level"), QString::number(parameters.blackLevel));
-        appendField(result, QStringLiteral("White Level"), QString::number(parameters.whiteLevel));
-        appendField(result, QStringLiteral("White Balance"),
-                    QStringLiteral("R %1  G %2  B %3")
-                        .arg(parameters.whiteBalanceGains.at(0), 0, 'g', 6)
-                        .arg(parameters.whiteBalanceGains.at(1), 0, 'g', 6)
-                        .arg(parameters.whiteBalanceGains.at(2), 0, 'g', 6));
-        appendField(result, QStringLiteral("Color Matrix"), matrixText(parameters.colorCorrectionMatrix));
-        appendField(result, QStringLiteral("Display Gamma"),
-                    QString::number(parameters.displayGamma, 'g', 6));
+        add("raw-bits", QT_TRANSLATE_NOOP("ImageProperties", "Valid bits"), QString::number(p.validBits()));
+        add("bayer-pattern", QT_TRANSLATE_NOOP("ImageProperties", "Bayer pattern"), bayerPatternName(p.bayerPattern));
+        add("cfa-sampling", QT_TRANSLATE_NOOP("ImageProperties", "CFA sampling"), bayerSamplingName(p.bayerSampling));
+        add("demosaic", QT_TRANSLATE_NOOP("ImageProperties", "Demosaic"), text(p.demosaic ? QT_TRANSLATE_NOOP("ImageProperties", "Yes") : QT_TRANSLATE_NOOP("ImageProperties", "No")), false);
+        add("black-level", QT_TRANSLATE_NOOP("ImageProperties", "Black level"), QString::number(p.blackLevel));
+        add("white-level", QT_TRANSLATE_NOOP("ImageProperties", "White level (0 = maximum)"), QString::number(p.whiteLevel));
+        add("white-balance", QT_TRANSLATE_NOOP("ImageProperties", "White balance gains"), QStringLiteral("R %1  G %2  B %3")
+            .arg(p.whiteBalanceGains[0], 0, 'g', 6).arg(p.whiteBalanceGains[1], 0, 'g', 6)
+            .arg(p.whiteBalanceGains[2], 0, 'g', 6));
+        auto matrix = field(QStringLiteral("color-matrix"), QT_TRANSLATE_NOOP("ImageProperties", "Color correction matrix"), matrixText(p.colorCorrectionMatrix), true);
+        QVariantList values;
+        for (double value : p.colorCorrectionMatrix) values.append(QString::number(value, 'g', 6));
+        matrix.insert(QStringLiteral("matrix"), values);
+        result.append(matrix);
+        add("display-gamma", QT_TRANSLATE_NOOP("ImageProperties", "Display gamma"), QString::number(p.displayGamma, 'g', 6));
     }
-    if (parameters.format == RawPixelFormat::P010 || parameters.format == RawPixelFormat::Raw16) {
-        appendField(result, QStringLiteral("Byte Order"),
-                    parameters.littleEndian ? QStringLiteral("Little endian")
-                                            : QStringLiteral("Big endian"));
-        appendField(result, QStringLiteral("Bit Alignment"),
-                    parameters.msbAligned ? QStringLiteral("MSB aligned")
-                                          : QStringLiteral("LSB aligned"));
+    if (p.format == RawPixelFormat::P010 || p.format == RawPixelFormat::Raw16) {
+        add("byte-order", QT_TRANSLATE_NOOP("ImageProperties", "Byte order"), text(p.littleEndian ? QT_TRANSLATE_NOOP("ImageProperties", "Little endian") : QT_TRANSLATE_NOOP("ImageProperties", "Big endian")), false);
+        add("bit-alignment", QT_TRANSLATE_NOOP("ImageProperties", "Bit alignment"), text(p.msbAligned ? QT_TRANSLATE_NOOP("ImageProperties", "MSB aligned") : QT_TRANSLATE_NOOP("ImageProperties", "LSB aligned")), false);
     }
     return result;
 }
@@ -164,7 +169,8 @@ QVariantMap channelMap(const QString& id, const QString& name, const QString& co
             {QStringLiteral("mean"), mean},
             {QStringLiteral("variance"), deviation * deviation},
             {QStringLiteral("min"), minimum}, {QStringLiteral("max"), maximum},
-            {QStringLiteral("median"), medianFor(bins, samples)}};
+            {QStringLiteral("median"), medianFor(bins, samples)},
+            {QStringLiteral("sampleCount"), QVariant::fromValue<qulonglong>(samples)}};
 }
 
 QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
@@ -173,19 +179,19 @@ QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
                 {QStringLiteral("message"), QStringLiteral("Display histogram unavailable")}};
     const quint64 samples = static_cast<quint64>(std::max<qint64>(0, histogram.sampledPixelCount));
     QVariantList channels;
-    channels << channelMap(QStringLiteral("luma"), QStringLiteral("Luma"), QStringLiteral("#52616B"),
+    channels << channelMap(QStringLiteral("luma"), QString::fromUtf8(QT_TRANSLATE_NOOP("ImageProperties", "Luma")), QStringLiteral("#52616B"),
                            histogram.luma.bins, samples, histogram.luma.mean,
                            histogram.luma.standardDeviation, histogram.luma.minimum,
                            histogram.luma.maximum)
-             << channelMap(QStringLiteral("red"), QStringLiteral("Red"), QStringLiteral("#D65A5A"),
+             << channelMap(QStringLiteral("red"), QString::fromUtf8(QT_TRANSLATE_NOOP("ImageProperties", "Red")), QStringLiteral("#D65A5A"),
                            histogram.red.bins, samples, histogram.red.mean,
                            histogram.red.standardDeviation, histogram.red.minimum,
                            histogram.red.maximum)
-             << channelMap(QStringLiteral("green"), QStringLiteral("Green"), QStringLiteral("#4E9D69"),
+             << channelMap(QStringLiteral("green"), QString::fromUtf8(QT_TRANSLATE_NOOP("ImageProperties", "Green")), QStringLiteral("#4E9D69"),
                            histogram.green.bins, samples, histogram.green.mean,
                            histogram.green.standardDeviation, histogram.green.minimum,
                            histogram.green.maximum)
-             << channelMap(QStringLiteral("blue"), QStringLiteral("Blue"), QStringLiteral("#527BC9"),
+             << channelMap(QStringLiteral("blue"), QString::fromUtf8(QT_TRANSLATE_NOOP("ImageProperties", "Blue")), QStringLiteral("#527BC9"),
                            histogram.blue.bins, samples, histogram.blue.mean,
                            histogram.blue.standardDeviation, histogram.blue.minimum,
                            histogram.blue.maximum);
@@ -198,7 +204,35 @@ QVariantMap displayHistogramMap(const DisplayHistogram& histogram) {
     return {{QStringLiteral("valid"), true}, {QStringLiteral("loading"), false},
             {QStringLiteral("maximumValue"), histogram.maximumValue},
             {QStringLiteral("channels"), channels},
-            {QStringLiteral("summary"), summary}};
+            {QStringLiteral("summary"), summary},
+            {QStringLiteral("analysisWidth"), histogram.analyzedSize.width()},
+            {QStringLiteral("analysisHeight"), histogram.analyzedSize.height()},
+            {QStringLiteral("sampleCount"), QVariant::fromValue<qlonglong>(histogram.sampledPixelCount)},
+            {QStringLiteral("sourceWidth"), histogram.logicalSize.width()},
+            {QStringLiteral("sourceHeight"), histogram.logicalSize.height()}};
+}
+
+QVariantMap nativeFileHistogramMap(const QString& path, const std::function<bool()>& cancelled) {
+    // Analyze original encoded values rather than the display-converted QImage in the cache.
+    // Read on the analysis worker and leave application-wide decoder/color settings untouched.
+    if (cancelled()) return {};
+    QImageReader reader(path);
+    QImage image = reader.read();
+    if (image.isNull() || cancelled())
+        return {{QStringLiteral("valid"), false}, {QStringLiteral("loading"), false}};
+    const int bits = image.format() == QImage::Format_Grayscale16 || image.depth() > 32 ? 16 : 8;
+    ImageFrame native;
+    native.descriptor.size = image.size();
+    native.descriptor.validBits = native.descriptor.storageBits = bits;
+    native.storage = std::move(image);
+    const auto histogram = DisplayHistogramAnalyzer::analyzeNativeRgb(native, cancelled);
+    auto result = displayHistogramMap(histogram);
+    if (!histogram.isValid()) return result;
+    // Encoded files expose Luma/R/G/B, all computed from the same native code values.
+    // Grayscale inputs use this same channel list; their RGB distributions coincide.
+    result[QStringLiteral("domain")] = QStringLiteral("RGB");
+    result[QStringLiteral("validBits")] = bits;
+    return result;
 }
 
 QString rawChannelColor(RawHistogramChannelId id) {
@@ -235,7 +269,11 @@ QVariantMap rawHistogramMap(const RawPlaneHistogram& histogram) {
                                 .arg(histogram.logicalSize.height());
     return {{QStringLiteral("valid"), true}, {QStringLiteral("loading"), false},
             {QStringLiteral("maximumValue"), histogram.maximumValue},
-            {QStringLiteral("channels"), channels}, {QStringLiteral("summary"), summary}};
+            {QStringLiteral("channels"), channels}, {QStringLiteral("summary"), summary},
+            {QStringLiteral("domain"), histogram.domain == RawHistogramDomain::Yuv ? QStringLiteral("YUV") : QStringLiteral("Bayer")},
+            {QStringLiteral("validBits"), histogram.validBits},
+            {QStringLiteral("sourceWidth"), histogram.logicalSize.width()},
+            {QStringLiteral("sourceHeight"), histogram.logicalSize.height()}};
 }
 
 } // namespace
@@ -243,163 +281,201 @@ QVariantMap rawHistogramMap(const RawPlaneHistogram& histogram) {
 ImagePropertiesController::ImagePropertiesController(ImageLoader* loader, QObject* parent)
     : QObject(parent), loader_(loader) {
     Q_ASSERT(loader_);
+    loadTimer_.setSingleShot(true);
+    connect(&loadTimer_, &QTimer::timeout, this, &ImagePropertiesController::startLoading);
+    connect(loader_, &ImageLoader::rawParametersChanged, this, [this](const QString& path) {
+        if (!path_.isEmpty() && QFileInfo(path).absoluteFilePath() == path_) reload();
+    });
+    connect(loader_, &ImageLoader::displayRevisionChanged, this, [this] {
+        if (!path_.isEmpty()) reload();
+    });
 }
 
-void ImagePropertiesController::loadPath(const QString& requestedPath) {
+ImagePropertiesController::~ImagePropertiesController() {
     loadHandle_.cancel();
     metadataHandle_.cancel();
+    for (const auto& handle : histogramHandles_) handle.cancel();
+}
+
+void ImagePropertiesController::clear() {
+    loadTimer_.stop();
+    loadHandle_.cancel();
+    metadataHandle_.cancel();
+    ++loadGeneration_;
+    pendingHistogramSources_.clear();
+    frame_.reset();
+    path_.clear();
+    fileName_.clear();
+    directory_ = loading_ = metadataLoading_ = false;
+    errorText_.clear();
+    metadataError_.clear();
+    overviewGroups_.clear();
+    advancedGroups_.clear();
+    warnings_.clear();
+    resetHistograms();
+    emit stateChanged();
+}
+
+void ImagePropertiesController::loadPath(const QString& requestedPath, bool deferred) {
+    clear();
+    if (requestedPath.isEmpty()) return;
     const QFileInfo info(requestedPath);
     path_ = info.absoluteFilePath();
     fileName_ = info.fileName().isEmpty() ? QDir::toNativeSeparators(path_) : info.fileName();
     directory_ = info.isDir();
-    loading_ = false;
-    errorText_.clear();
-    basicFields_.clear();
-    exifFields_.clear();
-    rawFields_.clear();
-    frame_.reset();
-    pendingHistogramSources_.clear();
-    ++loadGeneration_;
-    resetHistograms();
-
-    if (directory_) {
-        appendField(basicFields_, QStringLiteral("Type"), QStringLiteral("Folder"));
-        appendField(basicFields_, QStringLiteral("Location"),
-                    QDir::toNativeSeparators(info.absolutePath()));
-        appendField(basicFields_, QStringLiteral("Modified"),
-                    QLocale().toString(info.lastModified(), QLocale::LongFormat));
-        emit stateChanged();
-        return;
-    }
-
-    if (const auto parameters = loader_->rawParameters(path_))
-        rawFields_ = rawFieldRows(*parameters);
-    loading_ = true;
+    loading_ = !directory_;
+    rebuildFields();
     emit stateChanged();
+    if (!directory_) loadTimer_.start(deferred ? 150 : 0);
+}
 
+void ImagePropertiesController::reload() {
+    const QString current = path_;
+    const bool displayRequested = !displayHistogram_.isEmpty() || pendingHistogramSources_.contains(0);
+    const bool sourceRequested = !sourceHistogram_.isEmpty() || pendingHistogramSources_.contains(1);
+    loadPath(current);
+    if (displayRequested) pendingHistogramSources_.insert(0);
+    if (sourceRequested) pendingHistogramSources_.insert(1);
+}
+
+void ImagePropertiesController::retranslate() {
+    rebuildFields();
+    emit stateChanged();
+}
+
+void ImagePropertiesController::startLoading() {
     const quint64 generation = loadGeneration_;
     const QPointer<ImagePropertiesController> self(this);
     loadHandle_ = loader_->request(generation, {path_, DecodePurpose::Full, {}},
-                     [self, generation](quint64 id, const DecodeResult& result) {
-        if (!self || id != generation || self->loadGeneration_ != generation) return;
-        self->loading_ = false;
-        if (!result.frame) {
-            self->errorText_ = result.error;
-            emit self->stateChanged();
-            return;
-        }
-        self->setFrame(result.frame);
-        self->metadataHandle_ = self->loader_->requestMetadata(generation, result.frame,
-            [self, generation](quint64 id, const DecodeResult& metadata) {
-                if (self && self->loadGeneration_ == generation && id == generation && metadata.frame)
-                    self->setFrame(metadata.frame);
-            });
-    }, RequestOptions{LoadCategory::Metadata, 10, QStringLiteral("properties")});
+        [self, generation](quint64 id, const DecodeResult& result) {
+            if (!self || id != generation || self->loadGeneration_ != generation) return;
+            self->loading_ = false;
+            if (!result.frame) {
+                self->errorText_ = result.error;
+                emit self->stateChanged();
+                return;
+            }
+            self->metadataLoading_ = true;
+            self->setFrame(result.frame);
+            self->metadataHandle_ = self->loader_->requestMetadata(generation, result.frame,
+                [self, generation](quint64 id, const DecodeResult& result) {
+                    if (!self || self->loadGeneration_ != generation || id != generation) return;
+                    self->metadataLoading_ = false;
+                    if (result.frame) self->setFrame(result.frame);
+                    else {
+                        self->metadataError_ = result.error;
+                        self->rebuildFields();
+                        emit self->stateChanged();
+                    }
+                });
+        }, RequestOptions{LoadCategory::Metadata, 10, QStringLiteral("properties")});
 }
 
 void ImagePropertiesController::setFrame(ImageFramePtr frame) {
+    // Metadata enrichment keeps the same pixels and must not invalidate cached histograms.
     frame_ = std::move(frame);
-    basicFields_.clear();
-    exifFields_.clear();
-    const ImageMetadata& metadata = frame_->metadata;
-    const QSize dimensions = metadata.sourceSize.isValid() ? metadata.sourceSize
-                                                            : frame_->descriptor.size;
-    appendField(basicFields_, QStringLiteral("File Name"), metadata.fileName);
-    appendField(basicFields_, QStringLiteral("Location"), metadata.path);
-    appendField(basicFields_, QStringLiteral("Type"), metadata.format);
-    appendField(basicFields_, QStringLiteral("File Size"), byteSizeText(metadata.fileSize));
-    appendField(basicFields_, QStringLiteral("Date / Time"), metadata.modifiedAt.toString(Qt::ISODate));
-    appendField(basicFields_, QStringLiteral("Dimensions"),
-                QStringLiteral("%1 × %2").arg(dimensions.width()).arg(dimensions.height()));
-    appendField(basicFields_, QStringLiteral("Bit Depth"),
-                QStringLiteral("%1-bit valid in %2-bit storage")
-                    .arg(frame_->descriptor.validBits).arg(frame_->descriptor.storageBits));
-    const ColorDescriptor& sourceColor = frame_->descriptor.sourceColor;
-    const ColorDescriptor& displayColor = frame_->descriptor.displayColor;
-    appendField(basicFields_, QStringLiteral("Source Color Space"), sourceColor.colorSpace);
-    appendField(basicFields_, QStringLiteral("Source Primaries"), sourceColor.primaries);
-    appendField(basicFields_, QStringLiteral("Source Transfer"), sourceColor.transferFunction);
-    appendField(basicFields_, QStringLiteral("Source Matrix"), sourceColor.matrixCoefficients);
-    appendField(basicFields_, QStringLiteral("Source Range"),
-                sourceColor.fullRange ? QStringLiteral("Full") : QStringLiteral("Limited"));
-    appendField(basicFields_, QStringLiteral("Chroma Location"), sourceColor.chromaLocation);
-    appendField(basicFields_, QStringLiteral("Display Color Space"), displayColor.colorSpace);
-    appendField(basicFields_, QStringLiteral("Display Primaries"), displayColor.primaries);
-    appendField(basicFields_, QStringLiteral("Display Transfer"), displayColor.transferFunction);
-    if (metadata.colorProfile) {
-        const ImageMetadata::ColorProfile& profile = *metadata.colorProfile;
-        appendField(basicFields_, QStringLiteral("Source Profile"), profile.sourceDescription);
-        appendField(basicFields_, QStringLiteral("Profile Fingerprint"),
-                    profile.sourceFingerprint);
-        appendField(basicFields_, QStringLiteral("Profile Destination"),
-                    profile.destinationColorSpace);
-        appendField(basicFields_, QStringLiteral("Profile Transform"), profile.transformEngine);
-        appendField(basicFields_, QStringLiteral("Rendering Intent"), profile.renderingIntent);
-        appendField(basicFields_, QStringLiteral("Profile Status"),
-                    profile.converted ? QStringLiteral("Converted")
-                                      : QStringLiteral("Not converted"));
-    }
-    appendField(basicFields_, QStringLiteral("Color Warning"), metadata.colorWarning);
-
-    constexpr bool keepEmpty = true;
-    if (metadata.camera) {
-        const ImageMetadata::Camera& camera = *metadata.camera;
-        appendField(exifFields_, QStringLiteral("Make"), camera.make, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Model"), camera.model, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Software"), camera.software, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Captured At"),
-                    camera.capturedAt.toString(Qt::ISODate), keepEmpty);
-        appendField(exifFields_, QStringLiteral("Exposure Time"),
-                    exposureText(camera.exposureSeconds), keepEmpty);
-        appendField(exifFields_, QStringLiteral("Aperture"), camera.aperture > 0.0
-                        ? QStringLiteral("f/%1").arg(camera.aperture, 0, 'g', 3) : QString{}, keepEmpty);
-        appendField(exifFields_, QStringLiteral("ISO"), camera.iso > 0
-                        ? QString::number(camera.iso) : QString{}, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Exposure Program"), camera.exposureProgram, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Metering Mode"), camera.meteringMode, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Exposure Compensation"), camera.exposureCompensation, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Flash"), camera.flash, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Focal Length"), camera.focalLengthMm > 0.0
-                        ? QStringLiteral("%1 mm").arg(camera.focalLengthMm, 0, 'g', 4) : QString{}, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Lens"), camera.lens, keepEmpty);
-        appendField(exifFields_, QStringLiteral("GPS"), camera.gps, keepEmpty);
-        appendField(exifFields_, QStringLiteral("Sensor Size"), camera.sensorSize.isValid()
-                        ? QStringLiteral("%1 × %2").arg(camera.sensorSize.width()).arg(camera.sensorSize.height())
-                        : QString{}, keepEmpty);
-    } else {
-        const QStringList names{QStringLiteral("Make"), QStringLiteral("Model"),
-            QStringLiteral("Software"), QStringLiteral("Captured At"),
-            QStringLiteral("Exposure Time"), QStringLiteral("Aperture"), QStringLiteral("ISO"),
-            QStringLiteral("Exposure Program"), QStringLiteral("Metering Mode"),
-            QStringLiteral("Exposure Compensation"), QStringLiteral("Flash"),
-            QStringLiteral("Focal Length"), QStringLiteral("Lens"), QStringLiteral("GPS"),
-            QStringLiteral("Sensor Size")};
-        for (const QString& name : names) appendField(exifFields_, name, {}, keepEmpty);
-    }
-    appendField(exifFields_, QStringLiteral("Orientation"),
-                metadataOrientationText(metadata.sourceOrientation), keepEmpty);
-    if (metadata.descriptive) {
-        appendField(exifFields_, QStringLiteral("Title"), metadata.descriptive->title);
-        appendField(exifFields_, QStringLiteral("Description"), metadata.descriptive->description);
-        appendField(exifFields_, QStringLiteral("Creator"), metadata.descriptive->creator);
-        appendField(exifFields_, QStringLiteral("Copyright"), metadata.descriptive->copyright);
-    }
-    appendField(exifFields_, QStringLiteral("Metadata Warning"), metadata.metadataWarning, keepEmpty);
-    if (frame_->rawParameters) rawFields_ = rawFieldRows(*frame_->rawParameters);
-    errorText_.clear();
+    rebuildFields();
     emit stateChanged();
-
-    pendingHistogramSources_.insert(0);
-    const QSet<int> requested = pendingHistogramSources_;
+    const auto requested = pendingHistogramSources_;
     pendingHistogramSources_.clear();
-    for (const int source : requested) requestHistogram(source);
+    for (int source : requested) requestHistogram(source);
+}
+
+void ImagePropertiesController::rebuildFields() {
+    overviewGroups_.clear();
+    advancedGroups_.clear();
+    warnings_.clear();
+    if (path_.isEmpty()) return;
+    const QFileInfo info(path_);
+    QVariantList files;
+    if (directory_) {
+        appendField(files, QStringLiteral("folder-name"), QT_TRANSLATE_NOOP("ImageProperties", "Name"), fileName_);
+        appendField(files, QStringLiteral("folder-type"), QT_TRANSLATE_NOOP("ImageProperties", "Type"), text(QT_TRANSLATE_NOOP("ImageProperties", "Folder")));
+    } else {
+        appendField(files, QStringLiteral("file-size"), QT_TRANSLATE_NOOP("ImageProperties", "File size"), byteSizeText(info.size()), true);
+    }
+    appendField(files, QStringLiteral("path"), QT_TRANSLATE_NOOP("ImageProperties", "Full path"), QDir::toNativeSeparators(path_));
+    appendField(files, QStringLiteral("modified"), QT_TRANSLATE_NOOP("ImageProperties", "Modified"), QLocale().toString(info.lastModified(), QLocale::ShortFormat));
+    appendGroup(overviewGroups_, QStringLiteral("file"), directory_ ? QT_TRANSLATE_NOOP("ImageProperties", "Folder") : QT_TRANSLATE_NOOP("ImageProperties", "File"), files);
+    if (directory_) return;
+    if (!frame_) {
+        if (auto parameters = loader_->rawParameters(path_))
+            appendGroup(advancedGroups_, QStringLiteral("raw"), QT_TRANSLATE_NOOP("ImageProperties", "RAW / YUV parameters"), rawFieldRows(*parameters));
+        return;
+    }
+    const auto& m = frame_->metadata;
+    const auto& d = frame_->descriptor;
+    const QSize size = m.sourceSize.isValid() ? m.sourceSize : d.size;
+    QVariantList image;
+    appendField(image, QStringLiteral("format"), QT_TRANSLATE_NOOP("ImageProperties", "Format"), m.format);
+    appendField(image, QStringLiteral("dimensions"), QT_TRANSLATE_NOOP("ImageProperties", "Dimensions"), QStringLiteral("%1 × %2 px").arg(size.width()).arg(size.height()), true);
+    appendField(image, QStringLiteral("bit-depth"), QT_TRANSLATE_NOOP("ImageProperties", "Bit depth"), text(QT_TRANSLATE_NOOP("ImageProperties", "%1-bit valid / %2-bit storage")).arg(d.validBits).arg(d.storageBits), true);
+    appendField(image, QStringLiteral("source-color-space"), QT_TRANSLATE_NOOP("ImageProperties", "Source color space"), d.sourceColor.colorSpace);
+    appendField(image, QStringLiteral("display-color-space"), QT_TRANSLATE_NOOP("ImageProperties", "Display color space"), d.displayColor.colorSpace);
+    overviewGroups_.prepend(QVariantMap{{QStringLiteral("id"), QStringLiteral("image")},
+        {QStringLiteral("title"), text(QT_TRANSLATE_NOOP("ImageProperties", "Image"))}, {QStringLiteral("fields"), image}});
+
+    QVariantList color;
+    appendField(color, QStringLiteral("source-primaries"), QT_TRANSLATE_NOOP("ImageProperties", "Source primaries"), d.sourceColor.primaries);
+    appendField(color, QStringLiteral("source-transfer"), QT_TRANSLATE_NOOP("ImageProperties", "Source transfer"), d.sourceColor.transferFunction);
+    appendField(color, QStringLiteral("source-matrix"), QT_TRANSLATE_NOOP("ImageProperties", "Source matrix"), d.sourceColor.matrixCoefficients);
+    appendField(color, QStringLiteral("source-range"), QT_TRANSLATE_NOOP("ImageProperties", "Source range"), text(d.sourceColor.fullRange ? QT_TRANSLATE_NOOP("ImageProperties", "Full") : QT_TRANSLATE_NOOP("ImageProperties", "Limited")));
+    appendField(color, QStringLiteral("chroma-location"), QT_TRANSLATE_NOOP("ImageProperties", "Chroma location"), d.sourceColor.chromaLocation);
+    appendField(color, QStringLiteral("display-primaries"), QT_TRANSLATE_NOOP("ImageProperties", "Display primaries"), d.displayColor.primaries);
+    appendField(color, QStringLiteral("display-transfer"), QT_TRANSLATE_NOOP("ImageProperties", "Display transfer"), d.displayColor.transferFunction);
+    appendGroup(advancedGroups_, QStringLiteral("color"), QT_TRANSLATE_NOOP("ImageProperties", "Color"), color);
+    if (m.colorProfile) {
+        const auto& p = *m.colorProfile;
+        QVariantList icc;
+        appendField(icc, QStringLiteral("icc-description"), QT_TRANSLATE_NOOP("ImageProperties", "Source profile"), p.sourceDescription);
+        appendField(icc, QStringLiteral("icc-fingerprint"), QT_TRANSLATE_NOOP("ImageProperties", "Profile fingerprint"), p.sourceFingerprint, true);
+        appendField(icc, QStringLiteral("icc-destination"), QT_TRANSLATE_NOOP("ImageProperties", "Profile destination"), p.destinationColorSpace);
+        appendField(icc, QStringLiteral("icc-engine"), QT_TRANSLATE_NOOP("ImageProperties", "Transform engine"), p.transformEngine);
+        appendField(icc, QStringLiteral("icc-intent"), QT_TRANSLATE_NOOP("ImageProperties", "Rendering intent"), p.renderingIntent);
+        appendField(icc, QStringLiteral("icc-status"), QT_TRANSLATE_NOOP("ImageProperties", "Conversion status"), text(p.converted ? QT_TRANSLATE_NOOP("ImageProperties", "Converted") : QT_TRANSLATE_NOOP("ImageProperties", "Not converted")));
+        appendGroup(advancedGroups_, QStringLiteral("icc"), QT_TRANSLATE_NOOP("ImageProperties", "ICC profile"), icc);
+    }
+    QVariantList capture, metadata;
+    if (m.camera) {
+        const auto& c = *m.camera;
+        appendField(capture, QStringLiteral("camera"), QT_TRANSLATE_NOOP("ImageProperties", "Camera"), (c.make + QLatin1Char(' ') + c.model).trimmed());
+        appendField(capture, QStringLiteral("lens"), QT_TRANSLATE_NOOP("ImageProperties", "Lens"), c.lens);
+        appendField(capture, QStringLiteral("exposure"), QT_TRANSLATE_NOOP("ImageProperties", "Exposure time"), exposureText(c.exposureSeconds), true);
+        appendField(capture, QStringLiteral("aperture"), QT_TRANSLATE_NOOP("ImageProperties", "Aperture"), c.aperture > 0 ? QStringLiteral("f/%1").arg(c.aperture,0,'g',3) : QString{}, true);
+        appendField(capture, QStringLiteral("iso"), QT_TRANSLATE_NOOP("ImageProperties", "ISO"), c.iso > 0 ? QString::number(c.iso) : QString{}, true);
+        appendField(capture, QStringLiteral("focal-length"), QT_TRANSLATE_NOOP("ImageProperties", "Focal length"), c.focalLengthMm > 0 ? QStringLiteral("%1 mm").arg(c.focalLengthMm,0,'g',4) : QString{}, true);
+        appendField(capture, QStringLiteral("captured"), QT_TRANSLATE_NOOP("ImageProperties", "Captured at"), QLocale().toString(c.capturedAt, QLocale::ShortFormat));
+        appendField(metadata, QStringLiteral("make"), QT_TRANSLATE_NOOP("ImageProperties", "Make"), c.make);
+        appendField(metadata, QStringLiteral("model"), QT_TRANSLATE_NOOP("ImageProperties", "Model"), c.model);
+        appendField(metadata, QStringLiteral("software"), QT_TRANSLATE_NOOP("ImageProperties", "Software"), c.software);
+        appendField(metadata, QStringLiteral("exposure-program"), QT_TRANSLATE_NOOP("ImageProperties", "Exposure program"), c.exposureProgram);
+        appendField(metadata, QStringLiteral("metering"), QT_TRANSLATE_NOOP("ImageProperties", "Metering mode"), c.meteringMode);
+        appendField(metadata, QStringLiteral("exposure-compensation"), QT_TRANSLATE_NOOP("ImageProperties", "Exposure compensation"), c.exposureCompensation);
+        appendField(metadata, QStringLiteral("flash"), QT_TRANSLATE_NOOP("ImageProperties", "Flash"), c.flash);
+        appendField(metadata, QStringLiteral("gps"), QT_TRANSLATE_NOOP("ImageProperties", "GPS"), c.gps);
+        if (c.sensorSize.isValid()) appendField(metadata, QStringLiteral("sensor-size"), QT_TRANSLATE_NOOP("ImageProperties", "Raw sensor dimensions (px)"), QStringLiteral("%1 × %2").arg(c.sensorSize.width()).arg(c.sensorSize.height()), true);
+    }
+    appendGroup(overviewGroups_, QStringLiteral("capture"), QT_TRANSLATE_NOOP("ImageProperties", "Capture"), capture);
+    if (m.descriptive) {
+        QVariantList description;
+        appendField(description, QStringLiteral("title"), QT_TRANSLATE_NOOP("ImageProperties", "Title"), m.descriptive->title);
+        appendField(description, QStringLiteral("creator"), QT_TRANSLATE_NOOP("ImageProperties", "Creator"), m.descriptive->creator);
+        appendField(description, QStringLiteral("description"), QT_TRANSLATE_NOOP("ImageProperties", "Description"), m.descriptive->description);
+        appendField(description, QStringLiteral("copyright"), QT_TRANSLATE_NOOP("ImageProperties", "Copyright"), m.descriptive->copyright);
+        appendGroup(overviewGroups_, QStringLiteral("description"), QT_TRANSLATE_NOOP("ImageProperties", "Description"), description);
+    }
+    appendField(metadata, QStringLiteral("orientation"), QT_TRANSLATE_NOOP("ImageProperties", "Orientation"), metadataOrientationText(m.sourceOrientation));
+    appendGroup(advancedGroups_, QStringLiteral("metadata"), QT_TRANSLATE_NOOP("ImageProperties", "Metadata"), metadata);
+    if (frame_->rawParameters) appendGroup(advancedGroups_, QStringLiteral("raw"), QT_TRANSLATE_NOOP("ImageProperties", "RAW / YUV parameters"), rawFieldRows(*frame_->rawParameters));
+    else if (auto parameters = loader_->rawParameters(path_)) appendGroup(advancedGroups_, QStringLiteral("raw"), QT_TRANSLATE_NOOP("ImageProperties", "RAW / YUV parameters"), rawFieldRows(*parameters));
+    if (!m.colorWarning.isEmpty()) warnings_.append(m.colorWarning);
+    if (!m.metadataWarning.isEmpty()) warnings_.append(m.metadataWarning);
+    if (!metadataError_.isEmpty()) warnings_.append(metadataError_);
 }
 
 bool ImagePropertiesController::hasHistogramSource() const {
     return frame_ &&
-           (RawPlaneAccessor(*frame_).isValid() ||
-            (frame_->descriptor.validBits > 8 &&
-             std::holds_alternative<QImage>(frame_->storage)));
+           (RawPlaneAccessor(*frame_).isValid() || frame_->qImage());
 }
 
 void ImagePropertiesController::requestHistogram(int source) {
@@ -440,7 +516,7 @@ void ImagePropertiesController::requestHistogram(int source) {
             : RawPlaneAccessor(*frame).isValid()
                 ? rawHistogramMap(RawPlaneHistogramAnalyzer::analyze(*frame,
                     RawPlaneHistogramAnalyzer::kDefaultMaximumSamplesPerChannel, cancelled))
-                : displayHistogramMap(DisplayHistogramAnalyzer::analyzeNativeRgb(*frame, cancelled));
+                : nativeFileHistogramMap(frame->metadata.path, cancelled);
     }, [self, source, requestedGeneration](QVariantMap result) {
         if (self) self->setHistogram(source, requestedGeneration, std::move(result));
     });

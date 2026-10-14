@@ -299,7 +299,7 @@ ApplicationWindow {
     FullScreenPage {
         controller: fullScreenController
         externalModalVisible: window.settingsCard ? window.settingsCard.visible : false
-        propertiesController: imagePropertiesController
+        propertiesController: fullScreenPropertiesController
         settingsController: appSettings
         messageParent: window.contentItem
         onCloseRequested: window.closeFullScreen()

@@ -27,6 +27,7 @@ Item {
     property bool loadingMessageVisible: false
     readonly property bool imageLoading: root.visible && root.controller.loading
     onImageLoadingChanged: loadingMessageVisible = false
+    onVisibleChanged: if (!visible) propertiesDialog.close()
     signal imageFrameReady()
 
     Timer {
@@ -332,8 +333,8 @@ Item {
         onConfirmed: complete(root.controller.moveCurrentToTrash())
     }
 
-    Shortcut { enabled: root.visible && !root.externalModalVisible; sequence: "PageUp"; onActivated: root.controller.showPrevious() }
-    Shortcut { enabled: root.visible && !root.externalModalVisible; sequence: "PageDown"; onActivated: root.controller.showNext() }
-    Shortcut { enabled: root.visible && !root.externalModalVisible; sequences: [StandardKey.Copy]; onActivated: root.controller.copyCurrent(false) }
-    Shortcut { enabled: root.visible && !root.externalModalVisible; sequences: [StandardKey.Cut]; onActivated: root.controller.copyCurrent(true) }
+    Shortcut { enabled: root.visible && !root.externalModalVisible && !propertiesDialog.visible; sequence: "PageUp"; onActivated: root.controller.showPrevious() }
+    Shortcut { enabled: root.visible && !root.externalModalVisible && !propertiesDialog.visible; sequence: "PageDown"; onActivated: root.controller.showNext() }
+    Shortcut { enabled: root.visible && !root.externalModalVisible && !propertiesDialog.visible; sequences: [StandardKey.Copy]; onActivated: root.controller.copyCurrent(false) }
+    Shortcut { enabled: root.visible && !root.externalModalVisible && !propertiesDialog.visible; sequences: [StandardKey.Cut]; onActivated: root.controller.copyCurrent(true) }
 }
