@@ -400,8 +400,12 @@ class Renderer final : public QQuickRhiItemRenderer {
     }
 
     void rebuildBindings() {
+        // Pipelines retain the binding object used to create their layout. Keep that
+        // object alive across asynchronous texture changes and recreate its native
+        // bindings in place; replacing it leaves existing pipelines with stale state.
         for (auto& slot : slots_) {
-            slot.sideBindings.reset(rhi_->newShaderResourceBindings());
+            if (!slot.sideBindings)
+                slot.sideBindings.reset(rhi_->newShaderResourceBindings());
             slot.sideBindings->setBindings({
                 QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage,
                                                          slot.matrix.get()),
@@ -426,7 +430,8 @@ class Renderer final : public QQuickRhiItemRenderer {
             if (!resourceCreated(slot.sideBindings->create(), "sideBindings")) return;
         }
 
-        encodedCompareBindings_.reset(rhi_->newShaderResourceBindings());
+        if (!encodedCompareBindings_)
+            encodedCompareBindings_.reset(rhi_->newShaderResourceBindings());
         encodedCompareBindings_->setBindings({
             QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage,
                                                      slots_[0].matrix.get()),
@@ -439,7 +444,8 @@ class Renderer final : public QQuickRhiItemRenderer {
         });
         if (!resourceCreated(encodedCompareBindings_->create(), "encodedCompareBindings")) return;
 
-        yuvCompareBindings_.reset(rhi_->newShaderResourceBindings());
+        if (!yuvCompareBindings_)
+            yuvCompareBindings_.reset(rhi_->newShaderResourceBindings());
         yuvCompareBindings_->setBindings({
             QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage,
                                                      slots_[0].matrix.get()),
@@ -464,7 +470,8 @@ class Renderer final : public QQuickRhiItemRenderer {
         });
         if (!resourceCreated(yuvCompareBindings_->create(), "yuvCompareBindings")) return;
 
-        bayerCompareBindings_.reset(rhi_->newShaderResourceBindings());
+        if (!bayerCompareBindings_)
+            bayerCompareBindings_.reset(rhi_->newShaderResourceBindings());
         bayerCompareBindings_->setBindings({
             QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage,
                                                      slots_[0].matrix.get()),

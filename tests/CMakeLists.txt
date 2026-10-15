@@ -14,6 +14,17 @@ add_test(NAME rhi_fallback_regression COMMAND rhi_fallback_regression)
 set_tests_properties(rhi_fallback_regression PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=rhi")
 
+if(APPLE)
+    add_executable(canvas_pixels_regression canvas_pixels_regression.cpp
+        ${PROJECT_SOURCE_DIR}/src/qml/qml_image_canvas.cpp
+        ${PROJECT_SOURCE_DIR}/src/qml/qml_image_canvas.h)
+    target_link_libraries(canvas_pixels_regression PRIVATE
+        mvpview_io mvpview_render_backend mvpview_diagnostics Qt6::Quick Qt6::GuiPrivate)
+    mvpview_enable_warnings(canvas_pixels_regression)
+    add_test(NAME canvas_pixels_regression COMMAND canvas_pixels_regression)
+    set_tests_properties(canvas_pixels_regression PROPERTIES TIMEOUT 60)
+endif()
+
 add_executable(browse_restore_regression browse_restore_regression.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/thumbnail_image_provider.cpp)
