@@ -39,8 +39,12 @@ ThumbnailDiskCache::ThumbnailDiskCache(QString rootDirectory)
 QImage ThumbnailDiskCache::load(const QString& key) const {
     // A writer publishes a new immutable entry directly. Do not decode its
     // unfinished bytes, including when another process is filling this cache.
-    const QMutexLocker lock(&writeKeysMutex_);
-    if (writingKeys_.contains(key)) return {};
+    {
+        const QMutexLocker lock(&writeKeysMutex_);
+        if (writingKeys_.contains(key)) return {};
+    }
+    // Entries are immutable (NewOnly). A writer starting after this check can
+    // only create a missing file; readCacheImage rejects incomplete payloads.
     const QString base = pathForKey(key);
     for (const auto* format : {"PNG", "JPEG"}) {
         const QImage image = readCacheImage(

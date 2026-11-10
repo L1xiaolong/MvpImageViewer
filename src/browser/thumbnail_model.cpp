@@ -290,7 +290,24 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
     }
     const int referenceCount = std::max(1, std::max(static_cast<int>(files_.size()),
                                                     static_cast<int>(files.size())));
-    if (changedCount * 5 > referenceCount) {
+    QVector<QPair<int, int>> removals;
+    qint64 shiftedRecords = 0;
+    qint64 survivingSuffix = 0;
+    for (int row = static_cast<int>(files_.size()) - 1; row >= 0;) {
+        if (incomingByPath.contains(files_.at(row).path)) {
+            ++survivingSuffix;
+            --row;
+            continue;
+        }
+        const int last = row--;
+        while (row >= 0 && !incomingByPath.contains(files_.at(row).path)) --row;
+        removals.append({row + 1, last});
+        shiftedRecords += survivingSuffix;
+    }
+    // A small percentage of scattered deletions can still move the entire
+    // directory thousands of times. Bound both movement and model notifications.
+    if (qint64(changedCount) * 5 > referenceCount || removals.size() > 128 ||
+        shiftedRecords > qint64(referenceCount) * 4) {
         QHash<QString, QSize> retainedDimensions;
         QHash<QString, int> retainedBitDepths;
         for (const auto& incoming : files) {
@@ -313,15 +330,14 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
     }
 
     // Remove backwards so every existing persistent index before the removed row stays valid.
-    for (qsizetype row = files_.size(); row-- > 0;) {
-        const QString path = files_.at(row).path;
-        if (incomingByPath.contains(path)) {
-            continue;
+    for (const auto& range : removals) {
+        beginRemoveRows({}, range.first, range.second);
+        for (int row = range.first; row <= range.second; ++row) {
+            const QString& path = files_.at(row).path;
+            dimensions_.remove(path);
+            bitDepths_.remove(path);
         }
-        beginRemoveRows({}, static_cast<int>(row), static_cast<int>(row));
-        files_.removeAt(row);
-        dimensions_.remove(path);
-        bitDepths_.remove(path);
+        files_.remove(range.first, range.second - range.first + 1);
         endRemoveRows();
     }
     rebuildPathIndex();
@@ -348,7 +364,6 @@ void ThumbnailModel::updateFiles(const QVector<ImageFileRecord>& files) {
         if (!pathToRow_.contains(incoming.path)) additions.push_back(incoming);
     }
     appendFiles(additions);
-    rebuildPathIndex();
 }
 
 QString ThumbnailModel::pathAt(int row) const {

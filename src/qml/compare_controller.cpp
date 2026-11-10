@@ -214,12 +214,20 @@ void CompareController::requestFrame(int slot, const QString& path) {
                                        qRound(canvas_->height() * dpr))
                                 : QSize(1280, 1000);
     previewSize = previewSize.expandedTo(QSize(640, 480)).boundedTo(QSize(1920, 1600));
+    const bool quick = rawParameters && rawParameters->isYuv() &&
+        !loader_->isCached({path, DecodePurpose::Preview, previewSize, rawParameters});
+    requestPreview(slot, path, generation, previewSize, rawParameters, quick);
+}
+
+void CompareController::requestPreview(int slot, const QString& path, quint64 generation, QSize size,
+                                       std::optional<RawImageParameters> raw, bool quick) {
     const QPointer<CompareController> self(this);
     previewHandles_[slot] = loader_->request(
-        generation, {path, DecodePurpose::Preview, previewSize, rawParameters},
-        [self, slot, path, generation](quint64 id, const DecodeResult& result) {
+        generation, {path, DecodePurpose::Preview, quick ? QSize(512, 512) : size, raw},
+        [self, slot, path, generation, size, raw, quick](quint64 id, const DecodeResult& result) {
             if (!self || id != generation || slot < 0 || slot >= self->generations_.size() ||
-                self->generations_.at(slot) != generation) return;
+                self->generations_.at(slot) != generation || self->paths_.value(slot) != path || self->fullRequested_.value(slot) ||
+                self->fullResolution_.value(slot)) return;
             if (!result.frame) {
                 self->errors_[slot] = result.error;
                 emit self->loadFailed(slot, result.error);
@@ -228,12 +236,11 @@ void CompareController::requestFrame(int slot, const QString& path) {
                 return;
             }
             self->errors_[slot].clear();
+            const bool firstFrame = !self->frames_.value(slot);
             self->frames_[slot] = result.frame;
             self->metadata_[slot] = result.frame->metadata;
             if (self->exifVisible_) self->requestMetadata(slot);
-            self->fullRequested_[slot] = false;
-            self->fullResolution_[slot] = false;
-            self->refreshCanvas(slot, true);
+            self->refreshCanvas(slot, firstFrame);
             self->clearHistograms(slot);
             if (self->histogramRequested_.value(slot)) self->requestHistogram(slot);
             emit self->frameChanged(slot, false);
@@ -241,10 +248,16 @@ void CompareController::requestFrame(int slot, const QString& path) {
             emit self->revisionChanged();
             if (self->pixelValueVisible_ || self->histogramVisible_) {
                 self->requestFullFrame(slot, LoadCategory::Interactive);
+            } else if (quick) {
+                QTimer::singleShot(0, self, [self, slot, path, generation, size, raw] {
+                    if (self && self->paths_.value(slot) == path && self->generations_.value(slot) == generation &&
+                        !self->fullRequested_.value(slot) && !self->fullResolution_.value(slot))
+                        self->requestPreview(slot, path, generation, size, raw, false);
+                });
             } else {
                 self->automaticFullLoadTimer_.start();
             }
-        }, RequestOptions{LoadCategory::Interactive, 20,
+        }, RequestOptions{LoadCategory::Interactive, quick ? 30 : 20,
                           QStringLiteral("compare-preview")});
 }
 
@@ -254,6 +267,7 @@ void CompareController::requestFullFrame(int slot, LoadCategory category) {
         return;
     }
     fullRequested_[slot] = true;
+    previewHandles_[slot].cancel();
     const quint64 generation = generations_.at(slot);
     const QString path = paths_.at(slot);
     const QPointer<CompareController> self(this);

@@ -14,6 +14,18 @@ Dialog {
     property int sourceHeight: 0
     property bool updatingFields: false
     property string errorText: ""
+    property bool awaitingResize: false
+
+    Connections {
+        target: root.controller
+        ignoreUnknownSignals: true
+        function onTransformFinished(path, error) {
+            if (!root.awaitingResize) return
+            root.awaitingResize = false
+            if (error.length > 0) root.errorText = error
+            else root.close()
+        }
+    }
 
     modal: true
     focus: true
@@ -22,7 +34,7 @@ Dialog {
     x: parent ? Math.round((parent.width - width) / 2) : 0
     y: parent ? Math.round((parent.height - height) / 2) : 0
     padding: 0
-    closePolicy: Popup.CloseOnEscape
+    closePolicy: awaitingResize ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     function openForSelection() {
         const size = controller ? controller.selectedImageSize : Qt.size(0, 0)
@@ -62,6 +74,7 @@ Dialog {
     }
 
     function applyResize() {
+        if (awaitingResize) return
         let targetWidth = Number(widthField.text)
         let targetHeight = Number(heightField.text)
         if (percentageMode) {
@@ -78,7 +91,8 @@ Dialog {
             errorText = error
             return
         }
-        close()
+        if (controller.transformBusy === true) awaitingResize = true
+        else close()
     }
 
     Overlay.modal: Rectangle { color: "#330E1820" }
@@ -198,7 +212,7 @@ Dialog {
             x: 22
             y: 270
             width: parent.width - 44
-            text: root.errorText.length > 0 ? root.errorText : "Interpolation: bicubic"
+            text: root.awaitingResize ? qsTr("Processing…") : root.errorText.length > 0 ? root.errorText : "Interpolation: bicubic"
             color: root.errorText.length > 0 ? Theme.danger : Theme.mutedInk
             elide: Text.ElideRight
             font.family: Theme.uiFont
@@ -212,6 +226,7 @@ Dialog {
             height: 34
             text: qsTr("Cancel")
             onClicked: root.close()
+            enabled: !root.awaitingResize
         }
         Button {
             x: parent.width - 114
@@ -219,7 +234,7 @@ Dialog {
             width: 92
             height: 34
             text: qsTr("Resize")
-            enabled: root.sourceWidth > 0 && root.sourceHeight > 0
+            enabled: !root.awaitingResize && root.sourceWidth > 0 && root.sourceHeight > 0
             onClicked: root.applyResize()
         }
     }

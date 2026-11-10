@@ -69,8 +69,11 @@ class YuvSampleSource final {
             chroma * (parameters.format == RawPixelFormat::I420 ? 8 : 4));
     }
 
-    int sample(int plane, int x, int y) {
-        const bool high = parameters_.format == RawPixelFormat::P010;
+    void beginOutputRow() {
+        for (auto& plane : rows_) for (auto& row : plane) row.pinned = false;
+    }
+
+    const char* row(int plane, int y) {
         const qsizetype stride = plane == 0 ? rowStride(parameters_) : chromaStride(parameters_);
         const qsizetype planeOffset = plane == 0 ? 0 : rowStride(parameters_) * parameters_.size.height() +
             (plane == 2 ? stride * ((parameters_.size.height() + 1) / 2) : 0);
@@ -79,12 +82,17 @@ class YuvSampleSource final {
             data = bytes_.constData() + planeOffset + y * stride;
         } else {
             auto& rows = rows_[static_cast<std::size_t>(plane)];
-            for (const auto& row : rows) {
-                if (row.index == y) { data = row.bytes.constData(); break; }
+            for (auto& row : rows) {
+                if (row.index == y) { row.pinned = true; data = row.bytes.constData(); break; }
             }
             if (!data && error_.isEmpty()) {
                 auto& next = nextRow_[static_cast<std::size_t>(plane)];
+                // A cache hit can occupy the next FIFO victim. Never invalidate
+                // a pointer already obtained for this output row.
+                for (std::size_t i = 0; i < rows.size() && rows[next % rows.size()].pinned; ++i) ++next;
                 auto& row = rows[next++ % rows.size()];
+                Q_ASSERT(!row.pinned);
+                row.pinned = true;
                 row.index = -1;
                 const qsizetype count = plane == 0 ? minimumRowStride(parameters_)
                                                  : minimumChromaRowStride(parameters_);
@@ -103,16 +111,13 @@ class YuvSampleSource final {
                 }
             }
         }
-        if (!data) return 0; // Conversion reports the read error before delivering pixels.
-        if (!high) return static_cast<uchar>(data[x]);
-        const quint16 value = read16(data + x * 2, parameters_.littleEndian);
-        return parameters_.msbAligned ? value >> 6 : value & 0x03FF;
+        return data; // Conversion checks errors before using row pointers.
     }
 
     const QString& error() const { return error_; }
 
   private:
-    struct Row { int index = -1; QByteArray bytes; };
+    struct Row { int index = -1; QByteArray bytes; bool pinned = false; };
     const QByteArray& bytes_;
     const RawImageParameters& parameters_;
     QFile* file_;
@@ -126,6 +131,8 @@ QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
                   const QSize& outputSize, const std::function<bool()>& cancelled) {
     const int width = parameters.size.width();
     const int height = parameters.size.height();
+    const DisplayColorSpace displaySpace = currentDisplayColorSpace();
+    const YuvDisplayTransform displayTransform(parameters, displaySpace);
     const auto matrix = yuvCoefficients(parameters.yuvMatrix);
     const int bits = parameters.format == RawPixelFormat::P010 ? 10 : 8;
     const double maximum = static_cast<double>((1 << bits) - 1);
@@ -139,17 +146,40 @@ QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
 
     const int chromaWidth = (width + 1) / 2;
     const int chromaHeight = (height + 1) / 2;
-    auto chromaAt = [&](int chromaX, int chromaY) {
-        chromaX = std::clamp(chromaX, 0, chromaWidth - 1);
-        chromaY = std::clamp(chromaY, 0, chromaHeight - 1);
+    const auto sample = [&](const char* row, int x) -> int {
+        if (bits == 8) return static_cast<uchar>(row[x]);
+        const quint16 value = read16(row + x * 2, parameters.littleEndian);
+        return parameters.msbAligned ? value >> 6 : value & 0x03FF;
+    };
+    struct SampleRows {
+        const char* luma;
+        std::array<const char*, 2> top;
+        std::array<const char*, 2> bottom;
+        double fy;
+    };
+    const auto prepareRows = [&](int y) {
+        const double chromaY = std::clamp(
+            (y + 0.5) * chromaHeight / height - 0.5, 0.0,
+            static_cast<double>(chromaHeight - 1));
+        const int y0 = static_cast<int>(std::floor(chromaY));
+        const int y1 = std::min(y0 + 1, chromaHeight - 1);
+        SampleRows rows{source.row(0, y), {source.row(1, y0), nullptr},
+                        {source.row(1, y1), nullptr}, chromaY - y0};
+        if (parameters.format == RawPixelFormat::I420) {
+            rows.top[1] = source.row(2, y0);
+            rows.bottom[1] = source.row(2, y1);
+        }
+        return rows;
+    };
+    auto chromaAt = [&](int chromaX, const std::array<const char*, 2>& rows) {
         int uValue = 0;
         int vValue = 0;
         if (parameters.format == RawPixelFormat::I420) {
-            uValue = source.sample(1, chromaX, chromaY);
-            vValue = source.sample(2, chromaX, chromaY);
+            uValue = sample(rows[0], chromaX);
+            vValue = sample(rows[1], chromaX);
         } else {
-            const int first = source.sample(1, chromaX * 2, chromaY);
-            const int second = source.sample(1, chromaX * 2 + 1, chromaY);
+            const int first = sample(rows[0], chromaX * 2);
+            const int second = sample(rows[0], chromaX * 2 + 1);
             const bool vu = parameters.format == RawPixelFormat::NV21;
             uValue = vu ? second : first;
             vValue = vu ? first : second;
@@ -157,26 +187,21 @@ QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
         return std::array<double, 2>{static_cast<double>(uValue),
                                      static_cast<double>(vValue)};
     };
-    auto rgbAt = [&](int x, int y) {
-        const int yValue = source.sample(0, x, y);
+    auto rgbAt = [&](int x, const SampleRows& rows) {
+        const int yValue = sample(rows.luma, x);
         const double chromaX = std::clamp(
             parameters.chromaLocation == ChromaLocation::Left
                 ? static_cast<double>(x) * chromaWidth / width
                 : (x + 0.5) * chromaWidth / width - 0.5,
             0.0, static_cast<double>(chromaWidth - 1));
-        const double chromaY = std::clamp(
-            (y + 0.5) * chromaHeight / height - 0.5, 0.0,
-            static_cast<double>(chromaHeight - 1));
         const int x0 = static_cast<int>(std::floor(chromaX));
-        const int y0 = static_cast<int>(std::floor(chromaY));
         const int x1 = std::min(x0 + 1, chromaWidth - 1);
-        const int y1 = std::min(y0 + 1, chromaHeight - 1);
         const double fx = chromaX - x0;
-        const double fy = chromaY - y0;
-        const auto topLeft = chromaAt(x0, y0);
-        const auto topRight = chromaAt(x1, y0);
-        const auto bottomLeft = chromaAt(x0, y1);
-        const auto bottomRight = chromaAt(x1, y1);
+        const double fy = rows.fy;
+        const auto topLeft = chromaAt(x0, rows.top);
+        const auto topRight = chromaAt(x1, rows.top);
+        const auto bottomLeft = chromaAt(x0, rows.bottom);
+        const auto bottomRight = chromaAt(x1, rows.bottom);
         std::array<double, 2> chroma{};
         for (std::size_t channel = 0; channel < chroma.size(); ++channel) {
             const double top = topLeft[channel] * (1.0 - fx) + topRight[channel] * fx;
@@ -186,11 +211,10 @@ QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
         const double luma = (yValue - yOffset) / yScale;
         const double u = (chroma[0] - cCenter) / cScale;
         const double v = (chroma[1] - cCenter) / cScale;
-        return yuvRgbToDisplay(
+        return displayTransform.convert(
             {luma + matrix.redV * v,
              luma - matrix.greenU * u - matrix.greenV * v,
-             luma + matrix.blueU * u},
-            parameters);
+             luma + matrix.blueU * u});
     };
     auto writePixel = [](uchar* destination, const std::array<double, 3>& rgb) {
         destination[0] = static_cast<uchar>(toByte(rgb[0]));
@@ -205,27 +229,34 @@ QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
     if (image.isNull()) return {};
     const bool fullSize = outputSize == parameters.size;
     for (int y = 0; y < outputSize.height(); ++y) {
-        if ((cancelled && cancelled()) || !source.error().isEmpty()) return {};
+        if (cancelled && cancelled()) return {};
         auto* destination = image.scanLine(y);
+        const double sourceY = fullSize ? y :
+            std::clamp((y + 0.5) * height / outputSize.height() - 0.5, 0.0, height - 1.0);
+        const int y0 = static_cast<int>(std::floor(sourceY));
+        const int y1 = std::min(y0 + 1, height - 1);
+        const double fy = sourceY - y0;
+        // At most two luma and three chroma rows are pinned while processing
+        // this output row; the four-row caches keep these pointers stable.
+        source.beginOutputRow();
+        const auto topRows = prepareRows(y0);
+        const auto bottomRows = fy == 0.0 ? topRows : prepareRows(y1);
+        if (!source.error().isEmpty()) return {};
         for (int x = 0; x < outputSize.width(); ++x) {
             if (fullSize) {
-                writePixel(destination + x * 4, rgbAt(x, y));
+                writePixel(destination + x * 4, rgbAt(x, topRows));
                 continue;
             }
             const double sourceX =
                 std::clamp((x + 0.5) * width / outputSize.width() - 0.5, 0.0, width - 1.0);
-            const double sourceY =
-                std::clamp((y + 0.5) * height / outputSize.height() - 0.5, 0.0, height - 1.0);
             const int x0 = static_cast<int>(std::floor(sourceX));
-            const int y0 = static_cast<int>(std::floor(sourceY));
             const int x1 = std::min(x0 + 1, width - 1);
-            const int y1 = std::min(y0 + 1, height - 1);
             const double fx = sourceX - x0;
-            const double fy = sourceY - y0;
-            const auto topLeft = rgbAt(x0, y0);
-            const auto topRight = rgbAt(x1, y0);
-            const auto bottomLeft = rgbAt(x0, y1);
-            const auto bottomRight = rgbAt(x1, y1);
+            const auto topLeft = rgbAt(x0, topRows);
+            const auto topRight = fx == 0.0 ? topLeft : rgbAt(x1, topRows);
+            const auto bottomLeft = fy == 0.0 ? topLeft : rgbAt(x0, bottomRows);
+            const auto bottomRight = fy == 0.0 ? topRight :
+                fx == 0.0 ? bottomLeft : rgbAt(x1, bottomRows);
             std::array<double, 3> interpolated{};
             for (std::size_t channel = 0; channel < interpolated.size(); ++channel) {
                 const double top = topLeft[channel] * (1.0 - fx) + topRight[channel] * fx;
@@ -235,8 +266,7 @@ QImage convertYuv(YuvSampleSource& source, const RawImageParameters& parameters,
             writePixel(destination + x * 4, interpolated);
         }
     }
-    if (!source.error().isEmpty()) return {};
-    image.setColorSpace(displayQColorSpace(currentDisplayColorSpace()));
+    image.setColorSpace(displayQColorSpace(displaySpace));
     return image;
 }
 } // namespace

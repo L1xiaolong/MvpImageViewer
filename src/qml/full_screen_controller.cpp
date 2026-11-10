@@ -236,29 +236,41 @@ void FullScreenController::showIndex(int index) {
     if (rawParameters && !rawParameters->isYuv()) {
         previewSize = previewSize.boundedTo(QSize(1280, 800));
     }
+    const bool quick = QFileInfo(path).suffix().compare(QStringLiteral("yuv"), Qt::CaseInsensitive) == 0 &&
+        !loader_->isCached({path, DecodePurpose::Preview, previewSize});
+    requestPreview(path, generation, previewSize, quick);
+}
+
+void FullScreenController::requestPreview(const QString& path, quint64 generation, QSize size, bool quick) {
     const QPointer<FullScreenController> self(this);
-    previewHandle_ = loader_->request(generation, {path, DecodePurpose::Preview, previewSize},
-                     [self, generation, path](quint64 id, const DecodeResult& result) {
+    previewHandle_ = loader_->request(generation, {path, DecodePurpose::Preview, quick ? QSize(512, 512) : size},
+                     [self, generation, path, size, quick](quint64 id, const DecodeResult& result) {
         if (!self || id != generation || self->generation_ != generation ||
-            self->currentPath() != path) return;
+            self->currentPath() != path || self->fullRequested_) return;
         if (!result.frame) {
             self->loading_ = false;
             self->errorText_ = result.error;
             emit self->stateChanged();
             return;
         }
+        const bool firstFrame = !self->frame_;
         self->frame_ = result.frame;
         self->loading_ = false;
-        self->refreshCanvas(true);
+        self->refreshCanvas(firstFrame);
         emit self->stateChanged();
         if (self->exactResolutionRequested_) {
             self->requestFullFrame(path, generation);
+        } else if (quick) {
+            QTimer::singleShot(0, self, [self, path, generation, size] {
+                if (self && self->generation_ == generation && self->currentPath() == path && !self->fullRequested_)
+                    self->requestPreview(path, generation, size, false);
+            });
         } else {
             self->scheduleFullFrame(path, generation);
             self->loader_->prefetchAdjacentImages(self->paths_, self->currentIndex_,
                                                  self->frame_->descriptor.size);
         }
-    }, RequestOptions{LoadCategory::Interactive, 20, QStringLiteral("fullscreen-preview")});
+    }, RequestOptions{LoadCategory::Interactive, quick ? 30 : 20, QStringLiteral("fullscreen-preview")});
 }
 
 void FullScreenController::scheduleFullFrame(const QString& path, quint64 generation) {
@@ -273,6 +285,7 @@ void FullScreenController::requestFullFrame(const QString& path, quint64 generat
         return;
     }
     fullRequested_ = true;
+    previewHandle_.cancel(); // A late preview must never replace exact pixels.
     const QPointer<FullScreenController> self(this);
     fullHandle_ = loader_->request(generation, {path, DecodePurpose::Full, {}},
                      [self, generation, path](quint64 id, const DecodeResult& result) {

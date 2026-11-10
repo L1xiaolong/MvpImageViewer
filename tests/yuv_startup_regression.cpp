@@ -2,6 +2,7 @@
 #include "io/image_loader.h"
 #include "io/thumbnail_disk_cache.h"
 #include "io/raw_preset_store.h"
+#include "core/display_color_space.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -55,22 +56,30 @@ void pixelParity(const QString& root) {
                 p.chromaLocation = variant & 1 ? ChromaLocation::Left : ChromaLocation::Center;
                 p.range = variant & 2 ? QuantizationRange::Full : QuantizationRange::Limited;
                 p.yuvMatrix = static_cast<YuvMatrix>(variant % 3);
+                p.yuvPrimaries = static_cast<YuvPrimaries>(variant % 4);
+                p.yuvTransfer = static_cast<YuvTransfer>(variant % 3);
+                setCurrentDisplayColorSpace(static_cast<DisplayColorSpace>(variant % 4));
                 const QString path = fixture(root, p);
-                DecodeRequest streamed{path, DecodePurpose::Thumbnail, QSize(9, 7), p};
-                streamed.sourceCache = std::make_shared<SourceFrameCache>();
-                const auto reduced = decoder.decode(streamed);
-                DecodeRequest retained{path, DecodePurpose::Full, QSize(9, 7), p};
-                retained.requireDisplayImage = true;
-                const auto reference = decoder.decode(retained);
-                check(reduced.succeeded() && reference.succeeded(), "YUV conversion failed");
-                check(*reduced.frame->qImage() == *reference.frame->qImage(), "streamed YUV pixel mismatch");
-                check(streamed.sourceCache->cost() == 0, "thumbnail retained source frame");
-                check(reduced.frame->sourceSamplesPending, "thumbnail probe status lost");
-                check(!reference.frame->sourceSamplesPending, "full source samples missing");
-                ++cases;
+                // Exercise zero/nonzero interpolation weights, repeated row-cache
+                // hits and native resolution, with odd sizes and padded planes.
+                for (const QSize maximum : {QSize(9, 7), QSize(3, 3), QSize(16, 16), QSize(32, 32)}) {
+                    DecodeRequest streamed{path, DecodePurpose::Thumbnail, maximum, p};
+                    streamed.sourceCache = std::make_shared<SourceFrameCache>();
+                    const auto reduced = decoder.decode(streamed);
+                    DecodeRequest retained{path, DecodePurpose::Full, maximum, p};
+                    retained.requireDisplayImage = true;
+                    const auto reference = decoder.decode(retained);
+                    check(reduced.succeeded() && reference.succeeded(), "YUV conversion failed");
+                    check(*reduced.frame->qImage() == *reference.frame->qImage(), "streamed YUV pixel mismatch");
+                    check(streamed.sourceCache->cost() == 0, "thumbnail retained source frame");
+                    check(reduced.frame->sourceSamplesPending, "thumbnail probe status lost");
+                    check(!reference.frame->sourceSamplesPending, "full source samples missing");
+                    ++cases;
+                }
             }
         }
     }
+    setCurrentDisplayColorSpace(DisplayColorSpace::Srgb);
     std::cout << "Pixel parity: " << cases << " cases passed\n";
 }
 

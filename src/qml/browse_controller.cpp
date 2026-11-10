@@ -33,6 +33,8 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <exception>
+#include <new>
 #include <thread>
 #include <utility>
 
@@ -42,6 +44,25 @@
 
 namespace mvpview {
 namespace {
+// GUI-thread-only admission: editing is serialized across all browser panes.
+QSet<BrowseController*> transformObservers;
+QString transformingPath;
+const QString transformInProgress = QStringLiteral("An image operation is in progress. Please wait.");
+
+void notifyTransformAvailability() {
+    for (auto* browser : std::as_const(transformObservers)) emit browser->selectionChanged();
+}
+
+bool conflictsWithTransform(const QStringList& paths) {
+    if (transformingPath.isEmpty()) return false;
+    for (const auto& path : paths) {
+        const QString relative = QDir(path).relativeFilePath(transformingPath);
+        if (relative == QStringLiteral(".") ||
+            (!QDir::isAbsolutePath(relative) && relative != QStringLiteral("..") &&
+             !relative.startsWith(QStringLiteral("../")))) return true;
+    }
+    return false;
+}
 #ifdef Q_OS_WIN
 QString windowsDriveRoot(const QString& path) {
     const QString native = QDir::toNativeSeparators(QFileInfo(path).absoluteFilePath());
@@ -100,6 +121,9 @@ BrowseController::BrowseController(ImageLoader* sharedLoader,
 }
 
 void BrowseController::initialize(const QString& initialDirectory, bool startEmpty) {
+    transformObservers.insert(this);
+    transformPool_.setMaxThreadCount(1);
+    transformPool_.setExpiryTimeout(10'000);
     scanner_ = new DirectoryScanner(this);
     scanner_->setBatchBackpressure(true);
     thumbnailModel_ = new ThumbnailModel(loader_, this);
@@ -362,7 +386,15 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
     openDirectoryInternal(startupDirectory, true);
 }
 
-BrowseController::~BrowseController() = default;
+BrowseController::~BrowseController() {
+    transformObservers.remove(this);
+    // Let an atomic file operation finish before destroying its completion target.
+    transformPool_.waitForDone();
+    if (transformBusy_) {
+        transformingPath.clear();
+        notifyTransformAvailability();
+    }
+}
 
 QAbstractItemModel* BrowseController::thumbnails() const { return filterModel_; }
 
@@ -454,7 +486,7 @@ bool BrowseController::canCompare() const {
 }
 
 bool BrowseController::canEditRaw() const {
-    if (selectedPaths_.size() != 1) {
+    if (selectedPaths_.size() != 1 || conflictsWithTransform(selectedPaths_)) {
         return false;
     }
     const QString suffix = QFileInfo(selectedPaths_.first()).suffix().toLower();
@@ -462,7 +494,7 @@ bool BrowseController::canEditRaw() const {
 }
 
 bool BrowseController::canTransform() const {
-    return selectedImagePaths().size() == 1;
+    return transformingPath.isEmpty() && selectedImagePaths().size() == 1;
 }
 
 bool BrowseController::canRestoreSelected() const {
@@ -975,6 +1007,7 @@ void BrowseController::renameSelected() {
 }
 
 QString BrowseController::renameSelectedTo(const QString& requestedName) {
+    if (conflictsWithTransform(selectedPaths_)) return transformInProgress;
     if (selectedPaths_.size() != 1) return QStringLiteral("Select one item to rename.");
     const QFileInfo source(selectedPaths_.first());
     const QString newName = requestedName.trimmed();
@@ -1007,6 +1040,7 @@ void BrowseController::moveSelectedToTrash() {
 }
 
 QString BrowseController::moveSelectedToTrashConfirmed() {
+    if (conflictsWithTransform(selectedPaths_)) { setStatusText(transformInProgress); return transformInProgress; }
     if (selectedPaths_.isEmpty()) return {};
     const int requestedCount = static_cast<int>(selectedPaths_.size());
     const QString operation = diagnostics::operationId();
@@ -1075,7 +1109,38 @@ void BrowseController::editSelectedRawParameters() {
     if (canEditRaw()) emit rawParametersRequested(selectedPaths_.first());
 }
 
+QString BrowseController::startTransform(const QString& path, std::function<QString()> work) {
+    if (!transformingPath.isEmpty()) return transformInProgress;
+    transformingPath = path;
+    transformBusy_ = true;
+    emit transformBusyChanged();
+    notifyTransformAvailability();
+    setStatusText(QStringLiteral("Processing %1…").arg(QFileInfo(path).fileName()));
+    const QPointer<BrowseController> self(this);
+    transformPool_.start([self, path, work = std::move(work)] {
+        QString error;
+        try { error = work(); }
+        catch (const std::bad_alloc&) { error = QStringLiteral("Not enough memory to transform image."); }
+        catch (const std::exception&) { error = QStringLiteral("Image transformation failed."); }
+        if (!self) return;
+        QMetaObject::invokeMethod(self, [self, path, error] {
+            if (!self) return;
+            transformingPath.clear();
+            self->transformBusy_ = false;
+            emit self->transformBusyChanged();
+            if (error.isEmpty()) {
+                self->refreshTransformedPath(path);
+                self->setStatusText(QStringLiteral("Finished processing %1").arg(QFileInfo(path).fileName()));
+            } else self->setStatusText(error);
+            notifyTransformAvailability();
+            emit self->transformFinished(path, error);
+        }, Qt::QueuedConnection);
+    });
+    return {}; // Accepted; asynchronous errors are delivered by transformFinished.
+}
+
 QString BrowseController::transformSelected(bool clockwise) {
+    if (!transformingPath.isEmpty()) return transformInProgress;
     if (!canTransform()) return QStringLiteral("Select one image first.");
     const QString path = selectedImagePaths().first();
     std::optional<RawImageParameters> raw = loader_->rawParameters(path);
@@ -1092,11 +1157,9 @@ QString BrowseController::transformSelected(bool clockwise) {
         setStatusText(error);
         return error;
     }
-    const QString error = ImageTransformer::rotate(
-        path, clockwise ? QuarterTurn::Clockwise : QuarterTurn::CounterClockwise, raw);
-    if (error.isEmpty()) refreshTransformedPath(path);
-    else setStatusText(error);
-    return error;
+    return startTransform(path, [path, clockwise, raw] {
+        return ImageTransformer::rotate(path, clockwise ? QuarterTurn::Clockwise : QuarterTurn::CounterClockwise, raw);
+    });
 }
 
 QString BrowseController::rotateSelectedClockwise() { return transformSelected(true); }
@@ -1104,6 +1167,7 @@ QString BrowseController::rotateSelectedClockwise() { return transformSelected(t
 QString BrowseController::rotateSelectedCounterClockwise() { return transformSelected(false); }
 
 QString BrowseController::resizeSelected(int width, int height) {
+    if (!transformingPath.isEmpty()) return transformInProgress;
     if (!canTransform()) return QStringLiteral("Select one image first.");
     if (width <= 0 || height <= 0 || width > 100000 || height > 100000)
         return QStringLiteral("Enter dimensions between 1 and 100,000 pixels.");
@@ -1122,22 +1186,20 @@ QString BrowseController::resizeSelected(int width, int height) {
         return QStringLiteral("YUV 4:2:0 output dimensions must be even.");
     QJsonObject context{{"operation", diagnostics::operationId()}, {"file", diagnostics::fileId(path)}, {"width", width}, {"height", height}};
     diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("resize.begin"), context, true);
-    const QString error = ImageTransformer::resize(path, {width, height}, raw);
-    if (!error.isEmpty()) context.insert(QStringLiteral("reason"), error);
-    diagnostics::event(error.isEmpty() ? diagnostics::Level::Info : diagnostics::Level::Error, diagnostics::files(),
-        error.isEmpty() ? QStringLiteral("resize.complete") : QStringLiteral("resize.failed"), context, true);
-    if (error.isEmpty()) refreshTransformedPath(path);
-    else setStatusText(error);
-    return error;
+    return startTransform(path, [path, width, height, raw, context]() mutable {
+        const QString error = ImageTransformer::resize(path, {width, height}, raw);
+        if (!error.isEmpty()) context.insert(QStringLiteral("reason"), error);
+        diagnostics::event(error.isEmpty() ? diagnostics::Level::Info : diagnostics::Level::Error, diagnostics::files(),
+            error.isEmpty() ? QStringLiteral("resize.complete") : QStringLiteral("resize.failed"), context, true);
+        return error;
+    });
 }
 
 QString BrowseController::restoreSelected() {
+    if (!transformingPath.isEmpty()) return transformInProgress;
     if (!canRestoreSelected()) return QStringLiteral("No original image backup is available.");
     const QString path = selectedImagePaths().first();
-    const QString error = ImageTransformer::restore(path);
-    if (error.isEmpty()) refreshTransformedPath(path);
-    else setStatusText(error);
-    return error;
+    return startTransform(path, [path] { return ImageTransformer::restore(path); });
 }
 
 void BrowseController::refreshTransformedPath(const QString& path) {
@@ -1456,6 +1518,7 @@ void BrowseController::requestTransferPaths(const QStringList& paths, bool move,
 
 void BrowseController::transferPaths(const QStringList& paths, bool move,
                                      const QString& targetDirectory) {
+    if (conflictsWithTransform(paths)) { setStatusText(transformInProgress); return; }
     const QString target = targetDirectory.isEmpty() ? currentDirectory_
                                                       : QFileInfo(targetDirectory).absoluteFilePath();
     if (paths.isEmpty() || target.isEmpty() || !QFileInfo(target).isDir()) return;

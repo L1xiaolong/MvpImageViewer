@@ -14,6 +14,17 @@ struct YuvCoefficients {
     double blueU;
 };
 
+// Prepare once per image; the matrix and transfer selection do not vary by pixel.
+class YuvDisplayTransform {
+public:
+    YuvDisplayTransform(const RawImageParameters& parameters, DisplayColorSpace target);
+    [[nodiscard]] std::array<double, 3> convert(const std::array<double, 3>& rgb) const;
+private:
+    YuvTransfer sourceTransfer_;
+    DisplayTransfer targetTransfer_;
+    std::array<double, 9> matrix_;
+};
+
 [[nodiscard]] YuvCoefficients yuvCoefficients(YuvMatrix matrix);
 // Source primaries mapped into the fixed sRGB space. Kept public because it is the regression
 // reference for the display-space matrices and because sRGB remains the default display space.

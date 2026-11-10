@@ -4,6 +4,14 @@ mvpview_enable_warnings(yuv_startup_regression)
 add_test(NAME yuv_startup_regression COMMAND yuv_startup_regression)
 set_tests_properties(yuv_startup_regression PROPERTIES TIMEOUT 60)
 
+add_executable(yuv_progressive_regression yuv_progressive_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/full_screen_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/compare_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/qml_image_canvas.cpp)
+target_link_libraries(yuv_progressive_regression PRIVATE mvpview_io mvpview_browser_backend
+    mvpview_platform mvpview_render_backend Qt6::Quick Qt6::GuiPrivate)
+add_test(NAME yuv_progressive_regression COMMAND yuv_progressive_regression)
+set_tests_properties(yuv_progressive_regression PROPERTIES TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(rhi_fallback_regression rhi_fallback_regression.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/qml_image_canvas.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/qml_image_canvas.h)
@@ -35,6 +43,14 @@ add_test(NAME browse_restore_regression COMMAND browse_restore_regression)
 set_tests_properties(browse_restore_regression PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(performance_paths_regression performance_paths_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp)
+target_link_libraries(performance_paths_regression PRIVATE
+    mvpview_browser_backend mvpview_platform mvpview_io Qt6::Quick)
+mvpview_enable_warnings(performance_paths_regression)
+add_test(NAME performance_paths_regression COMMAND performance_paths_regression)
+set_tests_properties(performance_paths_regression PROPERTIES TIMEOUT 60
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(thumbnail_response_regression thumbnail_response_regression.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/thumbnail_image_provider.cpp)
 target_link_libraries(thumbnail_response_regression PRIVATE mvpview_io Qt6::Quick)

@@ -68,6 +68,7 @@ class FullScreenController final : public QObject {
 
   private:
     void showIndex(int index);
+    void requestPreview(const QString& path, quint64 generation, QSize size, bool quick);
     void scheduleFullFrame(const QString& path, quint64 generation);
     void requestFullFrame(const QString& path, quint64 generation);
     void refreshCanvas(bool resetView);

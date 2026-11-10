@@ -124,25 +124,30 @@ double encodeForDisplay(double linear, DisplayTransfer transfer) {
     }
 }
 
-std::array<double, 3> yuvRgbToDisplay(const std::array<double, 3>& sourceRgb,
-                                      const RawImageParameters& parameters,
-                                      DisplayColorSpace target) {
+YuvDisplayTransform::YuvDisplayTransform(const RawImageParameters& parameters, DisplayColorSpace target)
+    : sourceTransfer_(parameters.yuvTransfer), targetTransfer_(displayTransfer(target)),
+      matrix_(yuvPrimariesToDisplayMatrix(parameters.yuvPrimaries, displayPrimaries(target))) {}
+
+std::array<double, 3> YuvDisplayTransform::convert(const std::array<double, 3>& sourceRgb) const {
     std::array<double, 3> linear{};
     for (std::size_t channel = 0; channel < linear.size(); ++channel) {
-        linear[channel] = decodeTransfer(sourceRgb[channel], parameters.yuvTransfer);
+        linear[channel] = decodeTransfer(sourceRgb[channel], sourceTransfer_);
     }
-    const auto matrix =
-        yuvPrimariesToDisplayMatrix(parameters.yuvPrimaries, displayPrimaries(target));
-    const DisplayTransfer transfer = displayTransfer(target);
     std::array<double, 3> encoded{};
     for (std::size_t output = 0; output < encoded.size(); ++output) {
         double value = 0.0;
         for (std::size_t input = 0; input < linear.size(); ++input) {
-            value += matrix[output * 3 + input] * linear[input];
+            value += matrix_[output * 3 + input] * linear[input];
         }
-        encoded[output] = encodeForDisplay(value, transfer);
+        encoded[output] = encodeForDisplay(value, targetTransfer_);
     }
     return encoded;
+}
+
+std::array<double, 3> yuvRgbToDisplay(const std::array<double, 3>& sourceRgb,
+                                      const RawImageParameters& parameters,
+                                      DisplayColorSpace target) {
+    return YuvDisplayTransform(parameters, target).convert(sourceRgb);
 }
 
 std::array<double, 3> yuvRgbToDisplay(const std::array<double, 3>& sourceRgb,

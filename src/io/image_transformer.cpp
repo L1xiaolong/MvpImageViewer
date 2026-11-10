@@ -404,19 +404,27 @@ QByteArray packFrame(const RawPlanes& planes, const RawImageParameters& paramete
     return frame;
 }
 
+// Bound copying independently of file length, including RAW headers/trailers.
+QString copyBytes(QIODevice& source, QIODevice& destination, qint64 remaining) {
+    while (remaining > 0) {
+        const QByteArray chunk = source.read(std::min<qint64>(remaining, 1024 * 1024));
+        if (chunk.isEmpty()) return QStringLiteral("Unable to read the complete source file.");
+        if (destination.write(chunk) != chunk.size()) return destination.errorString();
+        remaining -= chunk.size();
+    }
+    return {};
+}
+
 QString transformRaw(const QString& path, RawImageParameters sourceParameters,
                      const QSize& targetSize, std::optional<QuarterTurn> turn) {
     QFile input(path);
     if (!input.open(QIODevice::ReadOnly)) return input.errorString();
-    const QByteArray bytes = input.readAll();
-    // QSaveFile replaces the destination during commit. Windows does not allow
-    // that while the original file is still open, even for read-only access.
-    input.close();
+    const qint64 inputSize = input.size();
     const qsizetype sourceFrameSize = frameByteSize(sourceParameters);
-    if (sourceFrameSize <= 0 || sourceParameters.headerOffset > bytes.size())
+    if (sourceFrameSize <= 0 || sourceParameters.headerOffset < 0 || sourceParameters.headerOffset > inputSize)
         return QStringLiteral("Invalid RAW/YUV layout.");
-    const qsizetype frameCount =
-        (bytes.size() - sourceParameters.headerOffset) / sourceFrameSize;
+    const qint64 frameCount =
+        (inputSize - sourceParameters.headerOffset) / sourceFrameSize;
     if (frameCount <= 0) return QStringLiteral("RAW/YUV file does not contain a complete frame.");
 
     RawImageParameters targetParameters = sourceParameters;
@@ -429,10 +437,12 @@ QString transformRaw(const QString& path, RawImageParameters sourceParameters,
                                 sourceParameters.size.width(), sourceParameters.size.height(),
                                 *turn);
     const int maximum = sourceParameters.maximumSampleValue();
-    QByteArray output = bytes.left(sourceParameters.headerOffset);
-    for (qsizetype frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
-        const QByteArray frame =
-            bytes.mid(sourceParameters.headerOffset + frameIndex * sourceFrameSize, sourceFrameSize);
+    QSaveFile saved(path);
+    if (!saved.open(QIODevice::WriteOnly)) return saved.errorString();
+    if (const auto error = copyBytes(input, saved, sourceParameters.headerOffset); !error.isEmpty()) return error;
+    for (qint64 frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
+        const QByteArray frame = input.read(sourceFrameSize);
+        if (frame.size() != sourceFrameSize) return QStringLiteral("Unable to read a complete RAW/YUV frame.");
         RawPlanes planes = unpackFrame(frame, sourceParameters);
         const int sw = sourceParameters.size.width();
         const int sh = sourceParameters.size.height();
@@ -453,13 +463,13 @@ QString transformRaw(const QString& path, RawImageParameters sourceParameters,
                                            (tw + 1) / 2, (th + 1) / 2, maximum);
             }
         }
-        output += packFrame(planes, targetParameters);
+        const QByteArray output = packFrame(planes, targetParameters);
+        if (saved.write(output) != output.size()) return saved.errorString();
     }
-    const qsizetype consumed = sourceParameters.headerOffset + frameCount * sourceFrameSize;
-    output += bytes.mid(consumed);
-    QSaveFile saved(path);
-    if (!saved.open(QIODevice::WriteOnly)) return saved.errorString();
-    if (saved.write(output) != output.size() || !saved.commit()) return saved.errorString();
+    if (const auto error = copyBytes(input, saved, inputSize - input.pos()); !error.isEmpty()) return error;
+    // Windows requires closing the original before atomic replacement.
+    input.close();
+    if (!saved.commit()) return saved.errorString();
     RawPresetStore::saveForFile(path, targetParameters);
     QString sidecarError;
     if (!RawPresetStore::saveSidecar(path, targetParameters, &sidecarError)) return sidecarError;
@@ -584,9 +594,9 @@ QString ImageTransformer::restore(const QString& path) {
     if (!source.open(QIODevice::ReadOnly)) return source.errorString();
     QSaveFile destination(path);
     if (!destination.open(QIODevice::WriteOnly)) return destination.errorString();
-    const QByteArray original = source.readAll();
-    if (destination.write(original) != original.size() || !destination.commit())
-        return destination.errorString();
+    if (const auto error = copyBytes(source, destination, source.size()); !error.isEmpty()) return error;
+    source.close();
+    if (!destination.commit()) return destination.errorString();
 
     const QString backupRawSidecar = RawPresetStore::sidecarPath(backupPath(path));
     if (QFileInfo::exists(backupRawSidecar)) {

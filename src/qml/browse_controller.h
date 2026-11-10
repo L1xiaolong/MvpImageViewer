@@ -11,9 +11,11 @@
 #include <QStringList>
 #include <QUrl>
 #include <QVariantList>
+#include <QThreadPool>
 
 #include <memory>
 #include <deque>
+#include <functional>
 
 QT_BEGIN_NAMESPACE
 class QFileSystemWatcher;
@@ -62,6 +64,7 @@ class BrowseController final : public QObject {
     Q_PROPERTY(QString galleryInfoText READ galleryInfoText NOTIFY galleryImageChanged)
     Q_PROPERTY(bool canEditRaw READ canEditRaw NOTIFY selectionChanged)
     Q_PROPERTY(bool canTransform READ canTransform NOTIFY selectionChanged)
+    Q_PROPERTY(bool transformBusy READ transformBusy NOTIFY transformBusyChanged)
     Q_PROPERTY(bool canRestoreSelected READ canRestoreSelected NOTIFY selectionChanged)
     Q_PROPERTY(QSize selectedImageSize READ selectedImageSize NOTIFY selectionChanged)
 
@@ -102,6 +105,7 @@ class BrowseController final : public QObject {
     [[nodiscard]] QString galleryInfoText() const { return galleryInfoText_; }
     [[nodiscard]] bool canEditRaw() const;
     [[nodiscard]] bool canTransform() const;
+    [[nodiscard]] bool transformBusy() const { return transformBusy_; }
     [[nodiscard]] bool canRestoreSelected() const;
     [[nodiscard]] QSize selectedImageSize() const;
     [[nodiscard]] ImageLoader* loader() const { return loader_; }
@@ -187,6 +191,8 @@ class BrowseController final : public QObject {
     void transferConfirmationRequested(bool move, int itemCount,
                                        const QString& targetDirectory);
     void imageTransformed(const QString& path);
+    void transformBusyChanged();
+    void transformFinished(const QString& path, const QString& error);
 
   private:
     void openDirectoryInternal(const QString& path, bool addToHistory,
@@ -202,10 +208,13 @@ class BrowseController final : public QObject {
     [[nodiscard]] QStringList allImagePaths() const;
     void initialize(const QString& initialDirectory, bool startEmpty);
     [[nodiscard]] QString transformSelected(bool clockwise);
+    QString startTransform(const QString& path, std::function<QString()> work);
     void refreshTransformedPath(const QString& path);
     void refreshNativeDrivePlaces();
 
     ImageLoader* loader_ = nullptr;
+    QThreadPool transformPool_;
+    bool transformBusy_ = false;
     DirectoryScanner* scanner_ = nullptr;
     ThumbnailModel* thumbnailModel_ = nullptr;
     ThumbnailFilterProxyModel* filterModel_ = nullptr;

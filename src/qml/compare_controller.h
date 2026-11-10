@@ -93,6 +93,8 @@ class CompareController final : public QObject {
 
   private:
     void requestFrame(int slot, const QString& path);
+    void requestPreview(int slot, const QString& path, quint64 generation, QSize size,
+                        std::optional<RawImageParameters> raw, bool quick);
     void requestFullFrame(int slot, LoadCategory category);
     void requestMetadata(int slot);
     void requestAutomaticFullFrames();
