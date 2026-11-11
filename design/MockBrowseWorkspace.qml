@@ -3,6 +3,7 @@ import QtQuick
 QtObject {
     id: root
     signal transferConfirmationRequested(bool move, int itemCount, string targetDirectory)
+    signal directoryOpenFailed(string path, string message)
 
     // Change this value from 1 through 4 in Design Studio to inspect every
     // production workspace geometry without substituting a design-only page.
@@ -105,7 +106,17 @@ QtObject {
         if (paneIndex < 0 || paneIndex >= paneCount)
             return;
         activatePane(paneIndex);
+        if (!toggle) {
+            for (let index = 0; index < paneCount; ++index)
+                if (index !== paneIndex) panes[index].clearSelection();
+        }
         panes[paneIndex].selectPath(path, extend, toggle);
+        refreshOrdinals();
+    }
+
+    function clearSelection() {
+        for (let index = 0; index < paneCount; ++index)
+            panes[index].clearSelection();
         refreshOrdinals();
     }
 

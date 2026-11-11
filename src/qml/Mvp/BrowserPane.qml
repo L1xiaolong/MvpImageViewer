@@ -253,6 +253,9 @@ Rectangle {
                                 width: recentLocationColumn.width
                                 height: 42
                                 hoverEnabled: true
+                                ToolTip.visible: hovered
+                                ToolTip.delay: 500
+                                ToolTip.text: modelData
 
                                 background: Rectangle {
                                     color: recentLocationButton.hovered || recentLocationButton.activeFocus
@@ -269,7 +272,10 @@ Rectangle {
                                         spacing: 1
                                         Text {
                                             width: parent.width
-                                            text: root.locationLabel(modelData)
+                                            text: root.locationLabel(modelData) +
+                                                  (root.controller.isNetworkPath !== undefined &&
+                                                   root.controller.isNetworkPath(modelData)
+                                                   ? "  · " + qsTr("Network") : "")
                                             elide: Text.ElideRight
                                             color: Theme.graphiteInk
                                             font.family: Theme.uiFont
@@ -487,6 +493,11 @@ Rectangle {
         }
         ThumbnailViewport { view: contactSheet; controller: root.controller }
         delegate: Item {
+            function containsThumbnailPoint(x, y) {
+                const point = thumbnailTile.mapFromItem(contactSheet, x, y)
+                return point.x >= 0 && point.x < thumbnailTile.width &&
+                       point.y >= 0 && point.y < thumbnailTile.height
+            }
             property bool thumbnailDemand: false
             readonly property bool thumbnailReady: thumbnailTile.thumbnailReady
             required property string path
@@ -564,14 +575,14 @@ Rectangle {
                 }
                 const itemIndex = contactSheet.indexAt(mouse.x + contactSheet.contentX,
                                                        mouse.y + contactSheet.contentY)
-                const listBlank = root.displayMode === 1 &&
-                                  mouse.x > Math.min(contactSheet.width - 12, 760)
-                if ((itemIndex < 0 || listBlank) && mouse.button === Qt.RightButton) {
+                const item = contactSheet.itemAtIndex(itemIndex)
+                const blank = !item || !item.containsThumbnailPoint(mouse.x, mouse.y)
+                if (blank && mouse.button === Qt.RightButton) {
                     workspaceMenu.popup(mouse.x, mouse.y)
                     return
                 }
-                if (itemIndex < 0 || listBlank) root.controller.clearSelection()
-                mouse.accepted = listBlank
+                if (blank) root.workspaceController.clearSelection()
+                mouse.accepted = blank
             }
         }
     }

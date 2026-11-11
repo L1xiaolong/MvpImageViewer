@@ -464,7 +464,7 @@ Item {
             wait(120)
             verify(testCapture.save(dialog.contentItem.parent, testArtifactDir + "/fullscreen-en.png"))
             dialog.close()
-            controller.warnings = ["Display color conversion warning. 原始配置文件不可用，当前采用默认色彩空间。"]
+            controller.warnings = ["E:/XAG/项目/M100/相机模组/镜头模组测试/M100相机模组V3性能摸底测试20261108/测试_16_12.yuv: The file contains data of an unknown image type"]
             panel().selectTab(2)
             wait(60)
             verify(testCapture.save(panel(), testArtifactDir + "/warnings.png"))

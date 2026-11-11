@@ -12,6 +12,7 @@
 #include <QUrl>
 #include <QVariantList>
 #include <QThreadPool>
+#include <QElapsedTimer>
 
 #include <memory>
 #include <deque>
@@ -23,6 +24,13 @@ class QTimer;
 QT_END_NAMESPACE
 
 namespace mvpview {
+
+// Network I/O stays off the UI thread. Injectable access also lets regressions
+// simulate an unresponsive redirector without depending on a real network share.
+struct NetworkFolderAccess {
+    std::function<bool(const QString&)> isRemote;
+    std::function<std::optional<QVector<ImageFileRecord>>(const QString&)> read;
+};
 
 class DirectoryScanner;
 class FullScreenWindow;
@@ -70,7 +78,8 @@ class BrowseController final : public QObject {
 
   public:
     BrowseController(std::shared_ptr<const IImageDecoder> decoder,
-                     const QString& initialDirectory = {}, QObject* parent = nullptr);
+                     const QString& initialDirectory = {}, QObject* parent = nullptr,
+                     std::shared_ptr<const NetworkFolderAccess> networkAccess = {});
     BrowseController(ImageLoader* sharedLoader, QFileSystemModel* sharedFileSystemModel,
                      const QString& initialDirectory, bool startEmpty, QObject* parent = nullptr);
     ~BrowseController() override;
@@ -117,6 +126,7 @@ class BrowseController final : public QObject {
     Q_INVOKABLE void openDirectory(const QString& path);
     Q_INVOKABLE void openDirectoryUrl(const QUrl& url);
     Q_INVOKABLE void loadFolderTreeChildren(const QString& path);
+    Q_INVOKABLE bool isNetworkPath(const QString& path) const;
     Q_INVOKABLE QModelIndex folderTreeIndex(const QString& path, const QString& branchPath = {}) const;
     Q_INVOKABLE QAbstractItemModel* folderTreeBranch(const QString& path);
     void restoreInitialDirectoryAsync(const QString& initialDirectory = {});
@@ -193,10 +203,13 @@ class BrowseController final : public QObject {
     void imageTransformed(const QString& path);
     void transformBusyChanged();
     void transformFinished(const QString& path, const QString& error);
+    void directoryOpenFailed(const QString& path, const QString& message);
 
   private:
     void openDirectoryInternal(const QString& path, bool addToHistory,
-                               bool pathAlreadyValidated = false);
+                               bool pathAlreadyValidated = false,
+                               std::optional<QVector<ImageFileRecord>> preparedFiles = std::nullopt);
+    void failNetworkDirectory(bool timedOut);
     void rescanCurrentDirectory();
     void setStatusText(const QString& text);
     void requestGalleryFull();
@@ -235,6 +248,12 @@ class BrowseController final : public QObject {
     QStringList recentFolders_;
     QStringList recentLocations_;
     QVariantList nativeDrivePlaces_;
+    bool nativeDriveRefreshPending_ = false;
+    std::shared_ptr<const NetworkFolderAccess> networkAccess_;
+    QTimer* networkDirectoryTimer_ = nullptr;
+    QElapsedTimer networkRequestElapsed_;
+    QString pendingNetworkPath_;
+    int confirmedHistoryIndex_ = -1;
     QHash<QString, FolderTreeBranchModel*> folderTreeBranches_;
     QStringList selectedPaths_;
     QStringList navigationHistory_;

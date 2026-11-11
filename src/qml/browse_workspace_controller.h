@@ -56,6 +56,7 @@ class BrowseWorkspaceController final : public QObject {
     Q_INVOKABLE void closePane(int index);
     Q_INVOKABLE void selectPath(int paneIndex, const QString& path, bool extend = false,
                                 bool toggle = false);
+    Q_INVOKABLE void clearSelection();
     Q_INVOKABLE void setActiveDisplayMode(int mode);
     Q_INVOKABLE void compareSelected();
     Q_INVOKABLE void refreshAll();
@@ -69,6 +70,7 @@ class BrowseWorkspaceController final : public QObject {
     void workspaceSelectionChanged();
     void statusTextChanged();
     void compareRequested(const QStringList& paths);
+    void directoryOpenFailed(const QString& path, const QString& message);
     void transferConfirmationRequested(bool move, int itemCount,
                                        const QString& targetDirectory);
 

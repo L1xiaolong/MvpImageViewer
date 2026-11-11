@@ -3,6 +3,7 @@
 #include "io/qt_image_decoder.h"
 #include "core/display_color_space.h"
 #include "io/thumbnail_disk_cache.h"
+#include "io/metadata_reader.h"
 #include <QGuiApplication>
 #include <QTemporaryDir>
 #include <QElapsedTimer>
@@ -180,6 +181,31 @@ int main(int argc, char** argv) {
         REQUIRE(waitFor([&] { return !real.loading() && !real.metadataLoading(); }));
         REQUIRE(real.histogramRevision() > revision);
     }
+    // Match the reported Windows directory structure without touching the user's files.
+    const QString unicodeDirectory = directory.path() + QStringLiteral(
+        "/XAG/项目/M100/相机模组/镜头模组测试/M100相机模组V3性能摸底测试20261108");
+    REQUIRE(QDir().mkpath(unicodeDirectory));
+    const QString unicodeYuv = unicodeDirectory + QStringLiteral("/测试_16_12.yuv");
+    QFile unicodeFile(unicodeYuv);
+    REQUIRE(unicodeFile.open(QIODevice::WriteOnly));
+    REQUIRE(unicodeFile.write(QByteArray(288, '\x40')) == 288);
+    unicodeFile.close();
+    RawImageParameters unicodeParameters;
+    unicodeParameters.size = QSize(16, 12);
+    unicodeParameters.format = RawPixelFormat::NV12;
+    realLoader.setRawParameters(unicodeYuv, unicodeParameters);
+    REQUIRE(load(unicodeYuv));
+    REQUIRE(real.errorText().isEmpty());
+    if (MetadataReader::isAvailable()) {
+        const QString warning = real.warnings().join(QLatin1Char('\n'));
+        REQUIRE(warning.contains(unicodeYuv));
+        REQUIRE(!warning.contains(QChar::ReplacementCharacter));
+    }
+    const QString unicodePng = unicodeDirectory + QStringLiteral("/测试.png");
+    REQUIRE(pixels.save(unicodePng));
+    REQUIRE(load(unicodePng));
+    REQUIRE(real.errorText().isEmpty());
+    REQUIRE(real.warnings().isEmpty());
     QImage gray(16, 12, QImage::Format_Grayscale16); gray.fill(Qt::gray);
     REQUIRE(gray.save(path("gray.png"))); REQUIRE(load(path("gray.png")));
     real.requestHistogram(1);

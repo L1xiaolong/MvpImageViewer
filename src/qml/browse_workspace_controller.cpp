@@ -72,6 +72,8 @@ BrowseController* BrowseWorkspaceController::createPane(const QString& initialDi
 }
 
 void BrowseWorkspaceController::connectPane(BrowseController* pane) {
+    connect(pane, &BrowseController::directoryOpenFailed, this,
+            &BrowseWorkspaceController::directoryOpenFailed);
     connect(pane, &BrowseController::selectionChanged, this,
             &BrowseWorkspaceController::recomputeSelection);
     connect(pane, &BrowseController::statusTextChanged, this, [this, pane] {
@@ -181,7 +183,17 @@ void BrowseWorkspaceController::selectPath(int paneIndex, const QString& path, b
                                            bool toggle) {
     if (paneIndex < 0 || paneIndex >= panes_.size() || path.isEmpty()) return;
     activatePane(paneIndex);
+    // Only Ctrl/Command preserves selections in other file managers. Keep the
+    // target pane's anchor intact so Shift can still select a local range.
+    if (!toggle) {
+        for (int index = 0; index < panes_.size(); ++index)
+            if (index != paneIndex) panes_.at(index)->clearSelection();
+    }
     panes_.at(paneIndex)->selectPath(path, extend, toggle);
+}
+
+void BrowseWorkspaceController::clearSelection() {
+    for (BrowseController* pane : panes_) pane->clearSelection();
 }
 
 void BrowseWorkspaceController::setActiveDisplayMode(int mode) {

@@ -49,6 +49,25 @@ add_test(NAME browse_restore_regression COMMAND browse_restore_regression)
 set_tests_properties(browse_restore_regression PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(workspace_selection_regression workspace_selection_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/browse_workspace_controller.cpp)
+target_link_libraries(workspace_selection_regression PRIVATE
+    mvpview_browser_backend mvpview_platform mvpview_io Qt6::Quick)
+mvpview_enable_warnings(workspace_selection_regression)
+add_test(NAME workspace_selection_regression COMMAND workspace_selection_regression)
+set_tests_properties(workspace_selection_regression PROPERTIES TIMEOUT 30
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(network_folder_regression network_folder_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp)
+target_link_libraries(network_folder_regression PRIVATE
+    mvpview_browser_backend mvpview_platform mvpview_io Qt6::Quick)
+mvpview_enable_warnings(network_folder_regression)
+add_test(NAME network_folder_regression COMMAND network_folder_regression)
+set_tests_properties(network_folder_regression PROPERTIES TIMEOUT 30
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(performance_paths_regression performance_paths_regression.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp)
 target_link_libraries(performance_paths_regression PRIVATE
@@ -67,6 +86,18 @@ set_tests_properties(thumbnail_response_regression PROPERTIES TIMEOUT 30
 
 # Exercise the real settings QML and AppSettings with a temporary QSettings store.
 find_package(Qt6 6.9 REQUIRED COMPONENTS QuickTest)
+add_executable(folder_navigation_ui_regression folder_navigation_ui_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/browse_workspace_controller.cpp)
+target_link_libraries(folder_navigation_ui_regression PRIVATE
+    mvpview_browser_backend mvpview_platform mvpview_io Qt6::QuickTest Qt6::QuickControls2)
+target_compile_definitions(folder_navigation_ui_regression PRIVATE
+    QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/folder-navigation-qml")
+mvpview_enable_warnings(folder_navigation_ui_regression)
+add_test(NAME folder_navigation_ui_regression COMMAND folder_navigation_ui_regression -o -,txt)
+set_tests_properties(folder_navigation_ui_regression PROPERTIES TIMEOUT 60
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+
 add_executable(settings_ui_regression settings_ui_regression.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/app_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/app_settings.h)

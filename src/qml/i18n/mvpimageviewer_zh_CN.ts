@@ -480,6 +480,10 @@ Choose another folder or drop images here</source>
         <source>Paste into folder</source>
         <translation type="vanished">粘贴到文件夹</translation>
     </message>
+    <message>
+        <source>Network</source>
+        <translation>网络</translation>
+    </message>
 </context>
 <context>
     <name>ComparePage</name>
@@ -902,6 +906,10 @@ Choose another folder or drop images here</source>
         <location filename="../Mvp/FolderNavigator.qml" line="284"/>
         <source>Locations</source>
         <translation>位置</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>网络</translation>
     </message>
 </context>
 <context>
@@ -2235,12 +2243,26 @@ Choose another folder or drop images here</source>
     <name>mvpview::BrowseController</name>
     <message>
         <source>Connecting to network folder…</source>
-        <translation type="vanished">正在连接网络文件夹…</translation>
+        <translation>正在连接网络文件夹…</translation>
     </message>
     <message>
         <location filename="../browse_controller.cpp" line="1310"/>
         <source>Network folder is unavailable: %1</source>
         <translation>网络文件夹不可用：%1</translation>
+    </message>
+    <message>
+        <source>Local disk (%1:)</source>
+        <translation>本地磁盘 (%1:)</translation>
+    </message>
+    <message>
+        <source>Network drive (%1:)</source>
+        <translation>网络驱动器 (%1:)</translation>
+    </message>
+    <message>
+        <source>Opening the network folder timed out after 10 seconds: %1
+Returned to the previous folder.</source>
+        <translation>打开网络文件夹超过 10 秒：%1
+已返回上一次正常打开的文件夹。</translation>
     </message>
 </context>
 <context>

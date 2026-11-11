@@ -193,6 +193,7 @@ Rectangle {
                         x: 12; y: 12
                         width: parent.width - 24
                         text: parent.modelData
+                        textFormat: Text.PlainText
                         wrapMode: Text.WrapAnywhere
                         font.family: Theme.uiFont
                         font.pixelSize: 12

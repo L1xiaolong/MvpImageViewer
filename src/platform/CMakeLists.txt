@@ -15,7 +15,7 @@ if(APPLE)
 endif()
 
 if(WIN32)
-    target_link_libraries(mvpview_platform PRIVATE user32)
+    target_link_libraries(mvpview_platform PRIVATE user32 mpr)
 endif()
 
 target_include_directories(mvpview_platform PUBLIC ${PROJECT_SOURCE_DIR}/src)

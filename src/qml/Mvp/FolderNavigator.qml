@@ -65,7 +65,9 @@ Rectangle {
             const path = String(recent[index])
             const key = root.platformName === "windows" ? path.toLowerCase() : path
             if (!seen[key]) {
-                entries.push({ label: root.pathLabel(path), path: path, kind: "recent" })
+                entries.push({ label: root.pathLabel(path), path: path, kind: "recent",
+                               remote: root.controller.isNetworkPath !== undefined &&
+                                       root.controller.isNetworkPath(path) })
                 seen[key] = true
             }
         }
@@ -111,7 +113,10 @@ Rectangle {
     Component.onCompleted: syncDrivePlaces()
     onPlatformNameChanged: syncDrivePlaces()
     onBrowsingEnabledChanged: syncDrivePlaces()
-    onControllerChanged: syncDrivePlaces()
+    onControllerChanged: {
+        syncDrivePlaces()
+        Qt.callLater(revealActivePath)
+    }
 
     Connections {
         target: root.controller
@@ -133,6 +138,21 @@ Rectangle {
         expandedDrives = state
     }
 
+    signal activePathChanged()
+    function revealActivePath() {
+        const state = ({})
+        const places = root.controller.nativeDrivePlaces || []
+        for (const place of places)
+            state[place.path] = root.belongsTo(root.controller.currentDirectory, place.path)
+        expandedDrives = state
+        activePathChanged()
+    }
+
+    Connections {
+        target: root.controller
+        function onCurrentDirectoryChanged() { root.revealActivePath() }
+    }
+
     component SidebarPlace: Rectangle {
         required property var entry
 
@@ -144,6 +164,10 @@ Rectangle {
             ? root.controller.currentDirectory.toLowerCase().startsWith(
                   String(entry.path).toLowerCase())
             : String(entry.path) === root.controller.currentDirectory
+
+        ToolTip.visible: sidebarPlaceMouse.containsMouse
+        ToolTip.delay: 500
+        ToolTip.text: String(entry.path)
 
         Rectangle {
             anchors.fill: parent
@@ -170,10 +194,11 @@ Rectangle {
         }
 
         Text {
+            objectName: "sidebarPlaceLabel-" + parent.entry.path
             x: root.macStyle ? 40 : parent.entry.kind === "drive" ? 51 : 46
             width: Math.max(0, parent.width - x - 12)
             anchors.verticalCenter: parent.verticalCenter
-            text: parent.entry.label
+            text: parent.entry.label + (parent.entry.remote ? "  · " + qsTr("Network") : "")
             elide: Text.ElideMiddle
             color: parent.selected && root.macStyle ? "white" : root.sidebarText
             font.family: root.nativeFont
@@ -309,8 +334,8 @@ Rectangle {
                             revealDrive()
                     }
                     Connections {
-                        target: root.controller
-                        function onCurrentDirectoryChanged() { driveBranch.revealDrive() }
+                        target: root
+                        function onActivePathChanged() { driveBranch.revealDrive() }
                     }
 
                     SidebarPlace {
@@ -367,12 +392,23 @@ Rectangle {
         Layout.fillWidth: true
         property string drivePath: ""
         property bool pendingReveal: true
+        property bool collapseBeforeReveal: true
         implicitHeight: rows * root.itemHeight
         interactive: false
         model: drivePath.length > 0 && !root.designMode
                ? root.controller.folderTreeBranch(drivePath) : root.controller.folderTree
         rootIndex: root.designMode || drivePath.length > 0
                    ? undefined : root.controller.folderRootIndex
+
+        function requestReveal() {
+            pendingReveal = true
+            Qt.callLater(revealCurrentFolder)
+        }
+
+        function resetToCurrentPath() {
+            collapseBeforeReveal = true
+            requestReveal()
+        }
 
         function revealCurrentFolder() {
             if (!pendingReveal || root.designMode || !visible
@@ -383,6 +419,10 @@ Rectangle {
             const currentIndex = drivePath.length > 0
                     ? root.controller.folderTreeIndex(root.controller.currentDirectory, drivePath)
                     : root.controller.currentFolderTreeIndex
+            if (collapseBeforeReveal) {
+                collapseRecursively()
+                collapseBeforeReveal = false
+            }
             expandToIndex(currentIndex)
             if ((drivePath.length > 0
                  && root.belongsTo(drivePath, root.controller.currentDirectory))
@@ -392,10 +432,19 @@ Rectangle {
 
         Connections {
             target: root.controller
-            function onCurrentDirectoryChanged() {
-                folderTree.pendingReveal = true
-                Qt.callLater(folderTree.revealCurrentFolder)
-            }
+            function onCurrentDirectoryChanged() { folderTree.resetToCurrentPath() }
+        }
+        Connections {
+            target: root
+            function onActivePathChanged() { folderTree.resetToCurrentPath() }
+        }
+        // Each pane owns a branch proxy. Swapping it resets TreeView's expanded
+        // rows even when both panes share the same underlying filesystem model.
+        onModelChanged: requestReveal()
+        onRootIndexChanged: requestReveal()
+        Connections {
+            target: folderTree.model
+            function onModelReset() { folderTree.requestReveal() }
         }
         Connections {
             target: root.designMode ? null : root.controller.folderTree

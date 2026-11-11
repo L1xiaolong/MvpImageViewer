@@ -71,6 +71,16 @@ QString sanitized(QString text, qsizetype maximumLength = kMaximumTextLength) {
     return text.trimmed().left(maximumLength);
 }
 
+QString metadataErrorText(const char* message) {
+#ifdef Q_OS_WIN
+    // Exiv2's narrow FileIo path (QFile::encodeName above) and CRT error
+    // messages use the Windows local code page. Metadata tag values remain UTF-8.
+    return QString::fromLocal8Bit(message);
+#else
+    return QString::fromUtf8(message);
+#endif
+}
+
 QString textFrom(const Exiv2::Metadatum& datum) {
     try {
         return sanitized(QString::fromUtf8(datum.toString()));
@@ -381,10 +391,10 @@ void MetadataReader::enrich(const QString& path, ImageMetadata& metadata) {
         mapDescription(exif, iptc, xmp, metadata);
     } catch (const Exiv2::Error& error) {
         metadata.metadataWarning =
-            sanitized(QString::fromUtf8(error.what()), kMaximumWarningLength);
+            sanitized(metadataErrorText(error.what()), kMaximumWarningLength);
     } catch (const std::exception& error) {
         metadata.metadataWarning =
-            sanitized(QString::fromUtf8(error.what()), kMaximumWarningLength);
+            sanitized(metadataErrorText(error.what()), kMaximumWarningLength);
     } catch (...) {
         metadata.metadataWarning = QStringLiteral("Unknown metadata parsing error");
     }

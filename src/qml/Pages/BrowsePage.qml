@@ -64,6 +64,7 @@ Rectangle {
                                                        !renameDialog.visible &&
                                                        !trashDialog.visible &&
                                                        !transferDialog.visible &&
+                                                       !directoryErrorDialog.visible &&
                                                        !folderPicker.visible
     readonly property bool fileShortcutsEnabled: (workspaceController.hasActivePane === undefined ||
                                                   workspaceController.hasActivePane) &&
@@ -1260,7 +1261,7 @@ Rectangle {
                         const point = mapToItem(root, mouse.x, mouse.y);
                         workspaceContextMenu.popup(point.x, point.y);
                     } else {
-                        root.controller.clearSelection();
+                        root.workspaceController.clearSelection();
                     }
                 }
             }
@@ -1533,6 +1534,12 @@ Rectangle {
     }
 
     AppConfirmDialog {
+        id: directoryErrorDialog
+        objectName: "directoryErrorDialog"
+        parent: root
+    }
+
+    AppConfirmDialog {
         id: trashDialog
         objectName: "trashConfirmationDialog"
         parent: root
@@ -1669,6 +1676,11 @@ Rectangle {
     Connections {
         target: root.workspaceController
         ignoreUnknownSignals: true
+
+        function onDirectoryOpenFailed(path, message) {
+            directoryErrorDialog.showConfirmation()
+            directoryErrorDialog.complete(message)
+        }
 
         function onTransferConfirmationRequested(move, itemCount, targetDirectory) {
             transferDialog.dialogTitle = move ? qsTr("Move items?") : qsTr("Copy items?")

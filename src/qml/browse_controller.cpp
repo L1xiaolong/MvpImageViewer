@@ -40,6 +40,7 @@
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
+#include <winnetwk.h>
 #endif
 
 namespace mvpview {
@@ -101,12 +102,41 @@ QString startupFallbackDirectory() {
     return QDir::homePath();
 #endif
 }
+
+std::shared_ptr<const NetworkFolderAccess> defaultNetworkFolderAccess() {
+    auto access = std::make_shared<NetworkFolderAccess>();
+    access->isRemote = [](const QString& path) {
+#ifdef Q_OS_WIN
+        return isWindowsRemotePath(path);
+#else
+        Q_UNUSED(path);
+        return false;
+#endif
+    };
+    access->read = [](const QString& path) -> std::optional<QVector<ImageFileRecord>> {
+        const QFileInfo info(path);
+        if (!info.exists() || !info.isDir() || !info.isReadable() ||
+            !DirectoryScanner::isBrowsableEntry(info)) return std::nullopt;
+#ifdef Q_OS_WIN
+        // An empty share is valid; a redirector/access error is not an empty folder.
+        const QString pattern = QDir::toNativeSeparators(QDir(path).filePath(QStringLiteral("*")));
+        WIN32_FIND_DATAW data{};
+        const HANDLE handle = FindFirstFileW(reinterpret_cast<LPCWSTR>(pattern.utf16()), &data);
+        if (handle == INVALID_HANDLE_VALUE) {
+            if (GetLastError() != ERROR_FILE_NOT_FOUND) return std::nullopt;
+        } else FindClose(handle);
+#endif
+        return DirectoryScanner::scan(path);
+    };
+    return access;
+}
 }
 
 BrowseController::BrowseController(std::shared_ptr<const IImageDecoder> decoder,
-                                   const QString& initialDirectory, QObject* parent)
+                                   const QString& initialDirectory, QObject* parent,
+                                   std::shared_ptr<const NetworkFolderAccess> networkAccess)
     : QObject(parent), loader_(new ImageLoader(std::move(decoder), this)),
-      fileSystemModel_(new QFileSystemModel(this)) {
+      fileSystemModel_(new QFileSystemModel(this)), networkAccess_(std::move(networkAccess)) {
     initialize(initialDirectory, false);
 }
 
@@ -121,6 +151,13 @@ BrowseController::BrowseController(ImageLoader* sharedLoader,
 }
 
 void BrowseController::initialize(const QString& initialDirectory, bool startEmpty) {
+    if (!networkAccess_) networkAccess_ = defaultNetworkFolderAccess();
+    networkDirectoryTimer_ = new QTimer(this);
+    networkDirectoryTimer_->setObjectName(QStringLiteral("networkDirectoryTimer"));
+    networkDirectoryTimer_->setSingleShot(true);
+    networkDirectoryTimer_->setTimerType(Qt::PreciseTimer);
+    networkDirectoryTimer_->setInterval(10000);
+    connect(networkDirectoryTimer_, &QTimer::timeout, this, [this] { failNetworkDirectory(true); });
     transformObservers.insert(this);
     transformPool_.setMaxThreadCount(1);
     transformPool_.setExpiryTimeout(10'000);
@@ -379,7 +416,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
             settings.value(QStringLiteral("browser/lastDirectory"), QDir::homePath()).toString();
         // A removable drive or project folder may have disappeared since the previous run.
         // Fall back quietly to a safe local directory instead of opening to an error state.
-        if (!QFileInfo(startupDirectory).isDir()) {
+        if (!networkAccess_->isRemote(startupDirectory) && !QFileInfo(startupDirectory).isDir()) {
             startupDirectory = startupFallbackDirectory();
         }
     }
@@ -441,6 +478,10 @@ void BrowseController::loadFolderTreeChildren(const QString& path) {
     if (fileSystemModel_->canFetchMore(directoryIndex)) {
         fileSystemModel_->fetchMore(directoryIndex);
     }
+}
+
+bool BrowseController::isNetworkPath(const QString& path) const {
+    return networkAccess_->isRemote(path);
 }
 
 QString BrowseController::currentFolderName() const {
@@ -527,7 +568,7 @@ void BrowseController::openDirectoryUrl(const QUrl& url) {
 QVariantList BrowseController::nativeSidebarPlaces() const {
     QVariantList places;
     QSet<QString> seenPaths;
-    const auto appendPlace = [&places, &seenPaths](const QString& label, const QString& path,
+    const auto appendPlace = [this, &places, &seenPaths](const QString& label, const QString& path,
                                                    const QString& kind) {
         if (path.isEmpty()) return;
         const QString cleanPath = QDir::cleanPath(path);
@@ -541,6 +582,7 @@ QVariantList BrowseController::nativeSidebarPlaces() const {
         QVariantMap place{{QStringLiteral("label"), label},
                           {QStringLiteral("path"), cleanPath},
                           {QStringLiteral("kind"), kind}};
+        place.insert(QStringLiteral("remote"), isNetworkPath(cleanPath));
 #ifdef Q_OS_WIN
         place.insert(QStringLiteral("icon"),
                      QStringLiteral("image://system-folder/%1")
@@ -597,15 +639,75 @@ void BrowseController::refreshNativeDrivePlaces() {
         const QString path = QStringLiteral("%1:/").arg(letter);
         const QString nativeRoot = QDir::toNativeSeparators(path);
         const UINT type = GetDriveTypeW(reinterpret_cast<LPCWSTR>(nativeRoot.utf16()));
-        drives.append(QVariantMap{{QStringLiteral("label"), QStringLiteral("%1:").arg(letter)},
+        QString label = type == DRIVE_REMOTE ? tr("Network drive (%1:)").arg(letter)
+                                             : tr("Local disk (%1:)").arg(letter);
+        for (const QVariant& previous : std::as_const(nativeDrivePlaces_)) {
+            const auto place = previous.toMap();
+            if (place.value(QStringLiteral("path")) == path &&
+                place.value(QStringLiteral("remote")).toBool() == (type == DRIVE_REMOTE))
+                label = place.value(QStringLiteral("label")).toString();
+        }
+        drives.append(QVariantMap{{QStringLiteral("label"), label},
                                   {QStringLiteral("path"), path},
                                   {QStringLiteral("kind"), QStringLiteral("drive")},
                                   {QStringLiteral("remote"), type == DRIVE_REMOTE}});
     }
 #endif
-    if (drives == nativeDrivePlaces_) return;
-    nativeDrivePlaces_ = std::move(drives);
-    emit nativeDrivePlacesChanged();
+    if (drives != nativeDrivePlaces_) {
+        nativeDrivePlaces_ = drives;
+        emit nativeDrivePlacesChanged();
+    }
+#ifdef Q_OS_WIN
+    if (nativeDriveRefreshPending_) return;
+    nativeDriveRefreshPending_ = true;
+    const QPointer<BrowseController> self(this);
+    std::thread([self, drives = std::move(drives)]() mutable {
+        SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX, nullptr);
+        for (QVariant& value : drives) {
+            auto place = value.toMap();
+            const QString path = place.value(QStringLiteral("path")).toString();
+            const QString native = QDir::toNativeSeparators(path);
+            QString name;
+            if (place.value(QStringLiteral("remote")).toBool()) {
+                wchar_t target[32768]{};
+                DWORD size = 32768;
+                const QString letter = path.left(2);
+                if (WNetGetConnectionW(reinterpret_cast<LPCWSTR>(letter.utf16()), target, &size) == NO_ERROR)
+                    name = QString::fromWCharArray(target);
+            } else {
+                const UINT type = GetDriveTypeW(reinterpret_cast<LPCWSTR>(native.utf16()));
+                wchar_t volume[MAX_PATH + 1]{};
+                if ((type == DRIVE_FIXED || type == DRIVE_REMOVABLE) &&
+                    GetVolumeInformationW(reinterpret_cast<LPCWSTR>(native.utf16()), volume,
+                                          MAX_PATH + 1, nullptr, nullptr, nullptr, nullptr, 0))
+                    name = QString::fromWCharArray(volume);
+            }
+            if (!name.isEmpty()) place[QStringLiteral("label")] =
+                QStringLiteral("%1 (%2)").arg(name, path.left(2));
+            value = place;
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self, [self, drives] {
+            if (!self) return;
+            self->nativeDriveRefreshPending_ = false;
+            bool changed = false;
+            for (QVariant& value : self->nativeDrivePlaces_) {
+                auto place = value.toMap();
+                for (const QVariant& result : drives) {
+                    const auto named = result.toMap();
+                    if (place.value(QStringLiteral("path")) == named.value(QStringLiteral("path")) &&
+                        place.value(QStringLiteral("remote")) == named.value(QStringLiteral("remote")) &&
+                        place.value(QStringLiteral("label")) != named.value(QStringLiteral("label"))) {
+                        place[QStringLiteral("label")] = named.value(QStringLiteral("label"));
+                        value = place;
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) emit self->nativeDrivePlacesChanged();
+        }, Qt::QueuedConnection);
+    }).detach();
+#endif
 }
 
 void BrowseController::restoreInitialDirectoryAsync(const QString& initialDirectory) {
@@ -613,6 +715,10 @@ void BrowseController::restoreInitialDirectoryAsync(const QString& initialDirect
     if (startupDirectory.isEmpty()) {
         startupDirectory =
             QSettings().value(QStringLiteral("browser/lastDirectory"), QDir::homePath()).toString();
+    }
+    if (networkAccess_->isRemote(startupDirectory)) {
+        openDirectoryInternal(startupDirectory, true);
+        return;
     }
     const quint64 requestGeneration = ++directoryRequestGeneration_;
     setStatusText(QStringLiteral("Restoring the previous folder…"));
@@ -637,21 +743,6 @@ void BrowseController::restoreInitialDirectoryAsync(const QString& initialDirect
             },
             Qt::QueuedConnection);
     };
-#ifdef Q_OS_WIN
-    // QFileInfo::isDir() may wait for the Windows network redirector timeout when the saved path
-    // is on an offline mapped drive. A detached validation thread lets the application remain
-    // interactive and cannot delay process shutdown if that OS call is still pending.
-    if (isWindowsRemotePath(startupDirectory)) {
-        QTimer::singleShot(1500, this, [this, requestGeneration] {
-            if (directoryRequestGeneration_ != requestGeneration || !currentDirectory_.isEmpty())
-                return;
-            ++directoryRequestGeneration_;
-            openDirectoryInternal(startupFallbackDirectory(), true, true);
-        });
-        std::thread(std::move(restore)).detach();
-        return;
-    }
-#endif
     QThreadPool::globalInstance()->start(std::move(restore), 100);
 }
 
@@ -705,12 +796,10 @@ QString BrowseController::navigateToTypedPath(const QString& path) {
         candidate = QDir(base).absoluteFilePath(candidate);
     }
 
-#ifdef Q_OS_WIN
-    if (isWindowsRemotePath(candidate)) {
+    if (networkAccess_->isRemote(candidate)) {
         openDirectoryInternal(QDir::cleanPath(candidate), true);
         return {};
     }
-#endif
     const QFileInfo info(QDir::cleanPath(candidate));
     if (!info.exists())
         return QStringLiteral("Folder does not exist: %1").arg(QDir::toNativeSeparators(candidate));
@@ -733,7 +822,12 @@ void BrowseController::clearRecentLocations() {
 }
 
 void BrowseController::activatePath(const QString& path) {
-    if (QFileInfo(path).isDir()) {
+    const auto& files = thumbnailModel_->files();
+    const auto entry = std::find_if(files.cbegin(), files.cend(),
+                                   [&path](const auto& file) { return file.path == path; });
+    const bool directory = entry != files.cend() ? entry->isDirectory
+        : networkAccess_->isRemote(path) ? !hasSupportedImageSuffix(path) : QFileInfo(path).isDir();
+    if (directory) {
         openDirectoryInternal(path, true);
         return;
     }
@@ -743,7 +837,7 @@ void BrowseController::activatePath(const QString& path) {
 
 void BrowseController::activateTreeItem(const QString& path) {
     if (path.isEmpty()) return;
-    if (QFileInfo(path).isDir()) {
+    if (networkAccess_->isRemote(path) ? !hasSupportedImageSuffix(path) : QFileInfo(path).isDir()) {
         openDirectoryInternal(path, true);
         return;
     }
@@ -1346,43 +1440,58 @@ void BrowseController::setGridCellWidth(int width) {
     emit gridCellWidthChanged();
 }
 
+void BrowseController::failNetworkDirectory(bool timedOut) {
+    if (pendingNetworkPath_.isEmpty()) return;
+    const QString path = std::exchange(pendingNetworkPath_, {});
+    networkDirectoryTimer_->stop();
+    ++directoryRequestGeneration_; // Discard any late redirector result.
+    navigationHistoryIndex_ = confirmedHistoryIndex_;
+    pendingActivationPath_.clear();
+    if (currentDirectory_.isEmpty()) openDirectoryInternal(startupFallbackDirectory(), true, true);
+    emit navigationStateChanged();
+    const QString message = timedOut
+        ? tr("Opening the network folder timed out after 10 seconds: %1\nReturned to the previous folder.").arg(path)
+        : tr("Network folder is unavailable: %1").arg(path);
+    setStatusText(message);
+    emit directoryOpenFailed(path, message);
+}
+
 void BrowseController::openDirectoryInternal(const QString& path, bool addToHistory,
-                                             bool pathAlreadyValidated) {
-#ifdef Q_OS_WIN
-    if (!pathAlreadyValidated && isWindowsRemotePath(path)) {
-        const quint64 requestGeneration = ++directoryRequestGeneration_;
+                                             bool pathAlreadyValidated,
+                                             std::optional<QVector<ImageFileRecord>> preparedFiles) {
+    networkDirectoryTimer_->stop();
+    pendingNetworkPath_.clear();
+    const quint64 requestGeneration = ++directoryRequestGeneration_;
+    if (!pathAlreadyValidated && networkAccess_->isRemote(path)) {
+        pendingNetworkPath_ = path;
+        networkRequestElapsed_.start();
+        networkDirectoryTimer_->start();
         setStatusText(tr("Connecting to network folder…"));
-        QTimer::singleShot(5000, this, [this, path, requestGeneration] {
-            if (directoryRequestGeneration_ != requestGeneration) return;
-            ++directoryRequestGeneration_;
-            setStatusText(tr("Network folder is unavailable: %1").arg(path));
-        });
         const QPointer<BrowseController> self(this);
-        std::thread([self, path, addToHistory, requestGeneration] {
-            const QFileInfo info(path);
-            const bool browsable = info.exists() && info.isDir()
-                && DirectoryScanner::isBrowsableEntry(info);
+        const auto readNetwork = networkAccess_->read;
+        std::thread([self, readNetwork, path, addToHistory, requestGeneration] {
+            std::optional<QVector<ImageFileRecord>> files;
+            try { files = readNetwork(path); }
+            catch (const std::exception&) { /* Report through the same failure path. */ }
             if (!self) return;
             QMetaObject::invokeMethod(
                 self,
-                [self, path, addToHistory, requestGeneration, browsable] {
+                [self, path, addToHistory, requestGeneration, files = std::move(files)]() mutable {
                     if (!self || self->directoryRequestGeneration_ != requestGeneration) return;
-                    if (!browsable) {
-                        self->setStatusText(
-                            QCoreApplication::translate(
-                                "mvpview::BrowseController",
-                                "Network folder is unavailable: %1")
-                                .arg(path));
+                    if (self->networkRequestElapsed_.elapsed() >= 10000) {
+                        self->failNetworkDirectory(true);
                         return;
                     }
-                    self->openDirectoryInternal(path, addToHistory, true);
+                    if (!files) {
+                        self->failNetworkDirectory(false);
+                        return;
+                    }
+                    self->openDirectoryInternal(path, addToHistory, true, std::move(files));
                 },
                 Qt::QueuedConnection);
         }).detach();
         return;
     }
-#endif
-    ++directoryRequestGeneration_;
     const QFileInfo info(path);
     if (!pathAlreadyValidated &&
         (!info.exists() || !info.isDir() || !DirectoryScanner::isBrowsableEntry(info))) {
@@ -1445,7 +1554,15 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     thumbnailModel_->setFiles({});
     incrementalScan_ = true;
     setStatusText(QStringLiteral("Scanning %1…").arg(QDir::toNativeSeparators(currentDirectory_)));
-    scanGeneration_ = scanner_->scanAsync(currentDirectory_);
+    confirmedHistoryIndex_ = navigationHistoryIndex_;
+    if (preparedFiles) {
+        scanner_->cancel();
+        ++scanGeneration_; // Invalidate batches from the previous folder.
+        thumbnailModel_->setFiles(*preparedFiles);
+        emit scanner_->scanFinished(currentDirectory_, *preparedFiles, scanGeneration_);
+    } else {
+        scanGeneration_ = scanner_->scanAsync(currentDirectory_);
+    }
 }
 
 void BrowseController::rescanCurrentDirectory() {
