@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/raw_plane_access.h"
+#include "core/histogram_sampling.h"
 
 #include <QRect>
 #include <QRectF>
@@ -50,7 +51,7 @@ class RawPlaneHistogramAnalyzer final {
   public:
     // The cap is applied independently to each engineering channel. Chroma and Bayer channels
     // have different native sample grids, so a single total-pixel count would hide that fact.
-    static constexpr qint64 kDefaultMaximumSamplesPerChannel = std::numeric_limits<qint64>::max();
+    static constexpr qint64 kDefaultMaximumSamplesPerChannel = detail::kHistogramMaximumSamples;
 
     [[nodiscard]] static RawPlaneHistogram
     analyze(const ImageFrame& frame,

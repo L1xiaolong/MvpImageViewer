@@ -7,6 +7,7 @@ qt_add_library(mvpview_core STATIC
     display_color_space.cpp
     display_histogram.h
     display_histogram.cpp
+    histogram_sampling.h
     comparison_pixel_probe.h
     comparison_pixel_probe.cpp
     image_types.h
@@ -18,6 +19,7 @@ qt_add_library(mvpview_core STATIC
     raw_plane_access.cpp
     raw_plane_histogram.h
     raw_plane_histogram.cpp
+    yuv_plane_view.h
     view_state.h
     view_state.cpp
     sync_group.h

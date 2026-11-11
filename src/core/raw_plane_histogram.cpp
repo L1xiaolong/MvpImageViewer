@@ -1,4 +1,5 @@
 #include "core/raw_plane_histogram.h"
+#include "core/yuv_plane_view.h"
 
 #include <algorithm>
 #include <cmath>
@@ -50,23 +51,6 @@ QRect sourceRegionForDisplayRegion(const QRect& displayRegion,
                                           : QRect{};
 }
 
-QPair<int, int> gridSampleCounts(int width, int height, qint64 maximumSamples) {
-    if (width <= 0 || height <= 0 || maximumSamples <= 0) {
-        return {0, 0};
-    }
-    const qint64 available = static_cast<qint64>(width) * height;
-    if (available <= maximumSamples) {
-        return {width, height};
-    }
-
-    const int maximumRows = static_cast<int>(std::min<qint64>(height, maximumSamples));
-    const double idealRows = std::sqrt(static_cast<double>(maximumSamples) * height / width);
-    const int rows = std::clamp(static_cast<int>(std::floor(idealRows)), 1, maximumRows);
-    const int columns = static_cast<int>(
-        std::clamp(maximumSamples / rows, qint64{1}, static_cast<qint64>(width)));
-    return {columns, rows};
-}
-
 void addSample(ChannelAccumulator& accumulator, int value) {
     if (value < 0 || accumulator.channel.bins.isEmpty()) {
         return;
@@ -115,17 +99,12 @@ void sampleGrid(const QRect& region, qint64 maximumSamples, const std::function<
         return;
     }
     const auto [sampleColumns, sampleRows] =
-        gridSampleCounts(region.width(), region.height(), maximumSamples);
+        detail::histogramGridCounts(region.width(), region.height(), maximumSamples);
     for (int rowIndex = 0; rowIndex < sampleRows; ++rowIndex) {
         if (cancelled && cancelled()) return;
-        const int y = region.top() +
-                      static_cast<int>(static_cast<qint64>(rowIndex) * region.height() /
-                                       sampleRows);
         for (int columnIndex = 0; columnIndex < sampleColumns; ++columnIndex) {
-            const int x = region.left() +
-                          static_cast<int>(static_cast<qint64>(columnIndex) * region.width() /
-                                           sampleColumns);
-            callback(QPoint(x, y));
+            callback(detail::histogramSamplePoint(region, columnIndex, rowIndex,
+                                                  sampleColumns, sampleRows));
         }
     }
 }
@@ -172,15 +151,14 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
     result.maximumValue = maximumValue;
 
     if (parameters.isYuv()) {
+        const detail::YuvPlaneView planes(frame);
         ChannelAccumulator y = makeAccumulator(RawHistogramChannelId::Y, maximumValue);
         ChannelAccumulator u = makeAccumulator(RawHistogramChannelId::U, maximumValue);
         ChannelAccumulator v = makeAccumulator(RawHistogramChannelId::V, maximumValue);
         y.channel.availableSampleCount =
             static_cast<qint64>(result.sourceRegion.width()) * result.sourceRegion.height();
         sampleGrid(result.sourceRegion, maximumSamplesPerChannel, cancelled, [&](const QPoint& point) {
-            if (const auto sample = accessor.yuvAtSourcePixel(point)) {
-                addSample(y, sample->y);
-            }
+            addSample(y, planes.luma(point.x(), point.y()));
         });
 
         const int chromaLeft = result.sourceRegion.left() / 2;
@@ -193,12 +171,11 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
             static_cast<qint64>(chromaRegion.width()) * chromaRegion.height();
         v.channel.availableSampleCount = u.channel.availableSampleCount;
         sampleGrid(chromaRegion, maximumSamplesPerChannel, cancelled, [&](const QPoint& chromaPoint) {
-            const QPoint sourcePoint(chromaPoint.x() * 2, chromaPoint.y() * 2);
-            if (const auto sample = accessor.yuvAtSourcePixel(sourcePoint)) {
-                addSample(u, sample->u);
-                addSample(v, sample->v);
-            }
+            const auto sample = planes.chroma(chromaPoint.x(), chromaPoint.y());
+            addSample(u, sample[0]);
+            addSample(v, sample[1]);
         });
+        if (cancelled && cancelled()) return {};
         finishChannel(y);
         finishChannel(u);
         finishChannel(v);
@@ -245,8 +222,8 @@ RawPlaneHistogram analyzeRegionImpl(const ImageFrame& frame, const QRectF& norma
                                    grids.constFirst().rows;
         for (qint64 sampleIndex = 0; sampleIndex < target; ++sampleIndex) {
             if ((sampleIndex % 4096) == 0 && cancelled && cancelled()) return {};
-            const qint64 ordinal =
-                (sampleIndex + 1) * accumulator.channel.availableSampleCount / target - 1;
+            const qint64 ordinal = detail::histogramSampleOrdinal(
+                sampleIndex, accumulator.channel.availableSampleCount, target);
             while (ordinal >= gridEnd && gridIndex + 1 < grids.size()) {
                 gridStart = gridEnd;
                 ++gridIndex;

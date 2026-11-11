@@ -1,3 +1,9 @@
+add_executable(histogram_regression histogram_regression.cpp)
+target_link_libraries(histogram_regression PRIVATE mvpview_io)
+mvpview_enable_warnings(histogram_regression)
+add_test(NAME histogram_regression COMMAND histogram_regression)
+set_tests_properties(histogram_regression PROPERTIES TIMEOUT 60)
+
 add_executable(yuv_startup_regression yuv_startup_regression.cpp)
 target_link_libraries(yuv_startup_regression PRIVATE mvpview_io)
 mvpview_enable_warnings(yuv_startup_regression)

@@ -520,8 +520,7 @@ void CompareController::requestHistogram(int slot) {
     const ImageFramePtr frame = frames_.at(slot);
     const QPointer<CompareController> self(this);
     histogramHandles_[slot] = loader_->requestAnalysis([frame](const auto& cancelled) {
-        return displayHistogramMap(DisplayHistogramAnalyzer::analyze(*frame,
-            DisplayHistogramAnalyzer::kDefaultMaximumSamples, cancelled));
+        return displayHistogramMap(DisplayHistogramAnalyzer::analyzeLuma(*frame, cancelled));
     }, [self, slot, generation](QVariantMap result) {
         if (self) self->completeHistogram(slot, generation, std::move(result));
     });

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/image_types.h"
+#include "core/histogram_sampling.h"
 
 #include <QSize>
 #include <QRect>
@@ -45,8 +46,13 @@ struct DisplayHistogram {
 
 class DisplayHistogramAnalyzer final {
   public:
-    // UI statistics are exact. A caller may explicitly request approximate sampling.
-    static constexpr qint64 kDefaultMaximumSamples = std::numeric_limits<qint64>::max();
+    // Bound interactive analysis work. Small images still visit every pixel.
+    static constexpr qint64 kDefaultMaximumSamples = detail::kHistogramMaximumSamples;
+
+    // Display-space luma for comparison overlays; RGB channels remain empty.
+    [[nodiscard]] static DisplayHistogram analyzeLuma(
+        const ImageFrame& frame, const std::function<bool()>& cancelled = {},
+        qint64 maximumSamples = kDefaultMaximumSamples);
 
     // Decoded RGB code values, preserving 16-bit precision (before histogram normalization).
     [[nodiscard]] static DisplayHistogram analyzeNativeRgb(const ImageFrame& frame, const std::function<bool()>& cancelled = {});
