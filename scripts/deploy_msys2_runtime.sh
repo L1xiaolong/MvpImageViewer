@@ -113,4 +113,6 @@ if (( missing_count != 0 )); then
     exit 1
 fi
 
+python "$(dirname -- "$0")/prune_windows_qt_dlls.py" "$package_directory" \
+    --objdump "$objdump_binary" --apply
 echo "Windows runtime audit passed; copied $copied_total DLLs in $round scan rounds."

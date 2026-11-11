@@ -177,8 +177,23 @@ function Publish-WindowsPackage {
     if ($LASTEXITCODE -ne 0) { throw "Diagnostic symbol archive failed" }
     $deployQt = Find-WinDeployQt -QtBin $QtBin
     Write-Host "Deploying Qt and QML dependencies with $deployQt"
-    & $deployQt --release --compiler-runtime --qmldir (Join-Path $ScriptDir "src\qml") $targetExe
-    if ($LASTEXITCODE -ne 0) { throw "windeployqt failed with exit code $LASTEXITCODE" }
+    if (-not [string]::IsNullOrWhiteSpace($MsysPrefix)) {
+        # Match CI: MSYS2's deploy tool cannot reliably launch qmlimportscanner.
+        & $deployQt --release --compiler-runtime --no-translations --no-quick-import $targetExe
+        if ($LASTEXITCODE -ne 0) { throw "windeployqt failed with exit code $LASTEXITCODE" }
+        $qmlTarget = Join-Path $stageDir "qml"
+        New-Item -ItemType Directory -Force -Path $qmlTarget | Out-Null
+        foreach ($module in @("QtCore", "QtQml", "QtQuick")) {
+            $sourceModule = Join-Path $MsysPrefix "share\qt6\qml\$module"
+            if (-not (Test-Path -LiteralPath (Join-Path $sourceModule "qmldir"))) {
+                throw "Required Qt QML module is missing: $sourceModule"
+            }
+            Copy-Item -LiteralPath $sourceModule -Destination $qmlTarget -Recurse
+        }
+    } else {
+        & $deployQt --release --compiler-runtime --qmldir (Join-Path $ScriptDir "src\qml") $targetExe
+        if ($LASTEXITCODE -ne 0) { throw "windeployqt failed with exit code $LASTEXITCODE" }
+    }
 
     # MSYS2's development layout stores QML modules under share\qt6, while
     # windeployqt copies them to qml\ beside the executable. Pin relocatable
@@ -198,6 +213,9 @@ Translations=translations
 
     if (-not [string]::IsNullOrWhiteSpace($MsysPrefix)) {
         Copy-Msys2DependencyClosure -TargetDir $stageDir -Prefix $MsysPrefix
+        python "$ScriptDir/scripts/prune_windows_qt_dlls.py" $stageDir `
+            --objdump (Join-Path $MsysPrefix "bin\objdump.exe") --apply
+        if ($LASTEXITCODE -ne 0) { throw "Windows Qt dependency pruning failed" }
     }
 
     foreach ($dependency in @(

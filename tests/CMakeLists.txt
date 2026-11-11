@@ -1,3 +1,16 @@
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_executable(preview_cache_regression preview_cache_regression.cpp)
+target_link_libraries(preview_cache_regression PRIVATE mvpview_io)
+add_test(NAME preview_cache_regression COMMAND preview_cache_regression)
+set_tests_properties(preview_cache_regression PROPERTIES TIMEOUT 30)
+add_executable(memory_benchmark memory_benchmark.cpp)
+target_link_libraries(memory_benchmark PRIVATE mvpview_io)
+if(WIN32)
+    target_link_libraries(memory_benchmark PRIVATE psapi)
+endif()
+add_test(NAME windows_package_pruning
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/windows_package_pruning_test.py")
+
 add_executable(histogram_regression histogram_regression.cpp)
 target_link_libraries(histogram_regression PRIVATE mvpview_io)
 mvpview_enable_warnings(histogram_regression)

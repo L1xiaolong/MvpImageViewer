@@ -217,13 +217,11 @@ jobs:
               exit 1
             }
           done
-          # Verify required runtime components without removing optional Qt
-          # modules. A slightly larger archive is preferable to a package that
-          # breaks after an MSYS2/Qt layout update.
+          # Use the same tested runtime pruning list as local release packages.
           cmake \
             -DPACKAGE_ROOT="$package_directory" \
             -DPACKAGE_PLATFORM=windows \
-            -DPACKAGE_PRUNE_OPTIONAL_COMPONENTS=OFF \
+            -DPACKAGE_PRUNE_OPTIONAL_COMPONENTS=ON \
             -P scripts/prune_qt_runtime.cmake
           # windeployqt places platforms/, imageformats/, etc. beside the EXE.
           # Point Qt at that location instead of a non-existent plugins/ dir.

@@ -133,6 +133,7 @@ class QmlImageCanvas : public QQuickRhiItem {
     void notifyNavigationChanged();
     void handleItemGeometryChanged();
     void attachHoverWindow(QWindow* window);
+    void updateHoverPolling();
     void probeHoverScenePosition(const QPointF& scenePosition, bool force = false);
     // Hover positions published by the platform can be stale after the in-place full-display
     // transition. They are only published while they still agree with the live cursor position.

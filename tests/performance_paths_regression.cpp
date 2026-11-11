@@ -119,6 +119,24 @@ void cacheConcurrency(const QString& root) {
         }
     }));
     for (auto& job : jobs) job.get();
+    // Writer metadata must round-trip for both cache formats without changing
+    // source pixels/text shared with the live thumbnail.
+    for (const bool transparent : {false, true}) {
+        QImage source(96, 64, QImage::Format_RGBA8888);
+        source.fill(QColor(12, 34, 56, transparent ? 90 : 255));
+        const QImage shared = source;
+        const auto* data = source.constBits();
+        const QString key = transparent ? "metadata-png" : "metadata-jpeg";
+        check(cache.store(key, source, QSize(6000, 4000), 12), "metadata store failed");
+        const QImage decoded = cache.load(key);
+        check(!decoded.isNull() && decoded.size() == source.size(), "metadata cache load failed");
+        check(decoded.text("mvpview.sourceWidth") == "6000" &&
+              decoded.text("mvpview.sourceHeight") == "4000" &&
+              decoded.text("mvpview.validBits") == "12", "cache metadata lost");
+        check(source.constBits() == data && shared.constBits() == data && source.textKeys().isEmpty(),
+              "cache writer mutated shared source");
+        if (transparent) check(decoded == source, "transparent cache pixels changed");
+    }
 }
 
 void asyncEditing(ImageLoader& loader, const QString& root) {

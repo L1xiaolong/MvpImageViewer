@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QScopeGuard>
 #include <QFileInfo>
+#include <QImageWriter>
 #include <QMutexLocker>
 #include <QStandardPaths>
 
@@ -68,23 +69,13 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
         const QMutexLocker lock(&writeKeysMutex_);
         writingKeys_.remove(key);
     });
-    QImage storedImage = image;
-    if (sourceSize.isValid()) {
-        storedImage.setText(QStringLiteral("mvpview.sourceWidth"),
-                            QString::number(sourceSize.width()));
-        storedImage.setText(QStringLiteral("mvpview.sourceHeight"),
-                            QString::number(sourceSize.height()));
-    }
-    if (validBits > 0) {
-        storedImage.setText(QStringLiteral("mvpview.validBits"), QString::number(validBits));
-    }
     bool hasTransparency = false;
-    if (storedImage.hasAlphaChannel()) {
+    if (image.hasAlphaChannel()) {
         const QImage alphaProbe =
-            storedImage.format() == QImage::Format_ARGB32 ||
-                    storedImage.format() == QImage::Format_RGBA8888
-                ? storedImage
-                : storedImage.convertToFormat(QImage::Format_RGBA8888);
+            image.format() == QImage::Format_ARGB32 ||
+                    image.format() == QImage::Format_RGBA8888
+                ? image
+                : image.convertToFormat(QImage::Format_RGBA8888);
         for (int y = 0; y < alphaProbe.height() && !hasTransparency; ++y) {
             const auto* pixels = reinterpret_cast<const QRgb*>(alphaProbe.constScanLine(y));
             for (int x = 0; x < alphaProbe.width(); ++x) {
@@ -101,7 +92,18 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     const int quality = hasTransparency ? 20 : 85;
     QByteArray encoded;
     QBuffer buffer(&encoded);
-    if (!buffer.open(QIODevice::WriteOnly) || !storedImage.save(&buffer, format, quality)) return false;
+    if (!buffer.open(QIODevice::WriteOnly)) return false;
+    QImageWriter writer(&buffer, format);
+    writer.setQuality(quality);
+    // Metadata belongs to the encoded entry. Setting it on a shared QImage
+    // detaches and copies all pixels even though their contents never change.
+    if (sourceSize.isValid()) {
+        writer.setText(QStringLiteral("mvpview.sourceWidth"), QString::number(sourceSize.width()));
+        writer.setText(QStringLiteral("mvpview.sourceHeight"), QString::number(sourceSize.height()));
+    }
+    if (validBits > 0)
+        writer.setText(QStringLiteral("mvpview.validBits"), QString::number(validBits));
+    if (!writer.write(image)) return false;
     // These files are disposable, content-addressed cache entries. Replacing
     // hundreds of them through QSaveFile triggers process termination on some
     // Windows installations. Create each key once without temporary-file renames;

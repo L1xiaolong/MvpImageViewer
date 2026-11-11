@@ -839,13 +839,11 @@ QmlImageCanvas::QmlImageCanvas(QQuickItem* parent) : QQuickRhiItem(parent) {
     // ordinary Qt Quick overlay items. Polling the cursor while this short-lived canvas
     // exists makes pixel inspection independent of that delivery path on macOS/Windows.
     hoverProbeTimer_.setInterval(16);
+    hoverProbeTimer_.setObjectName(QStringLiteral("pixelProbeTimer"));
     hoverProbeTimer_.setTimerType(Qt::PreciseTimer);
     connect(&hoverProbeTimer_, &QTimer::timeout, this,
             &QmlImageCanvas::pollCursorForPixelProbe);
-    connect(this, &QQuickItem::visibleChanged, this, [this] {
-        if (isVisible() && !frames_.isEmpty()) hoverProbeTimer_.start();
-        else hoverProbeTimer_.stop();
-    });
+    connect(this, &QQuickItem::visibleChanged, this, &QmlImageCanvas::updateHoverPolling);
     // Window-level pointer events are also observed directly: full-display presentation
     // rebuilds the native window, and that can leave item-level hover tracking stale until a
     // button press hands the item the mouse grab. Watching the window keeps hovering live.
@@ -862,6 +860,7 @@ QmlImageCanvas::~QmlImageCanvas() {
     // scene down, which would call back into this already partially destroyed object. Release
     // the hover plumbing here, while every member is still alive.
     disconnect(this, &QQuickItem::windowChanged, this, &QmlImageCanvas::attachHoverWindow);
+    disconnect(this, &QQuickItem::visibleChanged, this, &QmlImageCanvas::updateHoverPolling);
     disconnect(this, &QQuickItem::widthChanged, this,
                &QmlImageCanvas::handleItemGeometryChanged);
     disconnect(this, &QQuickItem::heightChanged, this,
@@ -869,6 +868,8 @@ QmlImageCanvas::~QmlImageCanvas() {
     hoverProbeTimer_.stop();
     if (hoverWindow_) {
         hoverWindow_->removeEventFilter(this);
+        disconnect(hoverWindow_, &QWindow::visibleChanged, this, &QmlImageCanvas::updateHoverPolling);
+        disconnect(hoverWindow_, &QWindow::windowStateChanged, this, &QmlImageCanvas::updateHoverPolling);
     }
 }
 
@@ -883,12 +884,28 @@ void QmlImageCanvas::attachHoverWindow(QWindow* window) {
     }
     if (hoverWindow_) {
         hoverWindow_->removeEventFilter(this);
+        disconnect(hoverWindow_, &QWindow::visibleChanged, this, &QmlImageCanvas::updateHoverPolling);
+        disconnect(hoverWindow_, &QWindow::windowStateChanged, this, &QmlImageCanvas::updateHoverPolling);
     }
     hoverWindow_ = window;
     if (hoverWindow_) {
         hoverWindow_->installEventFilter(this);
+        connect(hoverWindow_, &QWindow::visibleChanged, this, &QmlImageCanvas::updateHoverPolling);
+        connect(hoverWindow_, &QWindow::windowStateChanged, this, &QmlImageCanvas::updateHoverPolling);
     }
     hasLastHoverScenePosition_ = false;
+    updateHoverPolling();
+}
+
+void QmlImageCanvas::updateHoverPolling() {
+    const bool needed = isVisible() && !frames_.isEmpty() && hoverWindow_ &&
+        hoverWindow_->isVisible() && hoverWindow_->windowState() != Qt::WindowMinimized;
+    if (needed) {
+        if (!hoverProbeTimer_.isActive()) hoverProbeTimer_.start();
+    } else {
+        hoverProbeTimer_.stop();
+        clearPixelProbe();
+    }
 }
 
 bool QmlImageCanvas::eventFilter(QObject* watched, QEvent* event) {
@@ -1016,8 +1033,7 @@ void QmlImageCanvas::setFrames(const QVector<ImageFramePtr>& frames, int changed
                                bool resetChangedView) {
     const int oldCount = static_cast<int>(frames_.size());
     frames_ = frames.mid(0, kMaximumImages);
-    if (isVisible() && !frames_.isEmpty()) hoverProbeTimer_.start();
-    else hoverProbeTimer_.stop();
+    updateHoverPolling();
     viewStates_.resize(frames_.size());
     probeFullResolutionRequested_.resize(frames_.size());
     if (resetChangedView && changedSlot >= 0 && changedSlot < viewStates_.size()) {

@@ -314,9 +314,30 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     const auto decodeWorkingBudget = decodeWorkingBudget_;
     const auto residentAccounting = residentAccounting_;
     const auto workingPriority = inFlight_[key].workingPriority;
+    // Preserve this request's file-version snapshot, rather than re-stat a file
+    // that may have changed by the time its decode is delivered.
+    QStringList obsoletePreviewPrefixes, coveringPreviewPrefixes;
+    QString coveringFullPrefix;
+    if (!request.metadataSource && request.purpose != DecodePurpose::Thumbnail) {
+        auto candidate = request;
+        candidate.purpose = DecodePurpose::Full;
+        candidate.maximumSize = {};
+        coveringFullPrefix = cacheKeyPrefix(candidate, sourceInfo);
+        candidate.purpose = DecodePurpose::Preview;
+        const int edge = std::max(request.maximumSize.width(), request.maximumSize.height());
+        for (const int bucket : {512, 1024, 1536, 2048, 2560}) {
+            candidate.maximumSize = {bucket, bucket};
+            if ((request.purpose == DecodePurpose::Full && request.maximumSize.isEmpty()) ||
+                (request.purpose == DecodePurpose::Preview && edge <= 2560 && bucket < edge))
+                obsoletePreviewPrefixes.append(cacheKeyPrefix(candidate, sourceInfo));
+            else if (bucket > edge)
+                coveringPreviewPrefixes.append(cacheKeyPrefix(candidate, sourceInfo));
+        }
+    }
     inFlight_[key].work =
         [self, decoder, diskCache, request = std::move(request), key, keyPrefix, decoderIdentity, generation,
          activeConsumers, pendingWrites, resultBufferBudget, decodeWorkingBudget, workingPriority, residentAccounting,
+         obsoletePreviewPrefixes, coveringPreviewPrefixes, coveringFullPrefix,
          thumbnailSource = std::move(thumbnailSource)]() mutable {
             std::shared_ptr<ResultBufferBudget::Reservation> workingReservation;
             qint64 workingWaitMs = 0;
@@ -485,6 +506,7 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
             QMetaObject::invokeMethod(
                 self,
                 [self, completion = [self, resultReservation, result = std::move(result), key, keyPrefix, decoderIdentity, purpose = request.purpose,
+                 obsoletePreviewPrefixes, coveringPreviewPrefixes, coveringFullPrefix,
                  sourcePath = request.path, generation, activeConsumers, diskHit, metadataOnly = bool(request.metadataSource),
                  elapsedMs = decodeElapsedMs]() {
                     if (!self) {
@@ -509,8 +531,31 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
                             frameKey = keyPrefix + QLatin1Char('|') + result.frame->rawParameters->cacheKey() +
                                 QLatin1Char('|') + decoderIdentity;
                         }
-                        if (!metadataOnly) self->cacheFor(purpose).put(frameKey, result.frame, result.frame->byteSize());
+                        if (!metadataOnly) {
+                            // Encoded previews are already served from a larger preview or
+                            // full frame in requestImpl(). Retaining every progressive size
+                            // wastes pixels without providing another cache hit. RAW keeps
+                            // its separate CPU fallback/source-plane representations.
+                            const bool compact = !result.frame->rawParameters &&
+                                result.frame->qImage() && purpose != DecodePurpose::Thumbnail;
+                            const QString suffix = frameKey.mid(keyPrefix.size());
+                            bool covered = false;
+                            if (compact && purpose == DecodePurpose::Preview) {
+                                covered = self->fullCache_.contains(coveringFullPrefix + suffix);
+                                for (const auto& prefix : coveringPreviewPrefixes)
+                                    covered = covered || self->previewCache_.contains(prefix + suffix);
+                            }
+                            if (!covered) self->cacheFor(purpose).put(frameKey, result.frame, result.frame->byteSize());
+                        }
                         self->enforceMemoryBudget(purpose);
+                        // Only discard fallbacks after global budget enforcement: a
+                        // frame can fit its individual cache but exceed the total budget.
+                        if (!metadataOnly && !result.frame->rawParameters && result.frame->qImage() &&
+                            self->cacheFor(purpose).contains(frameKey)) {
+                            const QString suffix = frameKey.mid(keyPrefix.size());
+                            for (const auto& prefix : obsoletePreviewPrefixes)
+                                self->previewCache_.erase(prefix + suffix);
+                        }
 
                         if (purpose == DecodePurpose::Thumbnail) {
                             const QSize sourceSize = result.frame->metadata.sourceSize.isValid()

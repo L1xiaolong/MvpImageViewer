@@ -1,5 +1,8 @@
 #include "qml/qml_image_canvas.h"
 #include <QGuiApplication>
+#include <QElapsedTimer>
+#include <QEvent>
+#include <QThread>
 #include <QQuickGraphicsDevice>
 #include <QQuickRenderControl>
 #include <QQuickWindow>
@@ -9,6 +12,15 @@
 #include <iostream>
 
 using namespace mvpview;
+
+class ProbeTimerCounter : public QObject {
+public:
+    int ticks = 0;
+    bool eventFilter(QObject* receiver, QEvent* event) override {
+        if (event->type() == QEvent::Timer && receiver->objectName() == "pixelProbeTimer") ++ticks;
+        return false;
+    }
+};
 
 int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
@@ -68,5 +80,21 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     std::cout << "Oversized YUV rejected; CPU fallback rendered, nominal GPU bytes: " << gpu << '\n';
+    ProbeTimerCounter counter;
+    app.installEventFilter(&counter);
+    const auto wait = [&] {
+        QElapsedTimer elapsed; elapsed.start();
+        while (elapsed.elapsed() < 120) { app.processEvents(); QThread::msleep(1); }
+    };
+    window.show(); wait();
+    if (counter.ticks == 0) { std::cerr << "Visible canvas is not polling\n"; return 1; }
+    window.setWindowState(Qt::WindowMinimized);
+    counter.ticks = 0; wait();
+    if (counter.ticks != 0) { std::cerr << "Minimized canvas still polls\n"; return 1; }
+    window.setWindowState(Qt::WindowNoState); wait();
+    if (counter.ticks == 0) { std::cerr << "Restored canvas did not resume polling\n"; return 1; }
+    window.hide(); counter.ticks = 0; wait();
+    if (counter.ticks != 0) { std::cerr << "Hidden canvas still polls\n"; return 1; }
+    std::cout << "Hover polling stops while minimized/hidden and resumes on restore\n";
     return 0;
 }
