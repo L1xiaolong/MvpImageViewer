@@ -886,6 +886,24 @@ Rectangle {
                     contentHeight: galleryWorkspace.actualPixels
                                    ? Math.max(height, galleryImage.height + 36) : height
 
+                    // Show the cached contact-sheet pixels while the larger preview
+                    // decodes. Its demand is independent of the strip's viewport.
+                    Image {
+                        objectName: "galleryThumbnailPlaceholder"
+                        x: galleryImage.x
+                        y: galleryImage.y
+                        width: galleryImage.width
+                        height: galleryImage.height
+                        visible: galleryImage.status !== Image.Ready && !galleryWorkspace.actualPixels
+                        source: galleryWorkspace.visible && galleryWorkspace.currentPreviewUrl.toString().length > 0
+                                ? galleryWorkspace.currentPreviewUrl.toString() + "&purpose=gallery-thumbnail" : ""
+                        sourceSize: Qt.size(320, 240)
+                        asynchronous: true
+                        cache: true
+                        fillMode: Image.PreserveAspectFit
+                        smooth: root.smoothDisplay
+                    }
+
                     Image {
                         id: galleryImage
                         objectName: "galleryImage"

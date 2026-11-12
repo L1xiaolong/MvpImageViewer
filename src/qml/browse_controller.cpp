@@ -1338,8 +1338,22 @@ void BrowseController::setGalleryPath(const QString& path) {
     }
     const quint64 requestId = ++galleryRequestId_;
     const QPointer<BrowseController> self(this);
+    // Match the QML image provider's representation and RAW parameters so the
+    // information panel and displayed preview share one in-flight decode.
+    auto parameters = loader_->rawParameters(normalized);
+    const QString suffix = QFileInfo(normalized).suffix().toLower();
+    if (!parameters && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
+        parameters = RawPresetStore::loadForFile(normalized);
+        if (!parameters) parameters = RawPresetStore::inferFromFileName(normalized);
+        if (parameters && availableFrameCount(QFileInfo(normalized).size(), *parameters) > 0)
+            loader_->adoptRawParameters(normalized, *parameters);
+        else
+            parameters.reset();
+    }
+    DecodeRequest request{normalized, DecodePurpose::Preview, QSize(2048, 2048), parameters};
+    request.requireDisplayImage = true;
     galleryPreviewHandle_ = loader_->request(
-        requestId, {normalized, DecodePurpose::Preview, QSize(2048, 2048)},
+        requestId, std::move(request),
         [self, normalized](quint64 completedId, const DecodeResult& result) {
             if (!self || completedId != self->galleryRequestId_ ||
                 normalized != self->galleryPath_) {

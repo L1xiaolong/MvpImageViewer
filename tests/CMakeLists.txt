@@ -82,6 +82,7 @@ set_tests_properties(network_folder_regression PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(performance_paths_regression performance_paths_regression.cpp
+    ${PROJECT_SOURCE_DIR}/src/qml/thumbnail_image_provider.cpp
     ${PROJECT_SOURCE_DIR}/src/qml/browse_controller.cpp)
 target_link_libraries(performance_paths_regression PRIVATE
     mvpview_browser_backend mvpview_platform mvpview_io Qt6::Quick)

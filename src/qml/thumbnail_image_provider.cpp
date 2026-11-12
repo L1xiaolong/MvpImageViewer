@@ -102,8 +102,9 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
         const QPointer<ThumbnailImageResponse> self(this);
         const bool galleryFull = id_.contains(QStringLiteral("purpose=gallery-full"));
         const bool navigation = id_.contains(QStringLiteral("purpose=navigation"));
-        const bool galleryPreview = !galleryFull && id_.contains(QStringLiteral("purpose=gallery"));
-        const LoadCategory category = galleryFull || galleryPreview
+        const bool galleryThumbnail = id_.contains(QStringLiteral("purpose=gallery-thumbnail"));
+        const bool galleryPreview = !galleryFull && !galleryThumbnail && id_.contains(QStringLiteral("purpose=gallery"));
+        const LoadCategory category = galleryFull || galleryPreview || galleryThumbnail
                                           ? LoadCategory::Interactive
                                           : id_.contains(QStringLiteral("priority=near"))
                                                 ? LoadCategory::NearViewport
@@ -125,7 +126,8 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
                     if (self) self->complete(result);
                 }, Qt::QueuedConnection);
             },
-            RequestOptions{category, 0, navigation ? QStringLiteral("qml-navigation") : QStringLiteral("qml-thumbnail"), !navigation});
+            RequestOptions{category, 0, navigation ? QStringLiteral("qml-navigation") : QStringLiteral("qml-thumbnail"),
+                           !navigation && !galleryThumbnail && !galleryPreview && !galleryFull});
         const QMutexLocker lock(&mutex_);
         handle_ = std::move(handle);
         // Cancellation may have arrived between start()'s first check and attaching
@@ -169,7 +171,8 @@ ThumbnailImageProvider::ThumbnailImageProvider(std::shared_ptr<const IImageDecod
 QQuickImageResponse* ThumbnailImageProvider::requestImageResponse(const QString& id,
                                                                   const QSize& requestedSize) {
     const bool galleryFull = id.contains(QStringLiteral("purpose=gallery-full"));
-    const bool galleryPreview = !galleryFull && id.contains(QStringLiteral("purpose=gallery"));
+    const bool galleryThumbnail = id.contains(QStringLiteral("purpose=gallery-thumbnail"));
+    const bool galleryPreview = !galleryFull && !galleryThumbnail && id.contains(QStringLiteral("purpose=gallery"));
     const QSize target = galleryFull
                              ? QSize{}
                              : galleryPreview ? requestedSize.boundedTo(QSize(2048, 2048))

@@ -4,6 +4,9 @@
 #include "io/raw_preset_store.h"
 #include "io/thumbnail_disk_cache.h"
 #include "qml/browse_controller.h"
+#include "qml/thumbnail_image_provider.h"
+#include <QQuickTextureFactory>
+#include <QUrl>
 #include <QGuiApplication>
 #include <QFile>
 #include <QSettings>
@@ -175,6 +178,59 @@ void asyncEditing(ImageLoader& loader, const QString& root) {
     check(QImage(path) == image, "failed operation modified image");
 }
 
+class GalleryDecoder : public IImageDecoder {
+public:
+    mutable std::atomic_int previews{0};
+    std::shared_ptr<const IImageDecoder> decoder = createDefaultImageDecoder();
+    bool canDecode(const QString& path) const override { return decoder->canDecode(path); }
+    DecodeResult decode(const DecodeRequest& request) const override {
+        if (request.purpose == DecodePurpose::Preview) ++previews;
+        return decoder->decode(request);
+    }
+};
+
+void galleryPreview(const QString& root) {
+    const QString path = root + "/gallery_32_24.yuv";
+    write(path, QByteArray(1152, '\x80'));
+    auto decoder = std::make_shared<GalleryDecoder>();
+    ImageLoader loader(decoder, nullptr, std::make_shared<ThumbnailDiskCache>(root + "/gallery-cache"));
+    QFileSystemModel folders;
+    BrowseController browser(&loader, &folders, root, false);
+    ThumbnailImageProvider provider(decoder, &loader);
+    QEventLoop loop;
+    QTimer deadline; deadline.setSingleShot(true);
+    QObject::connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
+    browser.setGalleryPath(path);
+    auto* response = provider.requestImageResponse(
+        QString::fromLatin1(QUrl::toPercentEncoding(path)) + "?purpose=gallery", {2048, 2048});
+    bool ready = false;
+    QObject::connect(response, &QQuickImageResponse::finished, &loop, [&] {
+        std::unique_ptr<QQuickTextureFactory> texture(response->textureFactory());
+        ready = texture && texture->textureSize() == QSize(32, 24);
+        loop.quit();
+    });
+    deadline.start(10000); loop.exec();
+    delete response;
+    check(ready && browser.galleryImageReady(), "gallery preview did not reach both consumers");
+    check(decoder->previews == 1, "gallery information and display decoded RAW preview twice");
+    browser.setGalleryPath({});
+    loader.clearCache();
+    // The selected image can remain open after its strip card scrolls away.
+    loader.updateViewport("gallery-strip", {{root + "/other.png", 60}}, false);
+    ready = false;
+    response = provider.requestImageResponse(
+        QString::fromLatin1(QUrl::toPercentEncoding(path)) + "?purpose=gallery-thumbnail", {320, 240});
+    QObject::connect(response, &QQuickImageResponse::finished, &loop, [&] {
+        std::unique_ptr<QQuickTextureFactory> texture(response->textureFactory());
+        ready = texture && texture->textureSize() == QSize(32, 24);
+        loop.quit();
+    });
+    deadline.start(10000); loop.exec();
+    delete response;
+    check(ready, "gallery thumbnail stalled outside the strip viewport");
+    check(decoder->previews == 1, "gallery placeholder requested a large preview");
+}
+
 int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
     QTemporaryDir temporary(QDir::currentPath() + QStringLiteral("/performance-paths-XXXXXX"));
@@ -189,7 +245,8 @@ int main(int argc, char** argv) {
         modelUpdates(loader);
         cacheConcurrency(temporary.path());
         asyncEditing(loader, temporary.path());
-        std::cout << "Streaming, model updates, cache concurrency and asynchronous editing passed\n";
+        galleryPreview(temporary.path());
+        std::cout << "Streaming, model updates, cache concurrency, asynchronous editing and gallery preview sharing passed\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
     return 0;
 }
