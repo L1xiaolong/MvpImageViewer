@@ -47,7 +47,28 @@ int main(int argc,char** argv) {
     auto decoder=std::make_shared<Decoder>();
     ImageLoader loader(decoder,nullptr,std::make_shared<ThumbnailDiskCache>(dir.filePath("cache")));
     try {
+        bool missingDone = false;
+        auto missing = loader.request(90, {dir.filePath("missing.png"), DecodePurpose::Preview},
+            [&](quint64, const DecodeResult& r) { check(!r.frame && !r.error.isEmpty(), "missing file accepted"); missingDone = true; });
+        check(!missingDone, "file validation ran synchronously");
+        waitFor([&] { return missingDone; });
+        bool cancelledDelivered = false;
+        auto cancelled = loader.request(91, {path, DecodePurpose::Preview, {512,512}},
+            [&](quint64, const DecodeResult&) { cancelledDelivered = true; });
+        cancelled.cancel();
         auto small=load(loader,{path,DecodePurpose::Preview,{512,512}});
+        check(!cancelledDelivered && decoder->decodes == 1, "cancelled preflight decoded or delivered");
+        bool hitDone = false;
+        auto hit = loader.request(92, {path, DecodePurpose::Preview, {512,512}},
+            [&](quint64, const DecodeResult& r) { check(r.frame == small, "warm cache missed"); hitDone = true; });
+        check(!hitDone, "warm request skipped asynchronous validation");
+        waitFor([&] { return hitDone; });
+        QFile changed(path); check(changed.open(QIODevice::Append), "fixture mutation failed");
+        changed.write("new-version"); changed.close();
+        auto fresh = load(loader, {path, DecodePurpose::Preview, {512,512}});
+        check(fresh != small && decoder->decodes == 2, "file version change reused stale pixels");
+        small.reset(); fresh.reset(); loader.clearCache();
+        small = load(loader, {path,DecodePurpose::Preview,{512,512}});
         auto large=load(loader,{path,DecodePurpose::Preview,{1024,1024}});
         check(loader.cachedBytes()==large->byteSize(),"obsolete preview remains cached");
         check(small->qImage()->pixelColor(0,0)==QColor(20,40,60,128),"held preview was invalidated");

@@ -1320,9 +1320,6 @@ void BrowseController::setGalleryPath(const QString& path) {
         directoryWatcher_->removePath(galleryPath_);
     }
     galleryPath_ = normalized;
-    if (!normalized.isEmpty() && QFileInfo(normalized).isFile()) {
-        directoryWatcher_->addPath(normalized);
-    }
     galleryUpgradeTimer_->stop();
     galleryPreviewHandle_.cancel();
     galleryFullHandle_.cancel();
@@ -1333,7 +1330,8 @@ void BrowseController::setGalleryPath(const QString& path) {
     galleryInfoText_.clear();
     emit galleryImageChanged();
 
-    if (normalized.isEmpty() || QFileInfo(normalized).isDir()) {
+    const int row = thumbnailModel_->rowForPath(normalized);
+    if (normalized.isEmpty() || (row >= 0 && thumbnailModel_->files().at(row).isDirectory)) {
         return;
     }
     const quint64 requestId = ++galleryRequestId_;
@@ -1341,15 +1339,6 @@ void BrowseController::setGalleryPath(const QString& path) {
     // Match the QML image provider's representation and RAW parameters so the
     // information panel and displayed preview share one in-flight decode.
     auto parameters = loader_->rawParameters(normalized);
-    const QString suffix = QFileInfo(normalized).suffix().toLower();
-    if (!parameters && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
-        parameters = RawPresetStore::loadForFile(normalized);
-        if (!parameters) parameters = RawPresetStore::inferFromFileName(normalized);
-        if (parameters && availableFrameCount(QFileInfo(normalized).size(), *parameters) > 0)
-            loader_->adoptRawParameters(normalized, *parameters);
-        else
-            parameters.reset();
-    }
     DecodeRequest request{normalized, DecodePurpose::Preview, QSize(2048, 2048), parameters};
     request.requireDisplayImage = true;
     galleryPreviewHandle_ = loader_->request(
@@ -1359,6 +1348,9 @@ void BrowseController::setGalleryPath(const QString& path) {
                 normalized != self->galleryPath_) {
                 return;
             }
+            if (result.frame && !self->networkAccess_->isRemote(normalized) &&
+                !self->directoryWatcher_->files().contains(normalized))
+                self->directoryWatcher_->addPath(normalized);
             self->applyGalleryFrame(result.frame, false);
         }, RequestOptions{LoadCategory::Interactive, 0, QStringLiteral("gallery")});
 }

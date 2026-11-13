@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QHash>
+#include <QMutex>
 #include <QReadWriteLock>
 #include <QThreadPool>
 #include <QVector>
@@ -44,6 +45,8 @@ class LoadHandle final {
     struct State {
         std::atomic_bool cancelled{false};
         std::shared_ptr<std::atomic_int> activeConsumers;
+        QMutex nextMutex;
+        std::shared_ptr<State> next;
     };
     explicit LoadHandle(std::shared_ptr<State> state) : state_(std::move(state)) {}
     std::shared_ptr<State> state_;
@@ -74,6 +77,7 @@ class ImageLoader final : public QObject {
     [[nodiscard]] QString rawParametersRevision(const QString& path) const;
     [[nodiscard]] QString displayRevision() const;
     [[nodiscard]] std::optional<RawImageParameters> rawParameters(const QString& path) const;
+    // Non-blocking scheduling hint from the last worker snapshot, not a freshness guarantee.
     [[nodiscard]] bool isCached(DecodeRequest request) const;
     [[nodiscard]] qsizetype cachedBytes() const;
     [[nodiscard]] qsizetype residentPixelBytes() const;
@@ -128,8 +132,17 @@ class ImageLoader final : public QObject {
         std::function<void()> work;
     };
 
+    struct FileSnapshot {
+        QString absolutePath;
+        qint64 size = 0;
+        qint64 modifiedMs = 0;
+        bool browsable = false;
+    };
+    // Hints only. Every actual request revalidates on a worker before using pixels.
+    QHash<QString, FileSnapshot> fileSnapshots_;
     [[nodiscard]] LoadHandle requestImpl(quint64 requestId, DecodeRequest request,
-                                         Callback callback, int priority, bool viewportManaged = true);
+                                         Callback callback, int priority, bool viewportManaged = true,
+                                         std::optional<FileSnapshot> snapshot = std::nullopt);
     bool refreshThumbnailPriority(InFlightRequest& request);
     [[nodiscard]] WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose);
     [[nodiscard]] const WeightedLruCache<ImageFrame>& cacheFor(DecodePurpose purpose) const;

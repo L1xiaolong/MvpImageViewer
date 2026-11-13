@@ -1,4 +1,5 @@
 #include "browser/thumbnail_model.h"
+#include "browser/thumbnail_filter_proxy_model.h"
 #include "io/default_image_decoder.h"
 #include "io/image_transformer.h"
 #include "io/raw_preset_store.h"
@@ -9,6 +10,7 @@
 #include <QUrl>
 #include <QGuiApplication>
 #include <QFile>
+#include <QLockFile>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QEventLoop>
@@ -122,6 +124,25 @@ void cacheConcurrency(const QString& root) {
         }
     }));
     for (auto& job : jobs) job.get();
+    for (const bool transparent : {false, true}) {
+        const QString key = transparent ? "broken-png" : "broken-jpeg";
+        QImage source(96, 64, QImage::Format_RGBA8888);
+        source.fill(QColor(12, 34, 56, transparent ? 90 : 255));
+        const QString path = cache.pathForKey(key) + (transparent ? ".png" : ".jpg");
+        write(path, "truncated");
+        check(cache.load(key).isNull(), "corrupt cache accepted");
+        ThumbnailDiskCache second(cache.rootDirectory());
+        {
+            QLockFile writerLock(cache.pathForKey(key) + ".lock");
+            check(writerLock.tryLock(0), "fixture lock failed");
+            check(!second.store(key, source), "repair ignored active writer");
+            check(read(path) == "truncated", "active writer bytes removed");
+        }
+        check(second.store(key, source, {6000, 4000}, 12), "corrupt cache repair failed");
+        const auto repaired = cache.load(key);
+        check(!repaired.isNull() && repaired.text("mvpview.validBits") == "12", "repaired cache unreadable");
+        if (transparent) check(repaired == source, "repaired pixels changed");
+    }
     // Writer metadata must round-trip for both cache formats without changing
     // source pixels/text shared with the live thumbnail.
     for (const bool transparent : {false, true}) {
@@ -241,6 +262,35 @@ int main(int argc, char** argv) {
         check(temporary.isValid(), "temporary directory unavailable");
         ImageLoader loader(createDefaultImageDecoder(), nullptr,
                            std::make_shared<ThumbnailDiskCache>(temporary.path() + "/cache"));
+        if (app.arguments().contains("--benchmark-refresh")) {
+            for (int iteration = 0; iteration < 3; ++iteration) {
+                ThumbnailModel model(&loader);
+                ThumbnailFilterProxyModel proxy;
+                proxy.setSourceModel(&model);
+                QVector<ImageFileRecord> records;
+                records.reserve(100000);
+                for (int i = 0; i < 100000; ++i) {
+                    ImageFileRecord record;
+                    record.path = QStringLiteral("/fixture/image-%1.png").arg(i);
+                    record.fileName = QStringLiteral("image-%1.png").arg(i);
+                    records.append(record);
+                }
+                model.setFiles(records);
+                (void)proxy.rowCount();
+                QElapsedTimer timer; timer.start();
+                model.updateFiles(records);
+                std::cout << "refresh unchanged 100000: " << double(timer.nsecsElapsed())/1e6 << " ms\n";
+                records[50000].fileSize = 123;
+                timer.restart(); model.updateFiles(records);
+                std::cout << "refresh one change 100000: " << double(timer.nsecsElapsed())/1e6 << " ms\n";
+                QVector<ImageFileRecord> remaining;
+                for (int i = 0; i < records.size(); ++i) if (i % 20) remaining.append(records[i]);
+                timer.restart(); model.updateFiles(remaining);
+                std::cout << "refresh scattered deletion 5%: " << double(timer.nsecsElapsed())/1e6 << " ms\n";
+                check(proxy.rowCount() == 95000, "benchmark proxy count wrong");
+            }
+            return 0;
+        }
         streaming(temporary.path());
         modelUpdates(loader);
         cacheConcurrency(temporary.path());

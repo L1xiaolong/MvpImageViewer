@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QImageWriter>
 #include <QMutexLocker>
+#include <QLockFile>
 #include <QStandardPaths>
 
 #include <algorithm>
@@ -44,8 +45,8 @@ QImage ThumbnailDiskCache::load(const QString& key) const {
         const QMutexLocker lock(&writeKeysMutex_);
         if (writingKeys_.contains(key)) return {};
     }
-    // Entries are immutable (NewOnly). A writer starting after this check can
-    // only create a missing file; readCacheImage rejects incomplete payloads.
+    // Valid entries are immutable. A locked writer may replace a corrupt entry;
+    // concurrent readers reject incomplete payloads and fall back to the source.
     const QString base = pathForKey(key);
     for (const auto* format : {"PNG", "JPEG"}) {
         const QImage image = readCacheImage(
@@ -89,6 +90,13 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     const QString suffix = hasTransparency ? QStringLiteral(".png") : QStringLiteral(".jpg");
     const QString path = pathForKey(key) + suffix;
     const char* format = hasTransparency ? "PNG" : "JPEG";
+    // Cooperating processes hold this lock through validation, repair and publication.
+    // Never delete a partial file while another writer is still filling it.
+    QLockFile entryLock(pathForKey(key) + QStringLiteral(".lock"));
+    entryLock.setStaleLockTime(0); // A slow but live writer must never lose its lock.
+    if (!entryLock.tryLock(0)) return false;
+    if (!readCacheImage(path, format).isNull()) return true;
+    if (QFile::exists(path) && !QFile::remove(path)) return false;
     const int quality = hasTransparency ? 20 : 85;
     QByteArray encoded;
     QBuffer buffer(&encoded);
@@ -107,7 +115,7 @@ bool ThumbnailDiskCache::store(const QString& key, const QImage& image,
     // These files are disposable, content-addressed cache entries. Replacing
     // hundreds of them through QSaveFile triggers process termination on some
     // Windows installations. Create each key once without temporary-file renames;
-    // a partial entry is rejected by load() and the source is decoded normally.
+    // a partial entry is rejected by load() and repaired by the next locked writer.
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) return !readCacheImage(path, format).isNull();
     if (file.write(encoded) != encoded.size() || !file.flush()) {

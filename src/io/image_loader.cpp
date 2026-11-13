@@ -4,6 +4,7 @@
 #include "diagnostics/diagnostics.h"
 #include "core/nominal_gpu_bytes.h"
 #include "io/metadata_reader.h"
+#include "io/raw_preset_store.h"
 #include "io/thumbnail_disk_cache.h"
 
 #include <QFileInfo>
@@ -11,6 +12,7 @@
 #include <QCryptographicHash>
 #include <QImageReader>
 #include <QMetaObject>
+#include <QMutexLocker>
 #include <QPointer>
 #include <QThread>
 #include <QThreadPool>
@@ -39,9 +41,9 @@ bool isHeaderlessImage(const QString& path) {
     return suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv");
 }
 
-QString cacheKeyPrefix(const DecodeRequest& request, const QFileInfo& info) {
-    return info.absoluteFilePath() + QLatin1Char('|') + QString::number(info.size()) +
-        QLatin1Char('|') + QString::number(info.lastModified().toMSecsSinceEpoch()) +
+QString cacheKeyPrefix(const DecodeRequest& request, const QString& path, qint64 size, qint64 modifiedMs) {
+    return path + QLatin1Char('|') + QString::number(size) +
+        QLatin1Char('|') + QString::number(modifiedMs) +
         QLatin1Char('|') + QString::number(request.maximumSize.width()) + QLatin1Char('x') +
         QString::number(request.maximumSize.height()) + QLatin1Char('|') +
         QString::number(static_cast<int>(request.purpose) + (request.metadataSource ? 100 : 0) +
@@ -57,6 +59,8 @@ QString computeDisplayRevision(const IImageDecoder& decoder) {
 
 void LoadHandle::cancel() const {
     if (!state_) return;
+    const QMutexLocker nextLock(&state_->nextMutex);
+    if (state_->next) LoadHandle(state_->next).cancel();
     bool expected = false;
     if (state_->cancelled.compare_exchange_strong(expected, true, std::memory_order_relaxed) &&
         state_->activeConsumers) {
@@ -173,8 +177,70 @@ LoadHandle ImageLoader::requestMetadata(quint64 id, ImageFramePtr frame, Callbac
 }
 
 LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Callback callback,
-                                    int priority, bool viewportManaged) {
+                                    int priority, bool viewportManaged, std::optional<FileSnapshot> snapshot) {
     Q_ASSERT(thread() == QThread::currentThread());
+    if (!snapshot) {
+        if (inFlight_.size() >= 512 && priority < 60) {
+            callback(requestId, {{}, QStringLiteral("Background queue is full")});
+            return {};
+        }
+        if (!request.rawParameters) request.rawParameters = rawParameters(request.path);
+        const bool inferParameters = !request.rawParameters && isHeaderlessImage(request.path);
+        auto state = std::make_shared<LoadHandle::State>();
+        state->activeConsumers = std::make_shared<std::atomic_int>(1);
+        const QString key = QStringLiteral("stat:%1").arg(++nextInFlightGeneration_);
+        InFlightRequest job;
+        job.activeConsumers = state->activeConsumers;
+        job.generation = nextInFlightGeneration_;
+        job.path = request.path;
+        job.priority = priority;
+        job.purpose = request.purpose;
+        job.viewportPriorityKnown = !viewports_.isEmpty();
+        job.pending.push_back({requestId, {}, state, priority, viewportManaged});
+        job.queuedAt.start();
+        const QPointer<ImageLoader> self(this);
+        job.work = [self, key, state, requestId, request = std::move(request),
+                    callback = std::move(callback), priority, viewportManaged, inferParameters]() mutable {
+            FileSnapshot info;
+            if (!state->cancelled.load()) {
+                const QFileInfo file(request.path);
+                info.absolutePath = file.absoluteFilePath();
+                info.browsable = DirectoryScanner::isBrowsableEntry(file) && file.isFile();
+                info.size = file.size();
+                info.modifiedMs = file.lastModified().toMSecsSinceEpoch();
+                if (info.browsable && inferParameters && !state->cancelled.load()) {
+                    request.rawParameters = RawPresetStore::loadForFile(request.path);
+                    if (!request.rawParameters) request.rawParameters = RawPresetStore::inferFromFileName(request.path);
+                    if (request.rawParameters && availableFrameCount(info.size, *request.rawParameters) <= 0)
+                        request.rawParameters.reset();
+                }
+            }
+            QMetaObject::invokeMethod(self, [self, key, state, requestId, request = std::move(request),
+                                            callback = std::move(callback), priority, viewportManaged, info, inferParameters]() mutable {
+                if (!self) return;
+                --self->parallelRunning_;
+                self->inFlight_.remove(key);
+                self->scheduleDispatch();
+                if (state->cancelled.load()) return;
+                if (self->fileSnapshots_.size() >= 512) self->fileSnapshots_.clear();
+                self->fileSnapshots_.insert(request.path, info);
+                if (inferParameters) {
+                    if (request.rawParameters) self->adoptRawParameters(request.path, *request.rawParameters);
+                    request.rawParameters = self->rawParameters(request.path);
+                }
+                auto next = self->requestImpl(requestId, std::move(request),
+                    [state, callback = std::move(callback)](quint64 id, const DecodeResult& result) {
+                        if (!state->cancelled.load()) callback(id, result);
+                    }, priority, viewportManaged, info);
+                const QMutexLocker lock(&state->nextMutex);
+                state->next = next.state_;
+                if (state->cancelled.load()) next.cancel();
+            }, Qt::QueuedConnection);
+        };
+        inFlight_.insert(key, std::move(job));
+        scheduleDispatch();
+        return LoadHandle(state);
+    }
     if (request.purpose == DecodePurpose::Preview && request.maximumSize.isValid()) {
         const int edge = std::max(request.maximumSize.width(), request.maximumSize.height());
         for (const int bucket : {512, 1024, 1536, 2048, 2560}) {
@@ -186,8 +252,8 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
         const int demand = viewportPriority(request.path);
         if (demand > -1000) priority = viewportManaged ? demand : std::max(priority, demand);
     }
-    const QFileInfo sourceInfo(request.path);
-    if (!DirectoryScanner::isBrowsableEntry(sourceInfo) || !sourceInfo.isFile()) {
+    const auto& sourceInfo = *snapshot;
+    if (!sourceInfo.browsable) {
         callback(requestId, {{}, QStringLiteral("File is hidden, unreadable, or unavailable")});
         return {};
     }
@@ -196,10 +262,10 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
     }
     if (!request.rawParameters && decoder_->executionMode(request.path) == DecodeExecutionMode::Parallel)
         request.requireDisplayImage = false; // Encoded images already contain their full CPU image.
-    const QString keyPrefix = cacheKeyPrefix(request, sourceInfo);
+    const QString keyPrefix = cacheKeyPrefix(request, sourceInfo.absolutePath, sourceInfo.size, sourceInfo.modifiedMs);
     const QString decoderIdentity = decoder_->cacheIdentity();
     const auto candidateKey = [&sourceInfo, &decoderIdentity](const DecodeRequest& candidate) {
-        return cacheKeyPrefix(candidate,sourceInfo) + QLatin1Char('|') +
+        return cacheKeyPrefix(candidate, sourceInfo.absolutePath, sourceInfo.size, sourceInfo.modifiedMs) + QLatin1Char('|') +
             (candidate.rawParameters ? candidate.rawParameters->cacheKey() : QStringLiteral("encoded")) +
             QLatin1Char('|') + decoderIdentity;
     };
@@ -322,16 +388,16 @@ LoadHandle ImageLoader::requestImpl(quint64 requestId, DecodeRequest request, Ca
         auto candidate = request;
         candidate.purpose = DecodePurpose::Full;
         candidate.maximumSize = {};
-        coveringFullPrefix = cacheKeyPrefix(candidate, sourceInfo);
+        coveringFullPrefix = cacheKeyPrefix(candidate, sourceInfo.absolutePath, sourceInfo.size, sourceInfo.modifiedMs);
         candidate.purpose = DecodePurpose::Preview;
         const int edge = std::max(request.maximumSize.width(), request.maximumSize.height());
         for (const int bucket : {512, 1024, 1536, 2048, 2560}) {
             candidate.maximumSize = {bucket, bucket};
             if ((request.purpose == DecodePurpose::Full && request.maximumSize.isEmpty()) ||
                 (request.purpose == DecodePurpose::Preview && edge <= 2560 && bucket < edge))
-                obsoletePreviewPrefixes.append(cacheKeyPrefix(candidate, sourceInfo));
+                obsoletePreviewPrefixes.append(cacheKeyPrefix(candidate, sourceInfo.absolutePath, sourceInfo.size, sourceInfo.modifiedMs));
             else if (bucket > edge)
-                coveringPreviewPrefixes.append(cacheKeyPrefix(candidate, sourceInfo));
+                coveringPreviewPrefixes.append(cacheKeyPrefix(candidate, sourceInfo.absolutePath, sourceInfo.size, sourceInfo.modifiedMs));
         }
     }
     inFlight_[key].work =
@@ -740,7 +806,9 @@ void ImageLoader::prefetchAdjacentRawFrames(const QString& path, const RawImageP
     for (const auto& handle : rawPrefetchHandles_) handle.cancel();
     rawPrefetchHandles_.clear();
     if (fastScrolling() || hasInteractiveWork() || residentResourceBytes() > memoryBudget_ * 3 / 4) return;
-    const int frameCount = availableFrameCount(QFileInfo(path).size(), current);
+    const auto snapshot = fileSnapshots_.constFind(path);
+    if (snapshot == fileSnapshots_.cend() || !snapshot->browsable) return;
+    const int frameCount = availableFrameCount(snapshot->size, current);
     const int adjacentCount =
         (current.frameIndex > 0 ? 1 : 0) + (current.frameIndex + 1 < frameCount ? 1 : 0);
     const qsizetype estimatedFrameCost = estimatedFullFrameBytes(current);
@@ -828,6 +896,13 @@ std::optional<RawImageParameters> ImageLoader::rawParameters(const QString& path
 
 bool ImageLoader::isCached(DecodeRequest request) const {
     Q_ASSERT(thread() == QThread::currentThread());
+    const auto snapshot = fileSnapshots_.constFind(request.path);
+    if (snapshot == fileSnapshots_.cend() || !snapshot->browsable) return false;
+    const auto keyFor = [&](const DecodeRequest& candidate) {
+        return cacheKeyPrefix(candidate, snapshot->absolutePath, snapshot->size, snapshot->modifiedMs) +
+            QLatin1Char('|') + (candidate.rawParameters ? candidate.rawParameters->cacheKey() : QStringLiteral("encoded")) +
+            QLatin1Char('|') + decoder_->cacheIdentity();
+    };
     if (!request.rawParameters) request.rawParameters = rawParameters(request.path);
     if (!request.rawParameters && decoder_->executionMode(request.path) == DecodeExecutionMode::Parallel)
         request.requireDisplayImage = false;
@@ -835,16 +910,16 @@ bool ImageLoader::isCached(DecodeRequest request) const {
         DecodeRequest candidate = request;
         candidate.purpose = DecodePurpose::Full;
         candidate.maximumSize = {};
-        if (fullCache_.contains(cacheKey(candidate, decoder_->cacheIdentity()))) return true;
+        if (fullCache_.contains(keyFor(candidate))) return true;
         const int edge = std::max(request.maximumSize.width(), request.maximumSize.height());
         for (const int bucket : {512, 1024, 1536, 2048, 2560}) {
             if (bucket < edge) continue;
             candidate = request;
             candidate.maximumSize = QSize(bucket, bucket);
-            if (previewCache_.contains(cacheKey(candidate, decoder_->cacheIdentity()))) return true;
+            if (previewCache_.contains(keyFor(candidate))) return true;
         }
     }
-    return cacheFor(request.purpose).contains(cacheKey(request, decoder_->cacheIdentity()));
+    return cacheFor(request.purpose).contains(keyFor(request));
 }
 
 qsizetype ImageLoader::cachedBytes() const {
@@ -1077,7 +1152,8 @@ const WeightedLruCache<ImageFrame>& ImageLoader::cacheFor(DecodePurpose purpose)
 }
 
 QString ImageLoader::cacheKey(const DecodeRequest& request, const QString& decoderIdentity) {
-    return cacheKeyPrefix(request, QFileInfo(request.path)) + QLatin1Char('|') +
+    const QFileInfo info(request.path);
+    return cacheKeyPrefix(request, info.absoluteFilePath(), info.size(), info.lastModified().toMSecsSinceEpoch()) + QLatin1Char('|') +
         (request.rawParameters ? request.rawParameters->cacheKey() : QStringLiteral("encoded")) +
         QLatin1Char('|') + decoderIdentity;
 }

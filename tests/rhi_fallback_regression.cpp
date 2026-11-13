@@ -74,6 +74,27 @@ int main(int argc, char* argv[]) {
         app.processEvents();
     }
     const auto gpu = ledger->gpuResources()->bytes();
+    if (app.arguments().contains("--benchmark-large")) {
+        const int width = rhi->resourceLimit(QRhi::TextureSizeMax) + 1;
+        for (int iteration = 0; iteration < 3; ++iteration) {
+            auto large = std::make_shared<ImageFrame>();
+            QImage image(width, 2048, QImage::Format_RGBA8888);
+            if (image.isNull()) return 1;
+            image.fill(QColor(24, 80, 120));
+            large->descriptor.size = image.size();
+            large->metadata.sourceSize = image.size();
+            large->storage = image;
+            canvas.setFrames({large});
+            QElapsedTimer elapsed; elapsed.start();
+            control.beginFrame(); control.polishItems(); control.sync(); control.render(); control.endFrame();
+            std::cout << "oversized RGBA8 " << width << "x2048 resource rebuild: "
+                      << double(elapsed.nsecsElapsed())/1e6 << " ms\n";
+            elapsed.restart();
+            control.beginFrame(); control.polishItems(); control.sync(); control.render(); control.endFrame();
+            std::cout << "unchanged frame: " << double(elapsed.nsecsElapsed())/1e6 << " ms\n";
+            app.processEvents();
+        }
+    }
     control.invalidate();
     if (rendered == 0 || gpu == 0 || gpu > 256 * 1024) {
         std::cerr << "Oversized YUV did not render with bounded fallback: " << gpu << '\n';

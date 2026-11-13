@@ -118,7 +118,7 @@ QString CompareController::fileText(int slot) const {
                                          .arg(imageSize.width())
                                          .arg(imageSize.height())
                                    : QStringLiteral("—*—");
-    const qint64 fileSize = info.isFile() ? info.size() : value->metadata.fileSize;
+    const qint64 fileSize = value->metadata.fileSize;
     const QString sizeText = fileSize > 0 ? compactDataSize(fileSize) : QStringLiteral("—");
     return QStringLiteral("%1,%2,%3").arg(fileName, resolution, sizeText);
 }
@@ -199,14 +199,6 @@ void CompareController::requestFrame(int slot, const QString& path) {
     if (!loader_) return;
     std::optional<RawImageParameters> rawParameters = loader_->rawParameters(path);
     const QString suffix = QFileInfo(path).suffix().toLower();
-    if (!rawParameters && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
-        rawParameters = RawPresetStore::loadForFile(path);
-        if (!rawParameters) {
-            const RawImageParameters inferred = RawPresetStore::inferFromFileName(path);
-            if (inferred.size.isValid()) rawParameters = inferred;
-        }
-        if (rawParameters) loader_->setRawParameters(path, *rawParameters);
-    }
     const quint64 generation = ++generations_[slot];
     const qreal dpr = canvas_ && canvas_->window() ? canvas_->window()->devicePixelRatio() : 1.0;
     const int slotCount = std::max(1, static_cast<int>(paths_.size()));
@@ -214,7 +206,8 @@ void CompareController::requestFrame(int slot, const QString& path) {
                                        qRound(canvas_->height() * dpr))
                                 : QSize(1280, 1000);
     previewSize = previewSize.expandedTo(QSize(640, 480)).boundedTo(QSize(1920, 1600));
-    const bool quick = rawParameters && rawParameters->isYuv() &&
+    const bool quick = ((rawParameters && rawParameters->isYuv()) ||
+                        (!rawParameters && suffix == QStringLiteral("yuv"))) &&
         !loader_->isCached({path, DecodePurpose::Preview, previewSize, rawParameters});
     requestPreview(slot, path, generation, previewSize, rawParameters, quick);
 }

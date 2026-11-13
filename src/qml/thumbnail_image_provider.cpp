@@ -4,7 +4,6 @@
 #include "core/raw_image_parameters.h"
 #include "io/image_decoder.h"
 #include "io/image_loader.h"
-#include "io/raw_preset_store.h"
 
 #include <QAbstractFileIconProvider>
 #include <QEventLoop>
@@ -89,16 +88,6 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
         const QString path = QUrl::fromPercentEncoding(
             id_.section(QLatin1Char('?'), 0, 0).toUtf8());
         std::optional<RawImageParameters> parameters = loader_->rawParameters(path);
-        const QString suffix = QFileInfo(path).suffix().toLower();
-        if (!parameters && (suffix == QStringLiteral("raw") || suffix == QStringLiteral("yuv"))) {
-            parameters = RawPresetStore::loadForFile(path);
-            if (!parameters) parameters = RawPresetStore::inferFromFileName(path);
-            if (parameters && availableFrameCount(QFileInfo(path).size(), *parameters) > 0) {
-                loader_->adoptRawParameters(path, *parameters);
-            } else {
-                parameters.reset();
-            }
-        }
         const QPointer<ThumbnailImageResponse> self(this);
         const bool galleryFull = id_.contains(QStringLiteral("purpose=gallery-full"));
         const bool navigation = id_.contains(QStringLiteral("purpose=navigation"));
@@ -119,7 +108,7 @@ class ThumbnailImageResponse final : public QQuickImageResponse {
             ++requestCounter_, std::move(request),
             [self](quint64, const DecodeResult& result) {
                 if (!self) return;
-                // Cache hits and validation errors call back inside request().
+                // Queue completion so the engine cannot reclaim the response inside a loader callback.
                 // Publish the handle and leave start() before emitting finished:
                 // the engine can reclaim the response as soon as it receives it.
                 QMetaObject::invokeMethod(self, [self, result] {

@@ -52,12 +52,11 @@ QString FullScreenController::fileType() const {
 }
 
 QString FullScreenController::fileSizeText() const {
-    const QFileInfo info(currentPath());
-    if (!info.isFile())
+    if (!frame_)
         return {};
 
     QString text =
-        QLocale().formattedDataSize(info.size(), 1, QLocale::DataSizeTraditionalFormat);
+        QLocale().formattedDataSize(frame_->metadata.fileSize, 1, QLocale::DataSizeTraditionalFormat);
     // QLocale separates the number and unit with locale-dependent whitespace (often a normal,
     // non-breaking, or narrow non-breaking space). The fullscreen HUD intentionally keeps the
     // compact "100MB" form regardless of the active locale.
