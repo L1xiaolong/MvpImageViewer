@@ -13,6 +13,19 @@ ApplicationWindow {
     minimumWidth: 980
     minimumHeight: 640
     title: qsTr("MVP Image Viewer")
+    // Keep the title for task switching and accessibility; omit its visible
+    // decoration so the toolbar and system caption occupy a single surface.
+    flags: windowChrome.supported
+           ? Qt.Window | Qt.CustomizeWindowHint | Qt.WindowSystemMenuHint
+             | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint
+             | Qt.WindowCloseButtonHint | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+           : Qt.Window
+    topPadding: 0
+    readonly property real unifiedTitleBarHeight: windowChrome.supported ? 44 : 0
+    readonly property rect titleBarLeftControls: showingCompare && comparePage
+        ? comparePage.titleBarLeftControls : browsePage.titleBarLeftControls
+    readonly property rect titleBarRightControls: showingCompare && comparePage
+        ? comparePage.titleBarRightControls : browsePage.titleBarRightControls
     color: Theme.sensorWhite
     palette.window: Theme.sensorWhite
     palette.windowText: Theme.graphiteInk
@@ -254,6 +267,8 @@ ApplicationWindow {
     BrowsePage {
         id: browsePage
         anchors.fill: parent
+        titleBarHeight: window.unifiedTitleBarHeight || Theme.toolbarHeight
+        captionButtonsWidth: windowChrome.captionButtonsWidth
         controller: browseController.activePane
         workspaceController: browseController
         propertiesController: imagePropertiesController
@@ -265,6 +280,16 @@ ApplicationWindow {
             window.openFullScreen(paths, initialIndex)
         }
         onSettingsRequested: window.openSettings()
+    }
+    WindowCaptionButtons {
+        objectName: "windowCaptionButtons"
+        anchors.top: parent.top
+        anchors.right: parent.right
+        z: 200
+        controller: windowChrome
+        maximized: window.visibility === Window.Maximized
+        visible: windowChrome.supported && !window.showingFullScreen
+                 && !window.fullScreenTransitioning && window.visibility !== Window.FullScreen
     }
     Loader {
         id: compareLoader
@@ -280,6 +305,8 @@ ApplicationWindow {
         }
         sourceComponent: Component {
     ComparePage {
+        titleBarHeight: window.unifiedTitleBarHeight || Theme.toolbarHeight
+        captionButtonsWidth: windowChrome.captionButtonsWidth
         controller: compareController
         settingsController: appSettings
         onCloseRequested: window.closeCompare()
@@ -323,42 +350,19 @@ ApplicationWindow {
         function onFilesystemChanged() { browseController.refreshAll() }
     }
 
-    Rectangle {
-        id: diagnosticNotice
-        property bool dismissed: false
-        anchors.top: parent.top
+    ApplicationNotices {
+        objectName: "applicationNotices"
         anchors.right: parent.right
-        anchors.margins: 16
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 16
+        anchors.bottomMargin: 48
+        width: Math.min(380, parent.width - 32)
         z: 100
-        width: Math.min(470, parent.width - 32)
-        height: noticeColumn.implicitHeight + 24
-        radius: 8
-        color: Theme.paperWhite
-        border.color: Theme.exposureAmber
-        visible: !dismissed && typeof diagnosticsController !== "undefined"
-                 && diagnosticsController.previousExit.length > 0
-        Column {
-            id: noticeColumn
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
-            Text {
-                width: parent.width
-                wrapMode: Text.Wrap
-                color: Theme.graphiteInk
-                text: typeof diagnosticsController !== "undefined" && diagnosticsController.previousExit === "crash"
-                      ? qsTr("A crash report from the previous session is available.")
-                      : qsTr("The previous session ended unexpectedly. Diagnostic information may be available.")
-            }
-            Row {
-                spacing: 8
-                Button {
-                    text: qsTr("Diagnostics / Export")
-                    onClicked: { window.openSettings(4); diagnosticNotice.dismissed = true }
-                }
-                Button { text: qsTr("Dismiss"); onClicked: diagnosticNotice.dismissed = true }
-            }
-        }
+        visible: !window.fullScreenTransitioning
+        settingsController: appSettings
+        diagnostics: typeof diagnosticsController !== "undefined" ? diagnosticsController : null
+        onDiagnosticsRequested: window.openSettings(4)
+        onUpdatesRequested: window.openSettings(3)
     }
 
     Loader {

@@ -110,8 +110,8 @@ Dialog {
             text: qsTr("Resize image")
             color: Theme.graphiteInk
             font.family: Theme.uiFont
-            font.pixelSize: 17
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.titleFontSize
+            font.weight: Theme.emphasisFontWeight
         }
         Text {
             x: 22

@@ -51,6 +51,10 @@ Rectangle {
     property int displayMode: controller ? controller.displayMode : 0
     property bool designMode: false
     property string iconPrefix: Theme.iconPrefix
+    property real titleBarHeight: Theme.toolbarHeight
+    property real captionButtonsWidth: 0
+    readonly property rect titleBarLeftControls: toolbar.leftControlsBounds
+    readonly property rect titleBarRightControls: toolbar.rightControlsBounds
     readonly property var sortLabels: [qsTr("Name"), qsTr("Modified"),
                                        qsTr("Size"), qsTr("Type")]
     signal fullScreenRequested(var paths, int initialIndex)
@@ -68,7 +72,7 @@ Rectangle {
                                                        !folderPicker.visible
     readonly property bool fileShortcutsEnabled: (workspaceController.hasActivePane === undefined ||
                                                   workspaceController.hasActivePane) &&
-                                                  !toolbar.searchControl.activeFocus &&
+                                                  !root.searchInputFocused &&
                                                   !propertiesPanel.textSelectionActive &&
                                                   !(root.rawParametersVisible && rawParametersPanel.inputFocused) &&
                                                   root.contentInteractionEnabled
@@ -76,11 +80,20 @@ Rectangle {
         const lowered = path.toLowerCase();
         return lowered.endsWith(".raw") || lowered.endsWith(".yuv");
     }
-    function synchronizeActivePaneControls() {
-        if (!root.controller)
-            return
-        if (toolbar.searchControl.text !== root.controller.filterText)
-            toolbar.searchControl.text = root.controller.filterText || ""
+    function activePaneHeader(item) {
+        const candidate = item || root
+        if (candidate.visible && candidate.objectName === "paneHeader-" + root.workspaceController.activePaneIndex)
+            return candidate
+        const children = candidate.children || []
+        for (let i = 0; i < children.length; ++i) {
+            const result = activePaneHeader(children[i])
+            if (result) return result
+        }
+        return null
+    }
+    readonly property bool searchInputFocused: {
+        const focused = root.Window.window ? root.Window.window.activeFocusItem : null
+        return focused && String(focused.objectName).indexOf("paneSearchField-") === 0
     }
     function paneController(index) {
         const availablePanes = root.workspaceController.panes
@@ -115,12 +128,14 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: Theme.toolbarHeight
+        height: root.titleBarHeight
+        captionButtonsWidth: root.captionButtonsWidth
         iconPrefix: root.iconPrefix
         displayMode: root.displayMode
         sortMode: root.controller.sortMode
         openFolderShortcutText: root.configuredShortcutLabel("openFolder", Qt.platform.os === "osx" ? "⌘O" : "Ctrl+O")
         compareShortcutText: root.configuredShortcutLabel("compare", "C")
+        settingsVisible: !root.navigatorVisible
         settingsShortcutText: root.configuredShortcutLabel("settings", Qt.platform.os === "osx" ? "⌘," : "Ctrl+,")
         newFolderShortcutText: root.configuredShortcutLabel("newFolder", Qt.platform.os === "osx" ? "⇧⌘N" : "Ctrl+Shift+N")
         searchShortcutText: root.configuredShortcutLabel("find", Qt.platform.os === "osx" ? "⌘F" : "Ctrl+F")
@@ -168,20 +183,6 @@ Rectangle {
     Connections {
         target: toolbar.folderCompareControl
         function onClicked() { root.workspaceController.addFileManagerPane(); }
-    }
-    Connections {
-        target: toolbar.searchControl
-        function onTextChanged() { searchDebounce.restart(); }
-    }
-    Timer {
-        id: searchDebounce
-        interval: 120
-        repeat: false
-        onTriggered: root.controller.setFilterText(toolbar.searchControl.text)
-    }
-    Connections {
-        target: toolbar.clearSearchControl
-        function onClicked() { toolbar.searchControl.clear(); }
     }
     Connections {
         target: toolbar.compareControl
@@ -235,16 +236,6 @@ Rectangle {
             galleryWorkspace.resetPreview()
         }
     }
-    Connections {
-        target: root.workspaceController
-        function onActivePaneChanged() { Qt.callLater(root.synchronizeActivePaneControls) }
-    }
-    Connections {
-        target: root.controller
-        function onFilterTextChanged() { root.synchronizeActivePaneControls() }
-    }
-    Component.onCompleted: synchronizeActivePaneControls()
-
     AppMenu {
         id: sortMenu
         AppMenuItem {
@@ -300,6 +291,58 @@ Rectangle {
         }
     }
 
+    Rectangle {
+        id: sidebarFooter
+        anchors.left: parent.left
+        anchors.bottom: statusRail.top
+        width: navigator.width
+        height: root.navigatorVisible ? 44 : 0
+        visible: root.navigatorVisible
+        color: Theme.sidebarSurface
+        Button {
+            id: sidebarSettings
+            objectName: "settingsButton"
+            anchors.fill: parent
+            anchors.margins: 6
+            text: qsTranslate("TopToolbar.ui", "Settings")
+            Accessible.name: text
+            hoverEnabled: true
+            onClicked: root.settingsRequested()
+            background: Rectangle {
+                radius: 5
+                color: sidebarSettings.down ? Theme.pressedSurface
+                    : sidebarSettings.hovered ? Theme.softHover : "transparent"
+                border.width: sidebarSettings.visualFocus ? 1 : 0
+                border.color: Theme.keyboardFocus
+            }
+            contentItem: Item {
+                Image {
+                    x: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 16; height: 16
+                    source: root.iconPrefix + "settings.svg"
+                }
+                Text {
+                    x: 38
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sidebarSettings.text
+                    color: Theme.graphiteInk
+                    font.family: Theme.uiFont
+                    font.pixelSize: 13
+                }
+                Text {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.configuredShortcutLabel("settings", "Ctrl+,")
+                    color: Theme.faintInk
+                    font.family: Theme.uiFont
+                    font.pixelSize: 11
+                }
+            }
+        }
+    }
+
     // Design reference: Quick Folder Navigator, collapsible with Cmd/Ctrl+B.
     FolderNavigator {
         id: navigator
@@ -311,7 +354,7 @@ Rectangle {
         iconPrefix: root.iconPrefix
         anchors.left: parent.left
         anchors.top: toolbar.bottom
-        anchors.bottom: statusRail.top
+        anchors.bottom: sidebarFooter.top
         width: root.navigatorVisible ? Math.min(root.navigatorWidth,
             Math.max(200, root.width - root.effectiveInspectorWidth - 418)) : 0
         opacity: root.navigatorVisible ? 1 : 0
@@ -375,7 +418,7 @@ Rectangle {
         anchors.right: inspectorResizeHandle.left
         anchors.top: toolbar.bottom
         anchors.bottom: statusRail.top
-        anchors.margins: 8
+        anchors.margins: root.workspaceController.paneCount === 1 ? 0 : 8
 
         Loader {
             id: paneLayoutLoader
@@ -644,6 +687,21 @@ Rectangle {
 
     // Gallery view: a quiet inspection surface with a large fitted preview and
     // a compact contact strip. It uses the same production thumbnail model.
+    PaneHeader {
+        id: galleryPaneHeader
+        searchReturnTarget: galleryFlick
+        enabled: root.contentInteractionEnabled
+        visible: galleryWorkspace.visible
+        anchors.left: gutter.right
+        anchors.right: inspectorResizeHandle.left
+        anchors.top: toolbar.bottom
+        controller: root.controller
+        workspaceController: root.workspaceController
+        paneIndex: 0
+        settingsController: root.settingsController
+        iconPrefix: root.iconPrefix
+    }
+
     Item {
         id: galleryWorkspace
         objectName: "galleryWorkspace"
@@ -727,7 +785,7 @@ Rectangle {
         onVisibleChanged: root.controller.setGalleryPath(visible ? currentPreviewPath : "")
         anchors.left: gutter.right
         anchors.right: inspectorResizeHandle.left
-        anchors.top: toolbar.bottom
+        anchors.top: galleryPaneHeader.bottom
         anchors.bottom: statusRail.top
         anchors.margins: root.inspectorVisible ? 8 : 16
 
@@ -1171,13 +1229,13 @@ Rectangle {
                                       ? Theme.keyboardFocus
                                       : galleryDelegate.isSelected ? Theme.fileSelectionBorder : "transparent"
                         border.width: galleryStrip.activeFocus && galleryDelegate.GridView.isCurrentItem ? 2 : 1
-                        ToolTip.delay: 500
-                        ToolTip.timeout: 8000
-                        ToolTip.visible: galleryMouse.containsMouse &&
-                                         !galleryDragHandler.active &&
-                                         galleryDelegate.path.length > 0
-                        ToolTip.text: galleryDelegate.path
-
+                        PathToolTip {
+                            objectName: "galleryPathToolTip"
+                            parent: galleryCard
+                            path: galleryDelegate.path
+                            fileName: galleryDelegate.fileName
+                            visible: galleryMouse.containsMouse && !galleryDragHandler.active && galleryDelegate.path.length > 0
+                        }
                         Rectangle {
                             anchors.left: parent.left
                             anchors.right: parent.right
@@ -1371,13 +1429,17 @@ Rectangle {
             color: Theme.opticalGray
         }
         Text {
+            objectName: "browserStatusLabel"
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            elide: Text.ElideRight
             anchors.left: parent.left
             anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             text: root.displayMode === 2 && galleryWorkspace.pixelProbeText.length > 0
                   ? galleryWorkspace.pixelProbeText : root.workspaceController.statusText
             color: Theme.mutedInk
-            font.family: Theme.monoFont
+            font.family: root.displayMode === 2 && galleryWorkspace.pixelProbeText.length > 0 ? Theme.monoFont : Theme.uiFont
             font.pixelSize: 12
         }
     }
@@ -1761,8 +1823,8 @@ Rectangle {
         sequence: root.configuredShortcut("find", "Ctrl+F")
         enabled: root.contentInteractionEnabled
         onActivated: {
-            toolbar.searchControl.forceActiveFocus();
-            toolbar.searchControl.selectAll();
+            const header = root.activePaneHeader()
+            if (header) header.focusSearch()
         }
     }
     Shortcut {

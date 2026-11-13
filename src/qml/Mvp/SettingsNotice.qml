@@ -21,6 +21,6 @@ Rectangle {
         font.family: Theme.uiFont
         font.pixelSize: 12
         wrapMode: Text.Wrap
-        lineHeight: 1.25
+        lineHeight: Theme.descriptionLineHeight
     }
 }

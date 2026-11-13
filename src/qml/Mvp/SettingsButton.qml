@@ -17,7 +17,7 @@ Button {
         color: root.primary ? Theme.primaryButtonText : root.destructive ? Theme.danger : Theme.graphiteInk
         font.family: Theme.uiFont
         font.pixelSize: 12
-        font.weight: root.primary ? Font.DemiBold : Font.Normal
+        font.weight: root.primary ? Theme.emphasisFontWeight : Theme.bodyFontWeight
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
@@ -25,9 +25,9 @@ Button {
     background: Rectangle {
         radius: Theme.radius
         color: root.primary ? (root.down ? Theme.primaryButton : root.hovered ? Theme.primaryButtonHover : Theme.primaryButton)
-               : root.down ? Theme.pressedSurface : root.hovered ? Theme.softHover : Theme.raisedSurface
-        border.width: root.activeFocus ? 2 : 1
-        border.color: root.activeFocus ? Theme.probeBlue : root.destructive ? Theme.dangerBorder : Theme.opticalGray
+               : root.down ? Theme.pressedSurface : root.hovered ? Theme.softHover : "transparent"
+        border.width: root.visualFocus ? 2 : root.destructive ? 1 : 0
+        border.color: root.visualFocus ? Theme.probeBlue : root.destructive ? Theme.dangerBorder : "transparent"
         Behavior on color { ColorAnimation { duration: Theme.fast } }
     }
 }

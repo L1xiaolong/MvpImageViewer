@@ -49,6 +49,7 @@ class BrowseWorkspaceController final : public QObject {
     }
     [[nodiscard]] bool canCompare() const;
     [[nodiscard]] QString statusText() const;
+    void retranslate();
     [[nodiscard]] ImageLoader* loader() const { return loader_; }
 
     Q_INVOKABLE void addFileManagerPane();

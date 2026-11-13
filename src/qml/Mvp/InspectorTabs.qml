@@ -30,13 +30,13 @@ Row {
                 color: root.currentIndex === tab.index ? Theme.probeBlue : Theme.mutedInk
                 font.family: Theme.uiFont
                 font.pixelSize: 12
-                font.weight: root.currentIndex === tab.index ? Font.DemiBold : Font.Normal
+                font.weight: root.currentIndex === tab.index ? Theme.emphasisFontWeight : Font.Normal
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
             background: Rectangle {
                 color: tab.hovered ? Theme.softHover : "transparent"
-                border.width: tab.activeFocus ? 2 : 0
+                border.width: tab.visualFocus ? 2 : 0
                 border.color: Theme.probeBlue
                 Rectangle {
                     anchors.bottom: parent.bottom

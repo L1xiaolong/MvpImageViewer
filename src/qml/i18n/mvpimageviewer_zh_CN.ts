@@ -79,6 +79,86 @@
         <source>Network folder is unavailable: %1</source>
         <translation>网络文件夹不可用：%1</translation>
     </message>
+    <message>
+        <source>%1 %2 item(s) to the clipboard</source>
+        <translation>已%1 %2 项到剪贴板</translation>
+    </message>
+    <message>
+        <source>%1 %2 item(s)…</source>
+        <translation>%1 %2 项…</translation>
+    </message>
+    <message>
+        <source>%1 items · %2 selected</source>
+        <translation>%1 项 · 已选 %2 项</translation>
+    </message>
+    <message>
+        <source>%1 of %2 item(s) could not be moved to Trash</source>
+        <translation>%2 项中有 %1 项无法移入回收站</translation>
+    </message>
+    <message>
+        <source>Choose a folder for this pane</source>
+        <translation>为此窗格选择文件夹</translation>
+    </message>
+    <message>
+        <source>Copied</source>
+        <translation>复制</translation>
+    </message>
+    <message>
+        <source>Could not open the system file manager</source>
+        <translation>无法打开系统文件管理器</translation>
+    </message>
+    <message>
+        <source>Cut</source>
+        <translation>剪切</translation>
+    </message>
+    <message>
+        <source>Finished processing %1</source>
+        <translation>已完成处理 %1</translation>
+    </message>
+    <message>
+        <source>Folder is hidden, unreadable, or unavailable: %1</source>
+        <translation>文件夹已隐藏、无法读取或不可用：%1</translation>
+    </message>
+    <message>
+        <source>Moved %1 item(s) to Trash</source>
+        <translation>已将 %1 项移入回收站</translation>
+    </message>
+    <message>
+        <source>Processing %1…</source>
+        <translation>正在处理 %1…</translation>
+    </message>
+    <message>
+        <source>Refreshing %1…</source>
+        <translation>正在刷新 %1…</translation>
+    </message>
+    <message>
+        <source>Renamed to %1</source>
+        <translation>已重命名为 %1</translation>
+    </message>
+    <message>
+        <source>Restoring the previous folder…</source>
+        <translation>正在恢复上次的文件夹…</translation>
+    </message>
+    <message>
+        <source>Saved changes to %1</source>
+        <translation>已保存对 %1 的更改</translation>
+    </message>
+    <message>
+        <source>Scanning %1…</source>
+        <translation>正在扫描 %1…</translation>
+    </message>
+    <message>
+        <source>Scanning %1… %2 items</source>
+        <translation>正在扫描 %1… %2 项</translation>
+    </message>
+    <message>
+        <source>Select 2–4 images to compare</source>
+        <translation>选择 2～4 张图片进行对比</translation>
+    </message>
+    <message>
+        <source>The clipboard does not contain files</source>
+        <translation>剪贴板中没有文件</translation>
+    </message>
 </context>
 <context>
     <name>BrowsePage</name>
@@ -2102,6 +2182,7 @@ Choose another folder or drop images here</source>
         <source>Fill preview frame</source>
         <translation>填满预览框</translation>
     </message>
+    <message><source>Check each time the app starts. Downloads and installation always require your action.</source><translation>每次启动软件时检查更新。下载和安装均需手动操作。</translation></message>
 </context>
 <context>
     <name>ThumbnailTile</name>
@@ -3341,5 +3422,64 @@ Returned to the previous folder.</source>
         <source>Unable to load configuration: %1</source>
         <translation>无法加载配置：%1</translation>
     </message>
+</context>
+<context>
+    <name>BrowseWorkspaceController</name>
+    <message>
+        <source>%1 selected · from %2 panes</source>
+        <translation>已选 %1 项 · 来自 %2 个窗格</translation>
+    </message>
+    <message>
+        <source>%1 selected · from 1 pane</source>
+        <translation>已选 %1 项 · 来自 1 个窗格</translation>
+    </message>
+    <message>
+        <source>Choose a folder for this pane</source>
+        <translation>为此窗格选择文件夹</translation>
+    </message>
+</context>
+<context>
+    <name>MockBrowseController</name>
+    <message>
+        <source>%1 items · %2 selected</source>
+        <translation>%1 项 · 已选 %2 项</translation>
+    </message>
+</context>
+<context>
+    <name>MockBrowseWorkspace</name>
+    <message>
+        <source>%1 selected · from %2 panes</source>
+        <translation>已选 %1 项 · 来自 %2 个窗格</translation>
+    </message>
+    <message>
+        <source>%1 selected · from 1 pane</source>
+        <translation>已选 %1 项 · 来自 1 个窗格</translation>
+    </message>
+    <message>
+        <source>Choose a folder for this pane</source>
+        <translation>为此窗格选择文件夹</translation>
+    </message>
+</context>
+<context>
+    <name>WindowCaptionButtons</name>
+    <message><source>Minimize</source><translation>最小化</translation></message>
+    <message><source>Maximize</source><translation>最大化</translation></message>
+    <message><source>Restore</source><translation>还原</translation></message>
+    <message><source>Close</source><translation>关闭</translation></message>
+</context>
+<context>
+    <name>PaneHeader</name>
+    <message><source>Close search</source><translation>关闭搜索</translation></message>
+</context>
+<context>
+    <name>ApplicationNotices</name>
+    <message><source>Diagnostic report available</source><translation>诊断报告可用</translation></message>
+    <message><source>A crash report from the previous session is available.</source><translation>上次运行的崩溃报告可供导出。</translation></message>
+    <message><source>The previous session ended unexpectedly. Diagnostic information may be available.</source><translation>上次运行意外结束，可查看和导出诊断信息。</translation></message>
+    <message><source>Diagnostics / Export</source><translation>诊断 / 导出</translation></message>
+    <message><source>Dismiss</source><translation>关闭提示</translation></message>
+    <message><source>Update available</source><translation>发现新版本</translation></message>
+    <message><source>Version %1 is available.</source><translation>版本 %1 已可更新。</translation></message>
+    <message><source>View update</source><translation>查看更新</translation></message>
 </context>
 </TS>

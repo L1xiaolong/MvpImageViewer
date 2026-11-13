@@ -38,9 +38,9 @@ Item {
     property bool selected: false
     property int selectionOrdinal: 0
     property int displayMode: 0
-    readonly property string pathToolTipText: ToolTip.text
-    readonly property bool pathToolTipVisible: ToolTip.visible
-    readonly property int pathToolTipDelay: ToolTip.delay
+    readonly property string pathToolTipText: pathTip.text
+    readonly property bool pathToolTipVisible: pathTip.visible
+    readonly property int pathToolTipDelay: pathTip.delay
     readonly property bool pathHoverActive: tileMouse.containsMouse
     signal activated
     signal selectionRequested(bool extend, bool toggle)
@@ -89,27 +89,26 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            spacing: 5
+            spacing: 8
 
             Rectangle {
                 id: typeBadge
                 objectName: metadataStrip.badgeObjectName
                 visible: !metadataStrip.directory
-                Layout.preferredWidth: typeLabel.implicitWidth + 10
+                Layout.preferredWidth: typeLabel.implicitWidth
                 Layout.preferredHeight: 17
                 radius: 4
-                color: metadataStrip.badgeSurface
-                border.width: 1
-                border.color: metadataStrip.badgeBorder
+                color: "transparent"
+                border.width: 0
 
                 Text {
                     id: typeLabel
                     anchors.centerIn: parent
                     text: metadataStrip.normalizedType
-                    color: metadataStrip.badgeInk
+                    color: Theme.mutedInk
                     font.family: Theme.uiFont
-                    font.pixelSize: 10
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.metadataFontSize
+                    font.weight: Theme.bodyFontWeight
                 }
             }
 
@@ -119,8 +118,8 @@ Item {
                 Layout.fillWidth: true
                 text: metadataStrip.directory
                       ? qsTr("Folder")
-                      : "| " + metadataStrip.dimensionText + " | " +
-                        metadataStrip.depthText + " | " + metadataStrip.sizeText
+                      : metadataStrip.dimensionText + " · " +
+                        metadataStrip.depthText + " · " + metadataStrip.sizeText
                 elide: Text.ElideRight
                 color: Theme.mutedInk
                 font.family: Theme.uiFont
@@ -138,13 +137,16 @@ Item {
     Drag.hotSpot.y: Math.min(root.height / 2, 60)
 
     width: GridView.view ? GridView.view.cellWidth - 16 : 196
-    height: displayMode === 1 ? 68 : width * 0.75 + (displayMode === 2 ? 36 : 58)
+    height: displayMode === 1 ? 68 : width * 0.75 + (displayMode === 2 ? 36 : 48)
 
-    ToolTip.delay: 500
-    ToolTip.timeout: 8000
-    ToolTip.visible: tileMouse.containsMouse && !tileDragHandler.active &&
-                     root.path.length > 0
-    ToolTip.text: root.path
+    PathToolTip {
+        id: pathTip
+        objectName: "thumbnailPathToolTip"
+        parent: root
+        path: root.path
+        fileName: root.fileName || path.split(/[\\/]/).pop() || path
+        visible: tileMouse.containsMouse && !tileDragHandler.active && root.path.length > 0
+    }
 
     Loader {
         id: visualLoader
@@ -165,7 +167,7 @@ Item {
                 color: root.selected ? Theme.fileSelectionSurface : tileMouse.containsMouse ? Theme.paperWhite : "transparent"
                 radius: Theme.radius
                 border.width: 1
-                border.color: root.selected ? Theme.fileSelectionBorder : tileMouse.containsMouse ? Theme.opticalGray : "transparent"
+                border.color: root.selected ? Theme.fileSelectionBorder : "transparent"
             }
             Rectangle {
                 id: imageWell
@@ -178,7 +180,7 @@ Item {
                 height: Math.round(width * 0.75)
                 color: Theme.thumbnailWell
                 border.color: Theme.opticalGray
-                border.width: 1
+                border.width: 0
                 clip: true
                 Image {
                     id: gridPreview
@@ -220,19 +222,20 @@ Item {
                 anchors.top: imageWell.bottom
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
-                anchors.topMargin: 5
+                anchors.topMargin: 6
                 text: root.fileName
                 elide: Text.ElideMiddle
                 color: Theme.graphiteInk
                 font.family: Theme.uiFont
-                font.pixelSize: 13
+                font.pixelSize: Theme.bodyFontSize
+                font.weight: Theme.bodyFontWeight
             }
             MetadataStrip {
                 visible: root.displayMode !== 2
                 anchors.left: gridName.left
                 anchors.right: gridName.right
                 anchors.top: gridName.bottom
-                anchors.topMargin: 1
+                anchors.topMargin: 3
                 typeText: root.fileType
                 imageDimensions: root.dimensions
                 sourceBitDepth: root.bitDepth
@@ -253,7 +256,7 @@ Item {
                 color: root.selected ? Theme.fileSelectionSurface : tileMouse.containsMouse ? Theme.paperWhite : "transparent"
                 radius: Theme.radius
                 border.width: 1
-                border.color: root.selected ? Theme.fileSelectionBorder : tileMouse.containsMouse ? Theme.opticalGray : "transparent"
+                border.color: root.selected ? Theme.fileSelectionBorder : "transparent"
             }
             Rectangle {
                 id: listImageWell
@@ -264,7 +267,7 @@ Item {
                 height: 52
                 color: Theme.thumbnailWell
                 border.color: Theme.opticalGray
-                border.width: 1
+                border.width: 0
                 clip: true
                 Image {
                     id: listPreview
@@ -308,7 +311,7 @@ Item {
                 color: Theme.graphiteInk
                 font.family: Theme.uiFont
                 font.pixelSize: 13
-                font.weight: Font.Medium
+                font.weight: Font.Normal
             }
             MetadataStrip {
                 anchors.left: listName.left
@@ -344,14 +347,14 @@ Item {
         width: 18
         height: 18
         radius: 9
-        color: Theme.fileSelectionBorder
+        color: Theme.fileSelectionBadge
         Text {
             anchors.centerIn: parent
             text: root.selectionOrdinal > 0 ? root.selectionOrdinal : "✓"
             color: Theme.darkMode ? "#172027" : "white"
             font.family: Theme.monoFont
             font.pixelSize: 10
-            font.weight: Font.DemiBold
+            font.weight: Font.Medium
         }
     }
 

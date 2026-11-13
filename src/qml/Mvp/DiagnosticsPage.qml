@@ -21,7 +21,7 @@ Column {
         color: Theme.mutedInk
         font.family: Theme.uiFont
         font.pixelSize: 12
-        lineHeight: 1.25
+        lineHeight: Theme.descriptionLineHeight
     }
     SettingsHeading { text: qsTr("Recording") }
     SettingsRow {

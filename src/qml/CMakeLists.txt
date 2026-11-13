@@ -3,6 +3,8 @@ qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(MVPImageViewerQml
     main.cpp
+    window_chrome_controller.h
+    window_chrome_controller.cpp
     app_settings.h
     app_settings.cpp
     browse_controller.h
@@ -24,6 +26,9 @@ qt_add_executable(MVPImageViewerQml
     raw_parameters_controller.h
     raw_parameters_controller.cpp
 )
+if(WIN32)
+    target_link_libraries(MVPImageViewerQml PRIVATE comctl32)
+endif()
 
 qt_add_qml_module(MVPImageViewerQml
     URI MvpViewQml
@@ -46,6 +51,7 @@ qt_add_qml_module(MVPImageViewerQml
         Mvp/AppMenuItem.qml
         Mvp/AppMenuSeparator.qml
         Mvp/BrowserPane.qml
+        Mvp/PaneHeader.qml
         Mvp/CompareLumaHistogram.qml
         Mvp/DesignCompareCanvas.qml
         Mvp/DesignFullScreenCanvas.qml
@@ -67,8 +73,11 @@ qt_add_qml_module(MVPImageViewerQml
         Mvp/ProductionCompareCanvas.qml
         Mvp/ProductionFullScreenCanvas.qml
         Mvp/TopToolbar.ui.qml
+        Mvp/WindowCaptionButtons.qml
+        Mvp/ApplicationNotices.qml
         Mvp/ThumbnailViewport.qml
         Mvp/NavigationThumbnail.qml
+        Mvp/PathToolTip.qml
         Mvp/ThumbnailTile.qml
         Pages/BrowsePage.qml
         Pages/ComparePage.qml
@@ -84,6 +93,11 @@ qt_add_translations(MVPImageViewerQml
 )
 
 set(_mvpview_qml_icons
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/caption-minimize.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/caption-maximize.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/caption-restore.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/caption-close.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/caption-close-white.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/back.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/forward.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/up.svg
@@ -94,6 +108,13 @@ set(_mvpview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/folder-pane-plus.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/windows-folder.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/windows-folder-open.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-home.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-desktop.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-documents.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-downloads.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-pictures.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-drive.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/nav-network.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/windows-drive.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/macos-folder.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/macos-folder-open.svg

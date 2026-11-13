@@ -3,6 +3,7 @@
 #include "io/image_loader.h"
 #include "qml/browse_controller.h"
 
+#include <QCoreApplication>
 #include <QFileSystemModel>
 #include <QSet>
 
@@ -52,16 +53,28 @@ bool BrowseWorkspaceController::canCompare() const {
 
 QString BrowseWorkspaceController::statusText() const {
     const BrowseController* active = activeBrowsePane();
-    if (!active) return QStringLiteral("Choose a folder for this file manager");
-    QString result = active->statusText();
-    if (!selectedImagePaths_.isEmpty()) {
-        int selectedPanes = 0;
-        for (const BrowseController* pane : panes_)
-            if (!pane->selectedImagePaths().isEmpty()) ++selectedPanes;
-        result += QStringLiteral(" · %1 image(s) across %2 manager(s)")
-                      .arg(selectedImagePaths_.size()).arg(selectedPanes);
+    if (!active) return QCoreApplication::translate("BrowseWorkspaceController", "Choose a folder for this pane");
+    // Operational messages take precedence over the steady-state selection summary.
+    if (panes_.size() <= 1 || (!active->currentDirectory().isEmpty() &&
+                              active->statusText() != active->selectionStatusText()))
+        return active->statusText();
+    int selectedItems = 0;
+    int selectedPanes = 0;
+    for (const BrowseController* pane : panes_) {
+        selectedItems += pane->selectionCount();
+        if (pane->selectionCount() > 0) ++selectedPanes;
     }
-    return result;
+    if (selectedItems == 0) return active->statusText();
+    if (selectedPanes == 1)
+        return QCoreApplication::translate("BrowseWorkspaceController", "%1 selected · from 1 pane").arg(selectedItems);
+    return QCoreApplication::translate("BrowseWorkspaceController", "%1 selected · from %2 panes")
+        .arg(selectedItems).arg(selectedPanes);
+}
+
+void BrowseWorkspaceController::retranslate() {
+    for (BrowseController* pane : panes_) pane->retranslate();
+    emptyPane_->retranslate();
+    emit statusTextChanged();
 }
 
 BrowseController* BrowseWorkspaceController::createPane(const QString& initialDirectory,

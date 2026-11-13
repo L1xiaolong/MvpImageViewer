@@ -99,6 +99,8 @@ class BrowseController final : public QObject {
     [[nodiscard]] QString selectedUriList() const;
     [[nodiscard]] int selectionCount() const { return static_cast<int>(selectedPaths_.size()); }
     [[nodiscard]] QString statusText() const { return statusText_; }
+    [[nodiscard]] QString selectionStatusText() const;
+    void retranslate();
     [[nodiscard]] bool canGoBack() const { return navigationHistoryIndex_ > 0; }
     [[nodiscard]] bool canGoForward() const;
     [[nodiscard]] bool canGoUp() const;
@@ -258,6 +260,7 @@ class BrowseController final : public QObject {
     QStringList selectedPaths_;
     QStringList navigationHistory_;
     QString statusText_;
+    bool showingSelectionStatus_ = false;
     QString filterText_;
     int navigationHistoryIndex_ = -1;
     quint64 scanGeneration_ = 0;

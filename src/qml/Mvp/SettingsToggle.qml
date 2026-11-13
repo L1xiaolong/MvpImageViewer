@@ -15,8 +15,8 @@ Switch {
         height: 20
         radius: 10
         color: root.checked ? Theme.primaryButton : Theme.opticalGray
-        border.width: root.activeFocus ? 2 : 1
-        border.color: root.activeFocus ? Theme.probeBlue : root.hovered ? Theme.mutedInk : color
+        border.width: root.visualFocus ? 2 : 1
+        border.color: root.visualFocus ? Theme.probeBlue : root.hovered ? Theme.mutedInk : color
         Behavior on color { ColorAnimation { duration: Theme.fast } }
         Rectangle {
             x: root.checked ? parent.width - width - 3 : 3

@@ -46,8 +46,8 @@ Dialog {
             text: root.completedWithError ? qsTr("Operation incomplete") : root.dialogTitle
             color: Theme.graphiteInk
             font.family: Theme.uiFont
-            font.pixelSize: 18
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.titleFontSize
+            font.weight: Theme.emphasisFontWeight
             wrapMode: Text.Wrap
         }
         Text {
@@ -57,7 +57,7 @@ Dialog {
             wrapMode: Text.Wrap
             font.family: Theme.uiFont
             font.pixelSize: 12
-            lineHeight: 1.25
+            lineHeight: Theme.descriptionLineHeight
         }
         Text { id: errorLabel; visible: false }
         Flow {

@@ -14,6 +14,7 @@
 #include "qml/full_screen_controller.h"
 #include "qml/raw_parameters_controller.h"
 #include "qml/thumbnail_image_provider.h"
+#include "qml/window_chrome_controller.h"
 
 #include <QCoreApplication>
 #include <algorithm>
@@ -29,6 +30,7 @@
 #include <QSGRendererInterface>
 #include <QScreen>
 #include <QSettings>
+#include <QStyleHints>
 #include <QTimer>
 #include <QUrl>
 #include <rhi/qrhi.h>
@@ -61,6 +63,13 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QSettings settings;
     mvpview::AppSettings appSettings(&app);
+    const auto synchronizeNativeTheme = [&app, &appSettings] {
+        const auto scheme = appSettings.theme() == QStringLiteral("system") ? Qt::ColorScheme::Unknown
+            : appSettings.darkTheme() ? Qt::ColorScheme::Dark : Qt::ColorScheme::Light;
+        app.styleHints()->setColorScheme(scheme);
+    };
+    QObject::connect(&appSettings, &mvpview::AppSettings::themeChanged, &app, synchronizeNativeTheme);
+    synchronizeNativeTheme();
     mvpview::DiagnosticsController diagnosticsController(diagnosticService);
     QObject::connect(&appSettings, &mvpview::AppSettings::diagnosticsChanged, &app, [&] {
         diagnosticService.configure(appSettings.loggingEnabled(), mvpview::diagnostics::parseLevel(appSettings.logLevel()));
@@ -153,13 +162,17 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
         compareController.reload();
     });
 
+    mvpview::WindowChromeController windowChrome;
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty(QStringLiteral("windowChrome"), &windowChrome);
     QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
                      &engine, &QQmlApplicationEngine::retranslate);
     QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
                      &imagePropertiesController, &mvpview::ImagePropertiesController::retranslate);
     QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
                      &fullScreenPropertiesController, &mvpview::ImagePropertiesController::retranslate);
+    QObject::connect(&appSettings, &mvpview::AppSettings::languageChanged,
+                     &browseController, &mvpview::BrowseWorkspaceController::retranslate);
     engine.rootContext()->setContextProperty(QStringLiteral("fullScreenPropertiesController"), &fullScreenPropertiesController);
     engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), &appSettings);
     engine.rootContext()->setContextProperty(QStringLiteral("diagnosticsController"), &diagnosticsController);
@@ -221,6 +234,16 @@ static int runApplication(int argc, char* argv[], mvpview::diagnostics::Service&
     QObject::connect(mainWindow, &QQuickWindow::sceneGraphInitialized, &appSettings,
                      [applySurfaceColorSpace] { applySurfaceColorSpace(); });
     mainWindow->create();
+    windowChrome.attach(mainWindow);
+    const auto synchronizeChromeVisibility = [&] {
+        windowChrome.setSuspended(fullScreenPresentationController.active()
+                                   || mainWindow->visibility() == QWindow::FullScreen);
+    };
+    QObject::connect(&fullScreenPresentationController,
+                     &mvpview::FullScreenPresentationController::activeChanged,
+                     &windowChrome, synchronizeChromeVisibility);
+    QObject::connect(mainWindow, &QWindow::visibilityChanged,
+                     &windowChrome, synchronizeChromeVisibility);
     applySurfaceColorSpace();
     QObject::connect(mainWindow, &QWindow::screenChanged, mainWindow, [applySurfaceColorSpace] {
         mvpview::diagnostics::event(mvpview::diagnostics::Level::Info, mvpview::diagnostics::render(), QStringLiteral("window.screen_changed"), {}, true);

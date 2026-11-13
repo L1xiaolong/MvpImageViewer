@@ -441,20 +441,24 @@ void AppSettings::resetShortcuts() {
 }
 
 void AppSettings::startAutomaticUpdateCheck() {
-    if (!automaticUpdateChecks_)
+    if (!automaticUpdateChecks_ || startupUpdateCheckScheduled_)
         return;
+    int delay = 1500;
 #ifndef NDEBUG
-    if (qEnvironmentVariableIsSet("MVPVIEW_UPDATE_API_URL")) {
-        QTimer::singleShot(100, this, &AppSettings::checkForUpdates);
-        return;
-    }
+    const bool customEndpoint = qEnvironmentVariableIsSet("MVPVIEW_UPDATE_API_URL");
+    if (customEndpoint) delay = 100;
+#else
+    constexpr bool customEndpoint = false;
 #endif
-    if (repositorySlug().isEmpty())
+    if (!customEndpoint && repositorySlug().isEmpty())
         return;
-    const QDateTime lastCheck = QSettings().value(QLatin1String(kLastUpdateCheckKey)).toDateTime();
-    if (lastCheck.isValid() && lastCheck.secsTo(QDateTime::currentDateTimeUtc()) < 24 * 60 * 60)
-        return;
-    QTimer::singleShot(1500, this, &AppSettings::checkForUpdates);
+    startupUpdateCheckScheduled_ = true;
+    QTimer::singleShot(delay, this, [this] {
+        // Recheck the preference after the startup delay. A manual check or
+        // download started meanwhile already owns the update state.
+        if (automaticUpdateChecks_ && updateState_ == QStringLiteral("idle"))
+            checkForUpdates();
+    });
 }
 
 void AppSettings::checkForUpdates() {

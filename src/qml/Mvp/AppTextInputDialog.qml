@@ -66,7 +66,7 @@ Dialog {
             color: Theme.graphiteInk
             font.family: Theme.uiFont
             font.pixelSize: 17
-            font.weight: Font.DemiBold
+            font.weight: Theme.emphasisFontWeight
         }
 
         Text {
@@ -131,9 +131,9 @@ Dialog {
             }
             background: Rectangle {
                 radius: 6
-                color: cancelButton.down ? Theme.pressedSurface : cancelButton.hovered ? Theme.softHover : Theme.paperWhite
-                border.color: Theme.opticalGray
-                border.width: 1
+                color: cancelButton.down ? Theme.pressedSurface : cancelButton.hovered ? Theme.softHover : "transparent"
+                border.color: Theme.probeBlue
+                border.width: cancelButton.visualFocus ? 2 : 0
             }
         }
 
@@ -153,7 +153,7 @@ Dialog {
                 verticalAlignment: Text.AlignVCenter
                 font.family: Theme.uiFont
                 font.pixelSize: 13
-                font.weight: Font.DemiBold
+                font.weight: Theme.emphasisFontWeight
             }
             background: Rectangle {
                 radius: 6

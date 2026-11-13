@@ -11,6 +11,7 @@ Rectangle {
     required property var workspaceController
     required property int paneIndex
     property var settingsController: null
+    readonly property bool multiplePanes: workspaceController.paneCount !== undefined && workspaceController.paneCount > 1
     property bool active: workspaceController.activePaneIndex === paneIndex
     property bool contentInteractionEnabled: true
     property string iconPrefix: Theme.iconPrefix
@@ -18,346 +19,34 @@ Rectangle {
     signal newFolderRequested
 
     color: Theme.sensorWhite
-    border.width: 1
+    border.width: multiplePanes ? 1 : 0
     border.color: Theme.opticalGray
     clip: true
 
     function activate() { workspaceController.activatePane(paneIndex) }
-
-    function locationLabel(path) {
-        const parts = String(path).split(/[\\/]/).filter(function(part) { return part.length > 0 })
-        return parts.length > 0 ? parts[parts.length - 1] : String(path)
-    }
-
-    function submitLocation() {
-        root.activate()
-        const error = root.controller.navigateToTypedPath(locationField.text)
-        locationField.locationError = error
-        if (error.length === 0) {
-            locationField.text = root.controller.currentDirectory
-            locationField.focus = false
-        } else {
-            locationField.forceActiveFocus()
-            locationField.selectAll()
-        }
-    }
 
     Rectangle {
         id: focusRail
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: 2
+        height: root.multiplePanes ? 2 : 0
         color: Theme.activePaneAccent
         opacity: root.active ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
     }
 
-    Rectangle {
+    PaneHeader {
         id: paneHeader
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: focusRail.bottom
-        height: 38
-        color: root.active ? Theme.activePaneHeader : Theme.paperWhite
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.activate()
-        }
-
-        Row {
-            id: navigationButtons
-            anchors.left: parent.left
-            anchors.leftMargin: 4
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 0
-
-            AppIconButton {
-                objectName: "paneBackButton-" + root.paneIndex
-                width: 26
-                height: 28
-                controlSize: 26
-                renderedIconSize: 16
-                enabled: root.controller.canGoBack
-                iconSource: root.iconPrefix + "back.svg"
-                toolTipText: qsTr("Back")
-                onClicked: {
-                    root.activate()
-                    root.controller.navigateBack()
-                }
-            }
-            AppIconButton {
-                objectName: "paneForwardButton-" + root.paneIndex
-                width: 26
-                height: 28
-                controlSize: 26
-                renderedIconSize: 16
-                enabled: root.controller.canGoForward
-                iconSource: root.iconPrefix + "forward.svg"
-                toolTipText: qsTr("Forward")
-                onClicked: {
-                    root.activate()
-                    root.controller.navigateForward()
-                }
-            }
-            AppIconButton {
-                objectName: "paneUpButton-" + root.paneIndex
-                width: 26
-                height: 28
-                controlSize: 26
-                renderedIconSize: 16
-                enabled: root.controller.canGoUp
-                iconSource: root.iconPrefix + "up.svg"
-                toolTipText: qsTr("Parent folder")
-                onClicked: {
-                    root.activate()
-                    root.controller.navigateUp()
-                }
-            }
-        }
-
-        Rectangle {
-            id: locationFrame
-            objectName: "paneLocationFrame-" + root.paneIndex
-            anchors.left: navigationButtons.right
-            anchors.leftMargin: 4
-            anchors.right: selectionCount.visible ? selectionCount.left : closeButton.left
-            anchors.rightMargin: 6
-            anchors.verticalCenter: parent.verticalCenter
-            height: 28
-            radius: 5
-            color: Theme.searchFieldSurface
-            border.width: 1
-            border.color: locationField.locationError.length > 0 ? Theme.danger
-                        : locationField.activeFocus ? Theme.searchFieldFocusBorder
-                        : locationHover.hovered ? Theme.searchFieldHoverBorder
-                                                : Theme.searchFieldBorder
-
-            HoverHandler { id: locationHover }
-
-            TextField {
-                id: locationField
-                objectName: "paneLocationField-" + root.paneIndex
-                property string locationError: ""
-                anchors.fill: parent
-                anchors.rightMargin: 25
-                placeholderText: qsTr("Enter a folder path")
-                selectByMouse: true
-                leftPadding: 9
-                rightPadding: 5
-                topPadding: 0
-                bottomPadding: 0
-                verticalAlignment: TextInput.AlignVCenter
-                color: Theme.graphiteInk
-                selectionColor: Theme.probeBlue
-                selectedTextColor: "white"
-                font.family: Theme.monoFont
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                background: Item {}
-                onTextEdited: locationError = ""
-                onAccepted: root.submitLocation()
-                Keys.onEscapePressed: function(event) {
-                    text = root.controller.currentDirectory
-                    locationError = ""
-                    focus = false
-                    event.accepted = true
-                }
-                ToolTip.visible: activeFocus && locationError.length > 0
-                ToolTip.text: locationError
-                ToolTip.delay: 0
-            }
-
-            Binding {
-                target: locationField
-                property: "text"
-                value: root.controller.currentDirectory
-                when: !locationField.activeFocus
-                restoreMode: Binding.RestoreNone
-            }
-
-            AppIconButton {
-                id: locationDropButton
-                objectName: "paneLocationDropButton-" + root.paneIndex
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                width: 25
-                height: 26
-                controlSize: 25
-                renderedIconSize: 14
-                enabled: root.controller.recentLocations.length > 0
-                checked: locationPopup.opened
-                iconSource: root.iconPrefix + "chevron-down.svg"
-                toolTipText: qsTr("Recent folders")
-                onClicked: {
-                    root.activate()
-                    if (locationPopup.opened)
-                        locationPopup.close()
-                    else
-                        locationPopup.open()
-                }
-            }
-
-            Connections {
-                target: root.controller
-                function onCurrentDirectoryChanged() {
-                    locationField.locationError = ""
-                }
-            }
-
-            Popup {
-                id: locationPopup
-                objectName: "paneLocationPopup-" + root.paneIndex
-                x: 0
-                y: locationFrame.height + 4
-                width: Math.max(locationFrame.width, Math.min(360, root.width - 8))
-                height: Math.min(286, recentLocationColumn.implicitHeight + 10)
-                padding: 5
-                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-                background: Rectangle {
-                    color: Theme.raisedSurface
-                    border.color: Theme.searchFieldBorder
-                    radius: 6
-                }
-
-                contentItem: Flickable {
-                    contentWidth: width
-                    contentHeight: recentLocationColumn.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Column {
-                        id: recentLocationColumn
-                        width: parent.width
-                        spacing: 2
-
-                        Text {
-                            width: parent.width
-                            height: 25
-                            leftPadding: 8
-                            verticalAlignment: Text.AlignVCenter
-                            text: qsTr("Recent folders")
-                            color: Theme.mutedInk
-                            font.family: Theme.uiFont
-                            font.pixelSize: 10
-                            font.weight: Font.DemiBold
-                        }
-
-                        Repeater {
-                            model: root.controller.recentLocations
-                            delegate: Button {
-                                id: recentLocationButton
-                                required property string modelData
-                                width: recentLocationColumn.width
-                                height: 42
-                                hoverEnabled: true
-                                ToolTip.visible: hovered
-                                ToolTip.delay: 500
-                                ToolTip.text: modelData
-
-                                background: Rectangle {
-                                    color: recentLocationButton.hovered || recentLocationButton.activeFocus
-                                           ? Theme.softHover : "transparent"
-                                    radius: 4
-                                }
-                                contentItem: Item {
-                                    Column {
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.leftMargin: 8
-                                        anchors.rightMargin: 8
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 1
-                                        Text {
-                                            width: parent.width
-                                            text: root.locationLabel(modelData) +
-                                                  (root.controller.isNetworkPath !== undefined &&
-                                                   root.controller.isNetworkPath(modelData)
-                                                   ? "  · " + qsTr("Network") : "")
-                                            elide: Text.ElideRight
-                                            color: Theme.graphiteInk
-                                            font.family: Theme.uiFont
-                                            font.pixelSize: 12
-                                            font.weight: Font.Medium
-                                        }
-                                        Text {
-                                            width: parent.width
-                                            text: modelData
-                                            elide: Text.ElideMiddle
-                                            color: Theme.mutedInk
-                                            font.family: Theme.monoFont
-                                            font.pixelSize: 10
-                                        }
-                                    }
-                                }
-                                onClicked: {
-                                    root.activate()
-                                    root.controller.openDirectory(modelData)
-                                    locationPopup.close()
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.opticalGray
-                        }
-                        Button {
-                            id: clearRecentButton
-                            objectName: "clearRecentLocations-" + root.paneIndex
-                            width: parent.width
-                            height: 29
-                            flat: true
-                            text: qsTr("Clear recent folders")
-                            onClicked: {
-                                root.controller.clearRecentLocations()
-                                locationPopup.close()
-                            }
-                            background: Rectangle {
-                                color: clearRecentButton.hovered ? Theme.softHover : "transparent"
-                                radius: 4
-                            }
-                            contentItem: Text {
-                                text: clearRecentButton.text
-                                color: Theme.mutedInk
-                                verticalAlignment: Text.AlignVCenter
-                                horizontalAlignment: Text.AlignLeft
-                                leftPadding: 8
-                                font.family: Theme.uiFont
-                                font.pixelSize: 11
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Text {
-            id: selectionCount
-            visible: root.width >= 520 && root.controller.selectionCount > 0
-            anchors.right: closeButton.left
-            anchors.rightMargin: 7
-            anchors.verticalCenter: parent.verticalCenter
-            text: qsTr("%1 selected").arg(root.controller.selectionCount)
-            color: Theme.mutedInk
-            font.family: Theme.monoFont
-            font.pixelSize: Theme.metadataFontSize
-        }
-        AppIconButton {
-            id: closeButton
-            objectName: "closePaneButton-" + root.paneIndex
-            anchors.right: parent.right
-            anchors.rightMargin: 4
-            anchors.verticalCenter: parent.verticalCenter
-            width: 26
-            height: 26
-            iconSource: root.iconPrefix + "close.svg"
-            toolTipText: qsTr("Close browser pane")
-            onClicked: root.workspaceController.closePane(root.paneIndex)
-        }
+        controller: root.controller
+        workspaceController: root.workspaceController
+        paneIndex: root.paneIndex
+        settingsController: root.settingsController
+        searchReturnTarget: contactSheet
+        iconPrefix: root.iconPrefix
     }
 
     Item {
@@ -506,15 +195,13 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: paneHeader.bottom
         anchors.bottom: parent.bottom
-        anchors.margins: 10
+        anchors.margins: 16
         clip: true
         model: root.controller.thumbnails
-        readonly property int visualCellWidth: Math.min(
-            root.controller.gridCellWidth,
-            width >= 380 ? Math.max(144, Math.floor((width - 24) / 2))
-                         : Math.max(144, width - 16))
-        cellWidth: root.displayMode === 1 ? width : visualCellWidth + 12
-        cellHeight: root.displayMode === 1 ? 76 : Math.round(visualCellWidth * 0.75) + 62
+        readonly property int gridColumns: Math.max(1, Math.floor((width + 12) / (Math.max(144, root.controller.gridCellWidth) + 12)))
+        readonly property int visualCellWidth: Math.max(1, Math.floor(width / gridColumns) - 12)
+        cellWidth: root.displayMode === 1 ? width : Math.floor(width / gridColumns)
+        cellHeight: root.displayMode === 1 ? 76 : Math.round(visualCellWidth * 0.75) + 52
         boundsBehavior: Flickable.StopAtBounds
         interactive: root.contentInteractionEnabled
         reuseItems: true
@@ -568,6 +255,7 @@ Rectangle {
             height: contactSheet.cellHeight
             ThumbnailTile {
                 id: thumbnailTile
+                x: root.displayMode === 1 ? 0 : 6
                 width: root.displayMode === 1 ? Math.min(parent.width - 12, 760)
                                               : contactSheet.visualCellWidth
                 height: root.displayMode === 1 ? 68 : parent.height - 6

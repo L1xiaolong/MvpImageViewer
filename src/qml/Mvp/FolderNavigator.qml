@@ -15,16 +15,16 @@ Rectangle {
     property string platformName: Qt.platform.os
 
     readonly property bool macStyle: platformName === "osx"
-    readonly property int indentWidth: macStyle ? 16 : 20
-    readonly property int itemHeight: macStyle ? 28 : 26
-    readonly property int iconSize_: macStyle ? 16 : 18
-    readonly property color selectionBg: macStyle ? Theme.probeBlue : Theme.explorerSelectionBg
-    readonly property color hoverBg: macStyle ? "#12000000" : Theme.explorerSelectionBg
-    readonly property color sidebarText: macStyle ? Theme.graphiteInk : Theme.graphiteInk
+    readonly property int indentWidth: 16
+    readonly property int itemHeight: 30
+    readonly property int iconSize_: 16
+    readonly property color selectionBg: Theme.explorerSelectionBg
+    readonly property color hoverBg: Theme.softHover
+    readonly property color sidebarText: Theme.graphiteInk
     readonly property string nativeFont: Theme.uiFont
 
     objectName: "folderNavigatorSurface"
-    color: macStyle ? Theme.softHover : Theme.raisedSurface
+    color: Theme.sidebarSurface
     enabled: browsingEnabled
     opacity: browsingEnabled ? 1 : 0.45
     clip: true
@@ -36,9 +36,19 @@ Rectangle {
     }
 
     function folderIcon(expanded) {
-        if (root.macStyle)
-            return root.iconPrefix + (expanded ? "macos-folder-open.svg" : "macos-folder.svg")
-        return root.iconPrefix + (expanded ? "windows-folder-open.svg" : "windows-folder.svg")
+        return root.iconPrefix + (expanded ? "folder-open.svg" : "folder.svg")
+    }
+    function placeIcon(entry) {
+        if (entry.remote) return root.iconPrefix + "nav-network.svg"
+        const icons = {home:"nav-home", desktop:"nav-desktop", documents:"nav-documents",
+                       downloads:"nav-downloads", pictures:"nav-pictures", drive:"nav-drive"}
+        return root.iconPrefix + (icons[entry.kind] || "folder") + ".svg"
+    }
+    function samePath(left, right) {
+        let a = String(left).replace(/[\\/]+$/, "")
+        let b = String(right).replace(/[\\/]+$/, "")
+        if (root.platformName === "windows") { a = a.toLowerCase(); b = b.toLowerCase() }
+        return a === b
     }
 
     function quickAccessEntries() {
@@ -159,11 +169,7 @@ Rectangle {
         Layout.fillWidth: true
         implicitHeight: root.itemHeight
         color: "transparent"
-        readonly property bool selected:
-            entry.kind === "drive"
-            ? root.controller.currentDirectory.toLowerCase().startsWith(
-                  String(entry.path).toLowerCase())
-            : String(entry.path) === root.controller.currentDirectory
+        readonly property bool selected: root.samePath(entry.path, root.controller.currentDirectory)
 
         ToolTip.visible: sidebarPlaceMouse.containsMouse
         ToolTip.delay: 500
@@ -171,38 +177,35 @@ Rectangle {
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: root.macStyle ? 6 : 0
-            anchors.rightMargin: root.macStyle ? 6 : 0
-            anchors.topMargin: root.macStyle ? 1 : 0
-            anchors.bottomMargin: root.macStyle ? 1 : 0
-            radius: root.macStyle ? 5 : 0
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
+            anchors.topMargin: 1
+            anchors.bottomMargin: 1
+            radius: 5
             color: parent.selected ? root.selectionBg
                    : sidebarPlaceMouse.containsMouse ? root.hoverBg : "transparent"
         }
 
         Image {
-            x: root.macStyle ? 14 : parent.entry.kind === "drive" ? 28 : 18
+            x: parent.entry.kind === "drive" ? 32 : 16
             anchors.verticalCenter: parent.verticalCenter
             width: root.iconSize_
             height: root.iconSize_
-            source: parent.entry.icon ? parent.entry.icon
-                  : parent.entry.kind === "drive"
-                    ? root.iconPrefix + "windows-drive.svg"
-                    : root.folderIcon(parent.selected)
+            source: root.placeIcon(parent.entry)
             sourceSize: Qt.size(32, 32)
-            opacity: root.macStyle ? 0.86 : 1
+            opacity: 0.72
         }
 
         Text {
             objectName: "sidebarPlaceLabel-" + parent.entry.path
-            x: root.macStyle ? 40 : parent.entry.kind === "drive" ? 51 : 46
+            x: parent.entry.kind === "drive" ? 56 : 40
             width: Math.max(0, parent.width - x - 12)
             anchors.verticalCenter: parent.verticalCenter
-            text: parent.entry.label + (parent.entry.remote ? "  · " + qsTr("Network") : "")
+            text: parent.entry.label
             elide: Text.ElideMiddle
-            color: parent.selected && root.macStyle ? "white" : root.sidebarText
+            color: root.sidebarText
             font.family: root.nativeFont
-            font.pixelSize: root.macStyle ? 13 : 12
+            font.pixelSize: 13
         }
 
         MouseArea {
@@ -228,25 +231,25 @@ Rectangle {
 
             Item {
                 Layout.fillWidth: true
-                implicitHeight: root.macStyle ? 12 : 8
+                implicitHeight: 8
             }
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: root.macStyle ? 25 : 30
+                implicitHeight: 26
                 color: "transparent"
 
                 Text {
                     id: recentHeading
                     objectName: "nativeRecentHeading"
                     anchors.left: parent.left
-                    anchors.leftMargin: root.macStyle ? 12 : 14
+                    anchors.leftMargin: 16
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTr("Recent")
-                    color: root.macStyle ? Theme.mutedInk : Theme.graphiteInk
+                    color: Theme.mutedInk
                     font.family: root.nativeFont
-                    font.pixelSize: root.macStyle ? 11 : 12
-                    font.weight: Font.DemiBold
+                    font.pixelSize: 11
+                    font.weight: Theme.bodyFontWeight
                 }
             }
 
@@ -260,25 +263,25 @@ Rectangle {
 
             Item {
                 Layout.fillWidth: true
-                implicitHeight: root.macStyle ? 9 : 6
+                implicitHeight: 16
             }
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: root.macStyle ? 25 : 30
+                implicitHeight: 26
                 color: "transparent"
 
                 Text {
                     id: quickAccessHeading
                     objectName: "nativeQuickAccessHeading"
                     anchors.left: parent.left
-                    anchors.leftMargin: root.macStyle ? 12 : 14
+                    anchors.leftMargin: 16
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTr("Quick Access")
-                    color: root.macStyle ? Theme.mutedInk : Theme.graphiteInk
+                    color: Theme.mutedInk
                     font.family: root.nativeFont
-                    font.pixelSize: root.macStyle ? 11 : 12
-                    font.weight: Font.DemiBold
+                    font.pixelSize: 11
+                    font.weight: Theme.bodyFontWeight
                 }
             }
 
@@ -292,25 +295,25 @@ Rectangle {
 
             Item {
                 Layout.fillWidth: true
-                implicitHeight: root.macStyle ? 9 : 6
+                implicitHeight: 16
             }
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: root.macStyle ? 25 : 30
+                implicitHeight: 26
                 color: "transparent"
 
                 Text {
                     id: locationsHeading
                     objectName: "nativeLocationsHeading"
                     anchors.left: parent.left
-                    anchors.leftMargin: root.macStyle ? 12 : 14
+                    anchors.leftMargin: 16
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTr("Locations")
-                    color: root.macStyle ? Theme.mutedInk : Theme.graphiteInk
+                    color: Theme.mutedInk
                     font.family: root.nativeFont
-                    font.pixelSize: root.macStyle ? 11 : 12
-                    font.weight: Font.DemiBold
+                    font.pixelSize: 11
+                    font.weight: Theme.bodyFontWeight
                 }
             }
 
@@ -340,16 +343,14 @@ Rectangle {
 
                     SidebarPlace {
                         entry: driveBranch.place
-                        Text {
-                            x: 5
-                            width: root.indentWidth
-                            height: root.itemHeight
-                            text: driveBranch.expanded ? "▾" : "▸"
-                            color: Theme.mutedInk
-                            font.family: root.nativeFont
-                            font.pixelSize: 12
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                        Image {
+                            x: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 12
+                            height: 12
+                            source: root.iconPrefix + "chevron-down.svg"
+                            rotation: driveBranch.expanded ? 0 : -90
+                            opacity: 0.65
                         }
                         MouseArea {
                             objectName: "driveDisclosure-" + driveBranch.drivePath
@@ -495,28 +496,25 @@ Rectangle {
 
             Rectangle {
                 anchors.fill: parent
-                anchors.leftMargin: root.macStyle ? 6 : 0
-                anchors.rightMargin: root.macStyle ? 6 : 0
-                anchors.topMargin: root.macStyle ? 1 : 0
-                anchors.bottomMargin: root.macStyle ? 1 : 0
-                radius: root.macStyle ? 5 : 0
+                anchors.leftMargin: 6
+                anchors.rightMargin: 6
+                anchors.topMargin: 1
+                anchors.bottomMargin: 1
+                radius: 5
                 color: treeDelegate.isCurrentFolder ? root.selectionBg
                        : disclosureMouse.containsMouse || directoryMouse.containsMouse
                          ? root.hoverBg : "transparent"
             }
 
-            Text {
-                x: (treeDelegate.depth + (folderTree.drivePath.length > 0 ? 1 : 0)) * root.indentWidth + (root.macStyle ? 7 : 5)
+            Image {
+                x: (treeDelegate.depth + (folderTree.drivePath.length > 0 ? 1 : 0)) * root.indentWidth + 8
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.indentWidth
-                height: root.itemHeight
-                text: treeDelegate.isDirectory
-                      ? (treeDelegate.expanded ? "▾" : "▸") : ""
-                color: treeDelegate.isCurrentFolder && root.macStyle ? "white" : Theme.mutedInk
-                font.family: root.nativeFont
-                font.pixelSize: root.macStyle ? 11 : 12
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+                width: 12
+                height: 12
+                source: root.iconPrefix + "chevron-down.svg"
+                visible: treeDelegate.isDirectory
+                rotation: treeDelegate.expanded ? 0 : -90
+                opacity: 0.65
             }
 
             Image {
@@ -527,7 +525,7 @@ Rectangle {
                 height: root.iconSize_
                 source: root.folderIcon(treeDelegate.expanded)
                 sourceSize: Qt.size(32, 32)
-                opacity: root.macStyle ? 0.86 : 1
+                opacity: 0.72
             }
 
             Text {
@@ -536,12 +534,18 @@ Rectangle {
                 width: Math.max(0, parent.width - x - 10)
                 anchors.verticalCenter: parent.verticalCenter
                 text: treeDelegate.display
-                elide: Text.ElideRight
-                color: treeDelegate.isCurrentFolder && root.macStyle
-                       ? "white" : root.sidebarText
+                elide: Text.ElideMiddle
+                color: root.sidebarText
                 font.family: root.nativeFont
-                font.pixelSize: root.macStyle ? 13 : 12
+                font.pixelSize: 13
                 font.weight: Font.Normal
+            }
+
+            PathToolTip {
+                parent: treeDelegate
+                path: treeDelegate.filePath
+                fileName: treeDelegate.display
+                visible: directoryMouse.containsMouse
             }
 
             MouseArea {

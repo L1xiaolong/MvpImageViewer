@@ -23,6 +23,11 @@ Item {
     property bool transientError: false
     property int selectedSlot: 0
     property string iconPrefix: Theme.iconPrefix
+    property real titleBarHeight: Theme.toolbarHeight
+    property real captionButtonsWidth: 0
+    readonly property rect titleBarLeftControls: Qt.rect(toolbarControls.x, 0,
+                                                        toolbarControls.width, toolbar.height)
+    readonly property rect titleBarRightControls: Qt.rect(0, 0, 0, 0)
     readonly property var comparisonCanvas: comparisonCanvasLoader.item
 
     signal closeRequested()
@@ -209,7 +214,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 38
+        height: root.titleBarHeight
         color: Theme.raisedSurface
 
         Rectangle {
@@ -221,7 +226,9 @@ Item {
         }
 
         RowLayout {
-            anchors.centerIn: parent
+            id: toolbarControls
+            x: Math.max(8, (parent.width - root.captionButtonsWidth - width) / 2)
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 2
 
             AppIconButton {

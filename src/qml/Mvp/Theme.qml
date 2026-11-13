@@ -5,16 +5,16 @@ QtObject {
     property bool darkMode: false
     property string canvasBackgroundMode: "neutral"
 
-    // VS Code 1.19-era Dark workbench hierarchy (late 2017).
-    readonly property color sensorWhite: darkMode ? "#1E1E1E" : "#F4F5F2"
-    readonly property color paperWhite: darkMode ? "#252526" : "#FCFCFA"
-    readonly property color raisedSurface: darkMode ? "#3C3C3C" : "#FFFFFF"
-    readonly property color opticalGray: darkMode ? "#3F3F46" : "#DDE1E3"
-    readonly property color softHover: darkMode ? "#2A2D2E" : "#EDF0F0"
-    readonly property color pressedSurface: darkMode ? "#37373D" : "#E2E9ED"
-    readonly property color graphiteInk: darkMode ? "#F0F0F0" : "#25303A"
-    readonly property color mutedInk: darkMode ? "#C8C8C8" : "#69747D"
-    readonly property color faintInk: darkMode ? "#9D9D9D" : "#69747D"
+    // Neutral workbench surfaces keep image content visually dominant.
+    readonly property color sensorWhite: darkMode ? "#1C1C1E" : "#FAFAFA"
+    readonly property color paperWhite: darkMode ? "#242426" : "#F5F5F5"
+    readonly property color raisedSurface: darkMode ? "#29292C" : "#FFFFFF"
+    readonly property color opticalGray: darkMode ? "#39393D" : "#E5E5E5"
+    readonly property color softHover: darkMode ? "#303033" : "#EEEEEF"
+    readonly property color pressedSurface: darkMode ? "#38383C" : "#E5E5E7"
+    readonly property color graphiteInk: darkMode ? "#DDDDE2" : "#303036"
+    readonly property color mutedInk: darkMode ? "#A8A8B0" : "#666666"
+    readonly property color faintInk: darkMode ? "#A5A5AB" : "#666666"
     readonly property color probeBlue: darkMode ? "#78A5FF" : "#356AE6"
     readonly property color exposureAmber: darkMode ? "#E0A357" : "#B87524"
     readonly property color danger: darkMode ? "#F17A7A" : "#C94E4E"
@@ -28,9 +28,9 @@ QtObject {
     readonly property color primaryButtonHover: darkMode ? "#86A6BB" : "#607E92"
     readonly property color primaryButtonText: darkMode ? "#172027" : "#FFFFFF"
     readonly property color overlay: darkMode ? "#73000000" : "#660E1820"
-    readonly property color searchFieldSurface: darkMode ? "#252526" : "#FFFFFF"
-    readonly property color searchFieldBorder: darkMode ? "#6A6A6A" : "#C5CCD1"
-    readonly property color searchFieldHoverBorder: darkMode ? "#858585" : "#95A3AC"
+    readonly property color searchFieldSurface: darkMode ? "#242426" : "#FFFFFF"
+    readonly property color searchFieldBorder: darkMode ? "#525258" : "#D9D9DC"
+    readonly property color searchFieldHoverBorder: darkMode ? "#76767E" : "#A5A5AC"
     readonly property color searchFieldFocusBorder: darkMode ? "#007ACC" : "#356AE6"
     readonly property color canvasBackground:
         canvasBackgroundMode === "dark" ? "#2D2D30"
@@ -58,21 +58,29 @@ QtObject {
     readonly property color rawBadgeBorder: darkMode ? "#6D4F2D" : "#EDCFA4"
     readonly property color rawBadgeText: darkMode ? "#F3BE78" : "#955817"
 
-    // VS Code-style file tree
-    readonly property color explorerSelectionBg: darkMode ? "#094771" : "#E4E6F1"
+    // Navigation and selection share neutral surfaces.
+    readonly property color explorerSelectionBg: darkMode ? "#39393E" : "#EAECEF"
     readonly property color explorerHoverBg: softHover
     readonly property color explorerIndentGuide: darkMode ? "#404040" : "#D5D9DC"
     readonly property string iconPrefix: darkMode ? "qrc:/icons/ui-dark/" : "qrc:/icons/ui/"
     readonly property real disabledOpacity: darkMode ? 0.52 : 0.38
+    readonly property color sidebarSurface: darkMode ? "#242426" : "#F5F5F5"
     readonly property int metadataFontSize: 11
+    readonly property int bodyFontSize: 13
+    readonly property int captionFontSize: 12
+    readonly property int titleFontSize: 16
+    readonly property int bodyFontWeight: Font.Normal
+    readonly property int emphasisFontWeight: Font.Medium
+    readonly property real descriptionLineHeight: 1.35
 
     // Distinct cues for file selection, keyboard focus, and the active pane.
     readonly property color thumbnailWell: darkMode ? "#282828" : "#E8E8E8"
-    readonly property color fileSelectionSurface: darkMode ? "#29343B" : "#E8EEF2"
-    readonly property color fileSelectionBorder: darkMode ? "#89A6BA" : "#526F82"
+    readonly property color fileSelectionSurface: darkMode ? "#2A2A2F" : "#F0F1F4"
+    readonly property color fileSelectionBadge: darkMode ? "#A5A5AE" : "#73737D"
+    readonly property color fileSelectionBorder: darkMode ? "#50505A" : "#D3D6DD"
     readonly property color keyboardFocus: darkMode ? "#F0C46A" : "#7A5400"
-    readonly property color activePaneHeader: darkMode ? "#343B40" : "#E9EFF2"
-    readonly property color activePaneAccent: darkMode ? "#89A6BA" : "#526F82"
+    readonly property color activePaneHeader: darkMode ? "#29292D" : "#F3F3F4"
+    readonly property color activePaneAccent: darkMode ? "#A5A5AE" : "#73737D"
 
     readonly property int unit: 4
     readonly property int toolbarHeight: 38

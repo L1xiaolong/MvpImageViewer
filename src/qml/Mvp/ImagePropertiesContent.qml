@@ -143,7 +143,7 @@ Rectangle {
                         color: Theme.graphiteInk
                         font.family: Theme.uiFont
                         font.pixelSize: 13
-                        font.weight: Font.DemiBold
+                        font.weight: Theme.emphasisFontWeight
                         wrapMode: Text.Wrap
                     }
                     Rectangle {

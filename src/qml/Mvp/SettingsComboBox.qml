@@ -29,8 +29,8 @@ ComboBox {
     background: Rectangle {
         radius: Theme.radius
         color: root.down ? Theme.pressedSurface : root.hovered ? Theme.softHover : Theme.raisedSurface
-        border.width: root.activeFocus ? 2 : 1
-        border.color: root.activeFocus ? Theme.probeBlue : root.hovered ? Theme.searchFieldHoverBorder : Theme.opticalGray
+        border.width: root.visualFocus ? 2 : 1
+        border.color: root.visualFocus ? Theme.probeBlue : root.hovered ? Theme.searchFieldHoverBorder : Theme.opticalGray
         Behavior on color { ColorAnimation { duration: Theme.fast } }
     }
     delegate: ItemDelegate {

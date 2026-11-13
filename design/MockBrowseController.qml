@@ -30,7 +30,7 @@ QtObject {
     property var selectedFileUrls: selectedPaths.map(path => "file://" + path)
     property string selectedUriList: selectedFileUrls.join("\r\n")
     property int selectionCount: selectedPaths.length
-    property string statusText: "16 items · " + selectionCount + " selected"
+    property string statusText: qsTr("%1 items · %2 selected").arg(16).arg(selectionCount)
     property size galleryImageSize: Qt.size(4000, 3000)
     property bool galleryImageReady: true
     property bool galleryFullResolution: false
@@ -177,7 +177,7 @@ QtObject {
 
     function setFilterText(text) {
         filterText = text;
-        statusText = text.length > 0 ? "Filtered by ‘" + text + "’ · " + selectionCount + " selected" : "16 items · " + selectionCount + " selected";
+        statusText = qsTr("%1 items · %2 selected").arg(thumbnails.count).arg(selectionCount);
     }
 
     function setSortMode(mode) {

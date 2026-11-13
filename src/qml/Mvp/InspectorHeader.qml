@@ -37,8 +37,8 @@ Item {
         verticalAlignment: Text.AlignVCenter
         color: Theme.graphiteInk
         font.family: Theme.uiFont
-        font.pixelSize: 16
-        font.weight: Font.DemiBold
+        font.pixelSize: Theme.titleFontSize
+        font.weight: Theme.emphasisFontWeight
         elide: Text.ElideRight
     }
     Text {

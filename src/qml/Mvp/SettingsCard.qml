@@ -112,7 +112,7 @@ Popup {
         font.family: Theme.uiFont
         font.pixelSize: 12
         wrapMode: Text.Wrap
-        lineHeight: 1.25
+        lineHeight: Theme.descriptionLineHeight
     }
 
     Rectangle {
@@ -129,8 +129,8 @@ Popup {
             text: qsTr("Settings")
             color: Theme.graphiteInk
             font.family: Theme.uiFont
-            font.pixelSize: 18
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.titleFontSize
+            font.weight: Theme.emphasisFontWeight
         }
         Column {
             x: 12; y: 66
@@ -155,16 +155,16 @@ Popup {
                         color: Theme.graphiteInk
                         font.family: Theme.uiFont
                         font.pixelSize: 13
-                        font.weight: root.currentSection === nav.index ? Font.DemiBold : Font.Normal
+                        font.weight: root.currentSection === nav.index ? Theme.emphasisFontWeight : Font.Normal
                         verticalAlignment: Text.AlignVCenter
                     }
                     background: Rectangle {
                         radius: Theme.radius
                         color: root.currentSection === nav.index ? Theme.explorerSelectionBg : nav.hovered ? Theme.softHover : "transparent"
-                        border.width: nav.activeFocus ? 2 : 0
+                        border.width: nav.visualFocus ? 2 : 0
                         border.color: Theme.probeBlue
                         Behavior on color { ColorAnimation { duration: Theme.fast } }
-                        Rectangle { width: 2; height: 16; y: 10; color: Theme.probeBlue; visible: root.currentSection === nav.index }
+
                     }
                 }
             }
@@ -197,7 +197,7 @@ Popup {
                 background: Rectangle {
                     color: projectLink.hovered ? Theme.softHover : "transparent"
                     radius: Theme.radius
-                    border.width: projectLink.activeFocus ? 2 : 0
+                    border.width: projectLink.visualFocus ? 2 : 0
                     border.color: Theme.probeBlue
                 }
                 HoverHandler { cursorShape: Qt.PointingHandCursor }
@@ -227,8 +227,8 @@ Popup {
                 text: root.sections[root.currentSection].label
                 color: Theme.graphiteInk
                 font.family: Theme.uiFont
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
+                font.pixelSize: Theme.titleFontSize
+                font.weight: Theme.emphasisFontWeight
             }
             BodyText { text: root.sections[root.currentSection].description }
         }
@@ -480,7 +480,7 @@ Popup {
             SettingsHeading { text: qsTr("Update checks") }
             SettingsRow {
                 title: qsTr("Automatically check for updates")
-                description: qsTr("At most once every 24 hours. Downloads and installation always require your action.")
+                description: qsTr("Check each time the app starts. Downloads and installation always require your action.")
                 controlWidth: 40
                 SettingsToggle {
                     text: qsTr("Automatically check for updates")
@@ -561,7 +561,7 @@ Popup {
         contentItem: Column {
             id: recorderContent
             spacing: 14
-            Text { width: parent.width; text: root.shortcutLabel(root.recordingAction); color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 18; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
+            Text { width: parent.width; text: root.shortcutLabel(root.recordingAction); color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: Theme.titleFontSize; font.weight: Theme.emphasisFontWeight; wrapMode: Text.Wrap }
             BodyText { text: qsTr("Press the keys you want to use, then click Save. Esc cancels.") }
             Rectangle {
                 id: captureArea

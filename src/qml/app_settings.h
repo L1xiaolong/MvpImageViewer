@@ -173,6 +173,7 @@ class AppSettings final : public QObject {
     bool restoreLastDirectory_ = true;
     bool confirmTrash_ = true;
     bool automaticUpdateChecks_ = true;
+    bool startupUpdateCheckScheduled_ = false;
     bool applyEmbeddedColorProfiles_ = true;
     bool preserveHighBitDepth_ = true;
     QString displayColorSpace_ = QStringLiteral("auto");

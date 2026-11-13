@@ -280,7 +280,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                 pendingScanBatchEnds_.push_back(pendingScanFiles_.size());
                 if (!scanBatchTimer_->isActive()) scanBatchTimer_->start(0);
 
-                setStatusText(QStringLiteral("Scanning %1… %2 items")
+                setStatusText(QCoreApplication::translate("BrowseController", "Scanning %1… %2 items")
                                   .arg(QDir::toNativeSeparators(currentDirectory_))
                                   .arg(thumbnailModel_->rowCount()));
             });
@@ -329,9 +329,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
                     }
                 }
                 updateSelection(existing);
-                setStatusText(QStringLiteral("%1 items · %2 selected")
-                                  .arg(files.size())
-                                  .arg(selectedPaths_.size()));
+                setStatusText(selectionStatusText());
 
                 if (!pendingActivationPath_.isEmpty()) {
                     const QString pending = pendingActivationPath_;
@@ -406,7 +404,7 @@ void BrowseController::initialize(const QString& initialDirectory, bool startEmp
     });
 
     if (startEmpty) {
-        statusText_ = QStringLiteral("Choose a folder for this file manager");
+        statusText_ = QCoreApplication::translate("BrowseController", "Choose a folder for this pane");
         return;
     }
 
@@ -721,7 +719,7 @@ void BrowseController::restoreInitialDirectoryAsync(const QString& initialDirect
         return;
     }
     const quint64 requestGeneration = ++directoryRequestGeneration_;
-    setStatusText(QStringLiteral("Restoring the previous folder…"));
+    setStatusText(QCoreApplication::translate("BrowseController", "Restoring the previous folder…"));
     const QPointer<BrowseController> self(this);
     auto restore = [self, startupDirectory, requestGeneration] {
         QFileInfo startupInfo(startupDirectory);
@@ -939,9 +937,7 @@ void BrowseController::setFilterText(const QString& text) {
     filterText_ = normalized;
     filterTimer_->start();
     emit filterTextChanged();
-    setStatusText(QStringLiteral("%1 visible · %2 selected")
-                      .arg(filterModel_->rowCount())
-                      .arg(selectedPaths_.size()));
+    setStatusText(selectionStatusText());
 }
 
 void BrowseController::setDisplayMode(int mode) {
@@ -991,7 +987,7 @@ void BrowseController::refresh() {
     if (currentDirectory_.isEmpty()) {
         return;
     }
-    setStatusText(QStringLiteral("Refreshing %1…")
+    setStatusText(QCoreApplication::translate("BrowseController", "Refreshing %1…")
                       .arg(QDir::toNativeSeparators(currentDirectory_)));
     rescanCurrentDirectory();
 }
@@ -1010,7 +1006,7 @@ void BrowseController::openCurrentDirectoryInFileManager() {
         return;
     }
     if (!PlatformServices::openDirectoryInFileManager(currentDirectory_)) {
-        setStatusText(QStringLiteral("Could not open the system file manager"));
+        setStatusText(QCoreApplication::translate("BrowseController", "Could not open the system file manager"));
     }
 }
 
@@ -1019,15 +1015,15 @@ void BrowseController::copySelected(bool cut) {
         return;
     }
     FileClipboard::setPaths(selectedPaths_, cut);
-    setStatusText(QStringLiteral("%1 %2 item(s) to the clipboard")
-                      .arg(cut ? QStringLiteral("Cut") : QStringLiteral("Copied"))
+    setStatusText(QCoreApplication::translate("BrowseController", "%1 %2 item(s) to the clipboard")
+                      .arg(cut ? QCoreApplication::translate("BrowseController", "Cut") : QCoreApplication::translate("BrowseController", "Copied"))
                       .arg(selectedPaths_.size()));
 }
 
 void BrowseController::pasteItems() {
     const FileClipboardContents clipboard = FileClipboard::contents();
     if (clipboard.paths.isEmpty()) {
-        setStatusText(QStringLiteral("The clipboard does not contain files"));
+        setStatusText(QCoreApplication::translate("BrowseController", "The clipboard does not contain files"));
         return;
     }
     requestTransferPaths(clipboard.paths, clipboard.cut);
@@ -1036,7 +1032,7 @@ void BrowseController::pasteItems() {
 void BrowseController::pasteItemsInto(const QString& directory) {
     const FileClipboardContents clipboard = FileClipboard::contents();
     if (clipboard.paths.isEmpty()) {
-        setStatusText(QStringLiteral("The clipboard does not contain files"));
+        setStatusText(QCoreApplication::translate("BrowseController", "The clipboard does not contain files"));
         return;
     }
     requestTransferPaths(clipboard.paths, clipboard.cut, directory);
@@ -1124,7 +1120,7 @@ QString BrowseController::renameSelectedTo(const QString& requestedName) {
     diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("rename.complete"), context, true);
     updateSelection({destination});
     rescanCurrentDirectory();
-    setStatusText(QStringLiteral("Renamed to %1").arg(newName));
+    setStatusText(QCoreApplication::translate("BrowseController", "Renamed to %1").arg(newName));
     return {};
 }
 
@@ -1159,20 +1155,20 @@ QString BrowseController::moveSelectedToTrashConfirmed() {
     if (!failures.isEmpty()) {
         const QString message = QStringLiteral("Could not move to Trash:\n%1")
                                     .arg(failures.join(QLatin1Char('\n')));
-        setStatusText(QStringLiteral("%1 of %2 item(s) could not be moved to Trash")
+        setStatusText(QCoreApplication::translate("BrowseController", "%1 of %2 item(s) could not be moved to Trash")
                           .arg(failures.size())
                           .arg(requestedCount));
         return message;
     }
     diagnostics::event(diagnostics::Level::Info, diagnostics::files(), QStringLiteral("trash.complete"), {{"operation", operation}, {"count", requestedCount}}, true);
-    setStatusText(QStringLiteral("Moved %1 item(s) to Trash").arg(requestedCount));
+    setStatusText(QCoreApplication::translate("BrowseController", "Moved %1 item(s) to Trash").arg(requestedCount));
     return {};
 }
 
 void BrowseController::revealSelected() {
     if (!selectedPaths_.isEmpty() &&
         !PlatformServices::revealInFileManager(selectedPaths_.first())) {
-        setStatusText(QStringLiteral("Could not open the system file manager"));
+        setStatusText(QCoreApplication::translate("BrowseController", "Could not open the system file manager"));
     }
 }
 
@@ -1193,7 +1189,7 @@ void BrowseController::openSelected() {
 void BrowseController::compareSelected() {
     const QStringList paths = selectedImagePaths();
     if (paths.size() < 2 || paths.size() > 4) {
-        setStatusText(QStringLiteral("Select 2–4 images to compare"));
+        setStatusText(QCoreApplication::translate("BrowseController", "Select 2–4 images to compare"));
         return;
     }
     emit compareRequested(paths);
@@ -1209,7 +1205,7 @@ QString BrowseController::startTransform(const QString& path, std::function<QStr
     transformBusy_ = true;
     emit transformBusyChanged();
     notifyTransformAvailability();
-    setStatusText(QStringLiteral("Processing %1…").arg(QFileInfo(path).fileName()));
+    setStatusText(QCoreApplication::translate("BrowseController", "Processing %1…").arg(QFileInfo(path).fileName()));
     const QPointer<BrowseController> self(this);
     transformPool_.start([self, path, work = std::move(work)] {
         QString error;
@@ -1224,7 +1220,7 @@ QString BrowseController::startTransform(const QString& path, std::function<QStr
             emit self->transformBusyChanged();
             if (error.isEmpty()) {
                 self->refreshTransformedPath(path);
-                self->setStatusText(QStringLiteral("Finished processing %1").arg(QFileInfo(path).fileName()));
+                self->setStatusText(QCoreApplication::translate("BrowseController", "Finished processing %1").arg(QFileInfo(path).fileName()));
             } else self->setStatusText(error);
             notifyTransformAvailability();
             emit self->transformFinished(path, error);
@@ -1308,7 +1304,7 @@ void BrowseController::refreshTransformedPath(const QString& path) {
     emit selectionChanged();
     emit imageTransformed(path);
     rescanCurrentDirectory();
-    setStatusText(QStringLiteral("Saved changes to %1").arg(QFileInfo(path).fileName()));
+    setStatusText(QCoreApplication::translate("BrowseController", "Saved changes to %1").arg(QFileInfo(path).fileName()));
 }
 
 void BrowseController::setGalleryPath(const QString& path) {
@@ -1501,7 +1497,7 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     const QFileInfo info(path);
     if (!pathAlreadyValidated &&
         (!info.exists() || !info.isDir() || !DirectoryScanner::isBrowsableEntry(info))) {
-        setStatusText(QStringLiteral("Folder is hidden, unreadable, or unavailable: %1").arg(path));
+        setStatusText(QCoreApplication::translate("BrowseController", "Folder is hidden, unreadable, or unavailable: %1").arg(path));
         return;
     }
     // The gallery owns an asynchronous decode independently of the thumbnail model. Clear it
@@ -1559,7 +1555,7 @@ void BrowseController::openDirectoryInternal(const QString& path, bool addToHist
     pendingScanFiles_.clear(); pendingScanOffset_ = 0; pendingScanBatchEnds_.clear();
     thumbnailModel_->setFiles({});
     incrementalScan_ = true;
-    setStatusText(QStringLiteral("Scanning %1…").arg(QDir::toNativeSeparators(currentDirectory_)));
+    setStatusText(QCoreApplication::translate("BrowseController", "Scanning %1…").arg(QDir::toNativeSeparators(currentDirectory_)));
     confirmedHistoryIndex_ = navigationHistoryIndex_;
     if (preparedFiles) {
         scanner_->cancel();
@@ -1578,7 +1574,19 @@ void BrowseController::rescanCurrentDirectory() {
     }
 }
 
+QString BrowseController::selectionStatusText() const {
+    return QCoreApplication::translate("BrowseController", "%1 items · %2 selected")
+        .arg(filterModel_->rowCount()).arg(selectedPaths_.size());
+}
+
+void BrowseController::retranslate() {
+    if (showingSelectionStatus_) setStatusText(selectionStatusText());
+    else if (currentDirectory_.isEmpty())
+        setStatusText(QCoreApplication::translate("BrowseController", "Choose a folder for this pane"));
+}
+
 void BrowseController::setStatusText(const QString& text) {
+    showingSelectionStatus_ = text == selectionStatusText();
     if (statusText_ == text) {
         return;
     }
@@ -1603,9 +1611,7 @@ void BrowseController::updateSelection(const QStringList& paths) {
     selectedPaths_ = normalized;
     thumbnailModel_->setSelectedPaths(selectedPaths_);
     emit selectionChanged();
-    setStatusText(QStringLiteral("%1 visible · %2 selected")
-                      .arg(filterModel_->rowCount())
-                      .arg(selectedPaths_.size()));
+    setStatusText(selectionStatusText());
 }
 
 void BrowseController::setWorkspaceSelectionOrder(const QStringList& paths) {
@@ -1645,7 +1651,7 @@ void BrowseController::transferPaths(const QStringList& paths, bool move,
     const QString target = targetDirectory.isEmpty() ? currentDirectory_
                                                       : QFileInfo(targetDirectory).absoluteFilePath();
     if (paths.isEmpty() || target.isEmpty() || !QFileInfo(target).isDir()) return;
-    setStatusText(QStringLiteral("%1 %2 item(s)…")
+    setStatusText(QCoreApplication::translate("BrowseController", "%1 %2 item(s)…")
                       .arg(move ? QStringLiteral("Moving") : QStringLiteral("Copying"))
                       .arg(paths.size()));
     const QPointer<BrowseController> self(this);

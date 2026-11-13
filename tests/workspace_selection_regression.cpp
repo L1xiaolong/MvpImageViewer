@@ -10,6 +10,7 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QTranslator>
 #include <iostream>
 #include <stdexcept>
 
@@ -87,6 +88,33 @@ int main(int argc, char* argv[]) {
         workspace.clearSelection();
         workspace.selectPath(2, path(2));
         check(workspace.workspaceSelectionCount() == 1, "selection after clear failed");
+        check(workspace.statusText() == QStringLiteral("1 selected · from 1 pane"),
+              "single-source workspace summary is duplicated");
+        workspace.selectPath(0, path(0), false, true);
+        check(workspace.statusText() == QStringLiteral("2 selected · from 2 panes"),
+              "cross-pane summary lost the global selection");
+        QTranslator translator;
+        check(translator.load(QCoreApplication::applicationDirPath() +
+                              QStringLiteral("/src/qml/mvpimageviewer_zh_CN.qm")),
+              "load workspace translations failed");
+        app.installTranslator(&translator);
+        workspace.retranslate();
+        check(workspace.statusText() == QStringLiteral("已选 2 项 · 来自 2 个窗格"),
+              "workspace summary did not retranslate");
+        app.removeTranslator(&translator);
+        workspace.retranslate();
+        check(workspace.statusText() == QStringLiteral("2 selected · from 2 panes"),
+              "workspace summary did not switch back to English");
+        workspace.closePane(3);
+        workspace.addFileManagerPane();
+        check(workspace.activeBrowsePane()->currentDirectory().isEmpty() &&
+              workspace.statusText() == QStringLiteral("2 selected · from 2 panes"),
+              "empty active pane hid the selection in other panes");
+        workspace.activatePane(0);
+        panes[0]->copySelected(false);
+        check(workspace.statusText() == panes[0]->statusText() &&
+              workspace.statusText().contains(QStringLiteral("clipboard")),
+              "selection summary hid clipboard feedback");
         std::cout << "Workspace selection regression passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

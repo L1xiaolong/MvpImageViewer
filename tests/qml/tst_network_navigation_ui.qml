@@ -15,14 +15,16 @@ Item {
             scene.Window.window.width = 1280
             scene.Window.window.height = 900
         }
-        function test_network_marker() {
+        function test_network_label_has_no_suffix() {
             const page = findChild(preview, "browsePage")
             const navigator = findChild(page, "folderNavigator")
             navigator.platformName = "windows"
             tryVerify(function() {
                 const label = findChild(navigator, "sidebarPlaceLabel-Z:/")
-                return label && label.text.indexOf(" · ") >= 0
+                return label !== null
             })
+            const entry = page.controller.nativeDrivePlaces.filter(function(place) { return place.path === "Z:/" })[0]
+            compare(findChild(navigator, "sidebarPlaceLabel-Z:/").text, entry.label)
         }
         function test_network_error_dialog_blocks_interaction() {
             const page = findChild(preview, "browsePage")

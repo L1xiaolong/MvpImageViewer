@@ -23,7 +23,7 @@ Button {
     background: Rectangle {
         color: control.checked ? Theme.explorerSelectionBg : control.down ? Theme.pressedSurface : control.hovered ? Theme.softHover : "transparent"
         radius: 6
-        border.width: control.activeFocus ? 1 : 0
+        border.width: control.visualFocus ? 1 : 0
         border.color: Theme.probeBlue
     }
 
@@ -54,7 +54,7 @@ Button {
         }
     }
 
-    ToolTip.visible: (hovered || activeFocus) && toolTipText.length > 0
+    ToolTip.visible: (hovered || visualFocus) && toolTipText.length > 0
     ToolTip.text: toolTipText + (shortcutText.length > 0 ? " · " + shortcutText : "")
     ToolTip.delay: 500
 }

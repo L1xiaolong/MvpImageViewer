@@ -7,7 +7,7 @@ Item {
     property int controlWidth: 210
     default property alias controls: controlHost.data
     width: parent ? parent.width : 600
-    implicitHeight: Math.max(56, labels.implicitHeight + 20, controlHost.childrenRect.height + 20)
+    implicitHeight: Math.max(52, labels.implicitHeight + 16, controlHost.childrenRect.height + 16)
     height: implicitHeight
     data: [Column {
         id: labels
@@ -20,7 +20,8 @@ Item {
             text: root.title
             color: Theme.graphiteInk
             font.family: Theme.uiFont
-            font.pixelSize: 13
+            font.pixelSize: Theme.bodyFontSize
+            font.weight: Theme.bodyFontWeight
             wrapMode: Text.Wrap
         }
         Text {
@@ -29,9 +30,10 @@ Item {
             visible: text.length > 0
             color: Theme.mutedInk
             font.family: Theme.uiFont
-            font.pixelSize: 12
+            font.pixelSize: Theme.captionFontSize
+            font.weight: Theme.bodyFontWeight
             wrapMode: Text.Wrap
-            lineHeight: 1.2
+            lineHeight: Theme.descriptionLineHeight
         }
     }, Item {
         id: controlHost
@@ -39,12 +41,6 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: root.controlWidth
         height: childrenRect.height
-    }, Rectangle {
-        anchors.bottom: parent.bottom
-        width: parent.width
-        height: 1
-        color: Theme.opticalGray
-        opacity: 0.6
     }
     ]
 }

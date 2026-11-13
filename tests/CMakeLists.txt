@@ -1,4 +1,25 @@
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+if(WIN32 OR APPLE)
+    add_executable(startup_update_regression startup_update_regression.cpp
+        ${PROJECT_SOURCE_DIR}/src/qml/app_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/qml/app_settings.h)
+    target_link_libraries(startup_update_regression PRIVATE mvpview_io Qt6::Gui Qt6::Network)
+    if(MSVC)
+        target_compile_options(startup_update_regression PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(startup_update_regression PRIVATE -UNDEBUG)
+    endif()
+    add_test(NAME startup_update_regression COMMAND startup_update_regression)
+    set_tests_properties(startup_update_regression PROPERTIES TIMEOUT 20 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
+if(WIN32)
+    add_executable(window_chrome_regression window_chrome_regression.cpp
+        ${PROJECT_SOURCE_DIR}/src/qml/window_chrome_controller.h
+        ${PROJECT_SOURCE_DIR}/src/qml/window_chrome_controller.cpp)
+    target_link_libraries(window_chrome_regression PRIVATE mvpview_platform Qt6::Quick user32 comctl32)
+    add_test(NAME window_chrome_regression COMMAND window_chrome_regression)
+    set_tests_properties(window_chrome_regression PROPERTIES TIMEOUT 20 ENVIRONMENT "QT_QPA_PLATFORM=windows")
+endif()
 add_executable(preview_cache_regression preview_cache_regression.cpp)
 target_link_libraries(preview_cache_regression PRIVATE mvpview_io)
 add_test(NAME preview_cache_regression COMMAND preview_cache_regression)
@@ -123,12 +144,15 @@ target_compile_definitions(settings_ui_regression PRIVATE
     MVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY}")
 foreach(_variant ui ui-dark)
     set(_settings_icons)
-    foreach(_icon chevron-down)
+    foreach(_icon close caption-minimize caption-maximize caption-restore caption-close caption-close-white chevron-down folder folder-open nav-home nav-desktop nav-documents nav-downloads nav-pictures nav-drive nav-network)
         list(APPEND _settings_icons "${PROJECT_SOURCE_DIR}/assets/icons/${_variant}/${_icon}.svg")
     endforeach()
     qt_add_resources(settings_ui_regression "settings_test_${_variant}"
         PREFIX "/icons/${_variant}" BASE "${PROJECT_SOURCE_DIR}/assets/icons/${_variant}" FILES ${_settings_icons})
 endforeach()
+qt_add_resources(settings_ui_regression settings_brand
+    PREFIX "/brand" BASE "${PROJECT_SOURCE_DIR}/assets/brand"
+    FILES "${PROJECT_SOURCE_DIR}/assets/brand/app_icon.png")
 qt_add_resources(settings_ui_regression settings_test_translations
     PREFIX "/i18n" BASE "${PROJECT_BINARY_DIR}/src/qml"
     FILES "${PROJECT_BINARY_DIR}/src/qml/mvpimageviewer_zh_CN.qm")

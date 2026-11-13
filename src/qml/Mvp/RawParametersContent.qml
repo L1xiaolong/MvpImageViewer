@@ -147,7 +147,7 @@ Column {
     visible: true
     width: parent.width
     spacing: 8
-    Text { width: parent.width; text: qsTr("Frame layout"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text { width: parent.width; text: qsTr("Frame layout"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Theme.emphasisFontWeight }
     Rectangle {
         width: parent.width
         height: layoutFields.implicitHeight
@@ -188,7 +188,7 @@ Column {
     visible: root.controller && root.controller.endianControlsVisible
     width: parent.width
     spacing: 8
-    Text { width: parent.width; text: qsTr("Storage"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text { width: parent.width; text: qsTr("Storage"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Theme.emphasisFontWeight }
     Rectangle {
         width: parent.width
         height: storageFields.implicitHeight
@@ -216,7 +216,7 @@ Column {
     visible: root.controller && root.controller.yuvFormat
     width: parent.width
     spacing: 8
-    Text { width: parent.width; text: qsTr("YUV interpretation"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text { width: parent.width; text: qsTr("YUV interpretation"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Theme.emphasisFontWeight }
     Rectangle {
         width: parent.width
         height: yuvFields.implicitHeight
@@ -248,7 +248,7 @@ Column {
     visible: root.controller && !root.controller.yuvFormat
     width: parent.width
     spacing: 8
-    Text { width: parent.width; text: qsTr("Bayer development"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text { width: parent.width; text: qsTr("Bayer development"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Theme.emphasisFontWeight }
     Rectangle {
         width: parent.width
         height: bayerFields.implicitHeight
@@ -283,7 +283,7 @@ Column {
     visible: root.controller && !root.controller.yuvFormat
     width: parent.width
     spacing: 8
-    Text { width: parent.width; text: qsTr("White balance gains"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text { width: parent.width; text: qsTr("White balance gains"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Theme.emphasisFontWeight }
     Rectangle {
         width: parent.width
         height: wbFields.implicitHeight
@@ -321,7 +321,7 @@ Column {
     visible: root.controller && !root.controller.yuvFormat
     width: parent.width
     spacing: 8
-    Text { width: parent.width; text: qsTr("Color correction matrix"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text { width: parent.width; text: qsTr("Color correction matrix"); wrapMode: Text.Wrap; color: Theme.graphiteInk; font.family: Theme.uiFont; font.pixelSize: 13; font.weight: Theme.emphasisFontWeight }
     Rectangle {
         width: parent.width
         height: ccmFields.implicitHeight

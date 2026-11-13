@@ -18,10 +18,11 @@ QtObject {
     readonly property var workspaceSelectedPaths: collectSelectedPaths()
     readonly property int workspaceSelectionCount: workspaceSelectedPaths.length
     readonly property bool canCompare: workspaceSelectionCount >= 2 && workspaceSelectionCount <= 4
-    readonly property string statusText: hasActivePane
-        ? activePane.statusText + (workspaceSelectionCount > 0
-          ? " · " + workspaceSelectionCount + " image(s) across " + selectedPaneCount() + " manager(s)" : "")
-        : "Choose a folder for this file manager"
+    readonly property string statusText: !hasActivePane ? qsTr("Choose a folder for this pane")
+        : paneCount > 1 && workspaceSelectionCount > 0
+          ? (selectedPaneCount() === 1 ? qsTr("%1 selected · from 1 pane").arg(workspaceSelectionCount)
+             : qsTr("%1 selected · from %2 panes").arg(workspaceSelectionCount).arg(selectedPaneCount()))
+          : activePane.statusText
 
     signal compareRequested(var paths)
     function collectSelectedPaths() {
