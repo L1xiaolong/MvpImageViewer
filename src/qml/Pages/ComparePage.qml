@@ -55,7 +55,7 @@ Item {
     function initializePixelPlaceholders() {
         const placeholders = []
         for (let slot = 0; slot < root.paths.length; ++slot)
-            placeholders.push("Move over an image")
+            placeholders.push(qsTr("Move over an image"))
         pixelValues = placeholders
     }
 
@@ -78,20 +78,20 @@ Item {
         const scheduled = stage.grabToImage(function(result) {
             const saved = result.saveToFile(destination)
             if (saved)
-                root.showTransientMessage("Screenshot saved", false)
+                root.showTransientMessage(qsTr("Screenshot saved"), false)
             else
-                root.showTransientMessage("Unable to save screenshot", true)
+                root.showTransientMessage(qsTr("Unable to save screenshot"), true)
             root.screenshotFinished(saved, destination)
         })
         if (!scheduled) {
-            root.showTransientMessage("Unable to capture comparison", true)
+            root.showTransientMessage(qsTr("Unable to capture comparison"), true)
             root.screenshotFinished(false, destination)
         }
     }
 
     function comparisonFileText(slot, navigationData) {
         const currentRevision = root.controller.revision
-        const fileText = root.controller.fileText(slot) || "Loading…"
+        const fileText = root.controller.fileText(slot) || qsTr("Loading…")
         return fileText + "," + (navigationData.zoom || "—%")
     }
 
@@ -297,7 +297,7 @@ Item {
                 onClicked: {
                     const error = root.controller.rotateCounterClockwise(root.selectedSlot)
                     if (error.length > 0) root.showTransientMessage(error, true)
-                    else root.showTransientMessage("Image rotated and saved", false)
+                    else root.showTransientMessage(qsTr("Image rotated and saved"), false)
                 }
             }
             AppIconButton {
@@ -310,7 +310,7 @@ Item {
                 onClicked: {
                     const error = root.controller.rotateClockwise(root.selectedSlot)
                     if (error.length > 0) root.showTransientMessage(error, true)
-                    else root.showTransientMessage("Image rotated and saved", false)
+                    else root.showTransientMessage(qsTr("Image rotated and saved"), false)
                 }
             }
 

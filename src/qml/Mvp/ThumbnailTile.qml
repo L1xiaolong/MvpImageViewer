@@ -32,6 +32,9 @@ Item {
     readonly property bool thumbnailReady: visualLoader.item !== null && visualLoader.item.thumbnailReady
     property url thumbnailUrl
     property bool directory: false
+    property bool keyboardCurrent: false
+    readonly property int thumbnailFillMode: settingsController && settingsController.thumbnailPresentation === "fill"
+                                             ? Image.PreserveAspectCrop : Image.PreserveAspectFit
     property bool selected: false
     property int selectionOrdinal: 0
     property int displayMode: 0
@@ -105,7 +108,7 @@ Item {
                     text: metadataStrip.normalizedType
                     color: metadataStrip.badgeInk
                     font.family: Theme.uiFont
-                    font.pixelSize: 9
+                    font.pixelSize: 10
                     font.weight: Font.DemiBold
                 }
             }
@@ -159,10 +162,10 @@ Item {
             readonly property bool thumbnailReady: gridPreview.status === Image.Ready
             Rectangle {
                 anchors.fill: parent
-                color: tileMouse.containsMouse ? Theme.paperWhite : "transparent"
+                color: root.selected ? Theme.fileSelectionSurface : tileMouse.containsMouse ? Theme.paperWhite : "transparent"
                 radius: Theme.radius
                 border.width: 1
-                border.color: tileMouse.containsMouse ? Theme.opticalGray : "transparent"
+                border.color: root.selected ? Theme.fileSelectionBorder : tileMouse.containsMouse ? Theme.opticalGray : "transparent"
             }
             Rectangle {
                 id: imageWell
@@ -173,7 +176,7 @@ Item {
                 anchors.rightMargin: 8
                 anchors.topMargin: 6
                 height: Math.round(width * 0.75)
-                color: Theme.softHover
+                color: Theme.thumbnailWell
                 border.color: Theme.opticalGray
                 border.width: 1
                 clip: true
@@ -189,7 +192,7 @@ Item {
                     asynchronous: true
                     cache: true
                     sourceSize: Qt.size(384, 384)
-                    fillMode: Image.PreserveAspectCrop
+                    fillMode: root.thumbnailFillMode
                     smooth: !root.settingsController || root.settingsController.smoothDisplay
                     mipmap: !root.settingsController || root.settingsController.smoothDisplay
                 }
@@ -247,10 +250,10 @@ Item {
             readonly property bool thumbnailReady: listPreview.status === Image.Ready
             Rectangle {
                 anchors.fill: parent
-                color: tileMouse.containsMouse ? Theme.paperWhite : "transparent"
+                color: root.selected ? Theme.fileSelectionSurface : tileMouse.containsMouse ? Theme.paperWhite : "transparent"
                 radius: Theme.radius
                 border.width: 1
-                border.color: tileMouse.containsMouse ? Theme.opticalGray : "transparent"
+                border.color: root.selected ? Theme.fileSelectionBorder : tileMouse.containsMouse ? Theme.opticalGray : "transparent"
             }
             Rectangle {
                 id: listImageWell
@@ -259,7 +262,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 72
                 height: 52
-                color: Theme.softHover
+                color: Theme.thumbnailWell
                 border.color: Theme.opticalGray
                 border.width: 1
                 clip: true
@@ -272,7 +275,7 @@ Item {
                     asynchronous: true
                     cache: true
                     sourceSize: Qt.size(256, 256)
-                    fillMode: Image.PreserveAspectCrop
+                    fillMode: root.thumbnailFillMode
                     smooth: !root.settingsController || root.settingsController.smoothDisplay
                     mipmap: !root.settingsController || root.settingsController.smoothDisplay
                 }
@@ -324,12 +327,14 @@ Item {
     }
 
     Rectangle {
-        visible: root.selected
-        width: 2
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        color: Theme.probeBlue
+        objectName: "thumbnailKeyboardFocus"
+        visible: root.keyboardCurrent
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: Theme.radius
+        color: "transparent"
+        border.width: 2
+        border.color: Theme.keyboardFocus
     }
 
     Rectangle {
@@ -339,11 +344,11 @@ Item {
         width: 18
         height: 18
         radius: 9
-        color: Theme.probeBlue
+        color: Theme.fileSelectionBorder
         Text {
             anchors.centerIn: parent
             text: root.selectionOrdinal > 0 ? root.selectionOrdinal : "✓"
-            color: "white"
+            color: Theme.darkMode ? "#172027" : "white"
             font.family: Theme.monoFont
             font.pixelSize: 10
             font.weight: Font.DemiBold

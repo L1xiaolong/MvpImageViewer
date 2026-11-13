@@ -7,6 +7,7 @@
 #include <QQuickItemGrabResult>
 #include <QTimer>
 #include <QGuiApplication>
+#include <QPainter>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickStyle>
@@ -26,6 +27,22 @@ public slots:
 signals:
     void urlOpened();
 public:
+    Q_INVOKABLE QString reloadedThumbnailPresentation() {
+        mvpview::AppSettings reloaded(nullptr);
+        return reloaded.thumbnailPresentation();
+    }
+    Q_INVOKABLE QUrl thumbnailFixture(bool portrait) {
+        QImage image(portrait ? 60 : 240, portrait ? 240 : 60, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        QPainter painter(&image);
+        painter.fillRect(0, 0, portrait ? 60 : 40, portrait ? 40 : 60, Qt::red);
+        painter.fillRect(portrait ? 0 : 200, portrait ? 200 : 0, portrait ? 60 : 40, portrait ? 40 : 60, Qt::blue);
+        painter.end();
+        const QString path = QStringLiteral(SETTINGS_ARTIFACT_DIR) +
+            (portrait ? QStringLiteral("/thumbnail-portrait.png") : QStringLiteral("/thumbnail-landscape.png"));
+        if (!image.save(path)) return {};
+        return QUrl::fromLocalFile(path);
+    }
     Q_INVOKABLE QVariant storedSetting(const QString& key) { return QSettings().value(key); }
     Q_INVOKABLE bool save(QQuickItem* item, const QString& path) {
         if (!item) return false;

@@ -19,7 +19,7 @@ Rectangle {
 
     color: Theme.sensorWhite
     border.width: 1
-    border.color: active ? Theme.accentBorder : Theme.opticalGray
+    border.color: Theme.opticalGray
     clip: true
 
     function activate() { workspaceController.activatePane(paneIndex) }
@@ -48,7 +48,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         height: 2
-        color: Theme.probeBlue
+        color: Theme.activePaneAccent
         opacity: root.active ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
     }
@@ -59,7 +59,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: focusRail.bottom
         height: 38
-        color: root.active ? Theme.raisedSurface : Theme.paperWhite
+        color: root.active ? Theme.activePaneHeader : Theme.paperWhite
 
         MouseArea {
             anchors.fill: parent
@@ -355,7 +355,7 @@ Rectangle {
             width: 26
             height: 26
             iconSource: root.iconPrefix + "close.svg"
-            toolTipText: qsTr("Close file manager")
+            toolTipText: qsTr("Close browser pane")
             onClicked: root.workspaceController.closePane(root.paneIndex)
         }
     }
@@ -394,8 +394,8 @@ Rectangle {
             }
             Text {
                 width: parent.width
-                text: root.active ? "The file tree and toolbar now control this area"
-                                  : "Its folder and view settings stay independent"
+                text: root.active ? qsTr("The file tree and toolbar now control this pane")
+                                  : qsTr("This pane keeps its own folder and view settings")
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
                 color: Theme.mutedInk
@@ -464,6 +464,39 @@ Rectangle {
         }
     }
 
+    Column {
+        objectName: "paneEmptyState"
+        z: 2
+        anchors.centerIn: contactSheet
+        width: Math.min(contactSheet.width - 32, 420)
+        visible: contactSheet.visible && contactSheet.count === 0
+        spacing: 12
+        Text {
+            objectName: "paneEmptyMessage"
+            width: parent.width
+            text: root.controller.filterText.length > 0
+                  ? qsTr("No files match “%1”").arg(root.controller.filterText)
+                  : qsTr("No supported images in this folder\nChoose another folder or drop images here")
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WrapAnywhere
+            color: Theme.mutedInk
+            font.family: Theme.uiFont
+            font.pixelSize: 13
+            lineHeight: 1.45
+        }
+        AppIconButton {
+            objectName: "clearEmptySearchButton"
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: root.controller.filterText.length > 0
+            text: qsTr("Clear search")
+            onClicked: {
+                root.activate()
+                root.controller.setFilterText("")
+            }
+        }
+    }
+
+
     GridView {
         id: contactSheet
         objectName: "paneContactSheet-" + root.paneIndex
@@ -487,12 +520,31 @@ Rectangle {
         reuseItems: true
         cacheBuffer: Math.max(0, height)
         keyNavigationEnabled: root.active
+        activeFocusOnTab: true
+        property bool keyboardNavigating: false
+        readonly property bool keyboardFocusVisible: activeFocus && keyboardNavigating
+        onActiveFocusChanged: keyboardNavigating = activeFocus
+        Keys.onPressed: function(event) {
+            if ([Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down, Qt.Key_Home, Qt.Key_End].indexOf(event.key) >= 0) {
+                keyboardNavigating = true
+                root.activate()
+                event.accepted = false
+            } else if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && currentItem) {
+                keyboardNavigating = true
+                root.activate()
+                const tile = currentItem.fileTile
+                root.workspaceController.selectPath(root.paneIndex, tile.path, false, event.key === Qt.Key_Space)
+                if (event.key !== Qt.Key_Space) root.controller.activatePath(tile.path)
+                event.accepted = true
+            }
+        }
         onInteractiveChanged: {
             if (!interactive)
                 cancelFlick()
         }
         ThumbnailViewport { view: contactSheet; controller: root.controller }
         delegate: Item {
+            readonly property alias fileTile: thumbnailTile
             function containsThumbnailPoint(x, y) {
                 const point = thumbnailTile.mapFromItem(contactSheet, x, y)
                 return point.x >= 0 && point.x < thumbnailTile.width &&
@@ -500,6 +552,7 @@ Rectangle {
             }
             property bool thumbnailDemand: false
             readonly property bool thumbnailReady: thumbnailTile.thumbnailReady
+            required property int index
             required property string path
             required property string fileName
             required property string technicalLabel
@@ -533,9 +586,13 @@ Rectangle {
                 requestThumbnail: parent.thumbnailDemand
                 thumbnailUrl: parent.thumbnailUrl
                 directory: parent.isDirectory
+                keyboardCurrent: contactSheet.keyboardFocusVisible && parent.GridView.isCurrentItem
                 selected: parent.isSelected
                 selectionOrdinal: parent.selectionOrdinal
                 onSelectionRequested: function(extend, toggle) {
+                    contactSheet.currentIndex = parent.index
+                    contactSheet.forceActiveFocus(Qt.MouseFocusReason)
+                    contactSheet.keyboardNavigating = false
                     root.workspaceController.selectPath(root.paneIndex, path, extend, toggle)
                 }
                 onActivated: {
@@ -547,16 +604,6 @@ Rectangle {
 
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-        Text {
-            anchors.centerIn: parent
-            visible: contactSheet.count === 0
-            text: qsTr("No supported images in this folder\nChoose another folder or drop images here")
-            horizontalAlignment: Text.AlignHCenter
-            color: Theme.mutedInk
-            font.family: Theme.uiFont
-            font.pixelSize: 12
-            lineHeight: 1.45
-        }
 
         MouseArea {
             anchors.fill: parent

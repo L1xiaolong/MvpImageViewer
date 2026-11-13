@@ -93,6 +93,14 @@ Rectangle {
         return root.settingsController
                 ? root.settingsController.shortcutFor(action) : fallback
     }
+    function configuredShortcutLabel(action, fallback) {
+        const revision = root.settingsController ? root.settingsController.shortcutsRevision : 0
+        const entries = root.settingsController ? root.settingsController.shortcutEntries : []
+        for (let i = 0; i < entries.length; ++i) {
+            if (entries[i].id === action) return entries[i].nativeSequence
+        }
+        return fallback
+    }
     function setSmoothDisplay(enabled) {
         if (root.settingsController && root.settingsController.smoothDisplay !== undefined)
             root.settingsController.smoothDisplay = enabled
@@ -111,6 +119,11 @@ Rectangle {
         iconPrefix: root.iconPrefix
         displayMode: root.displayMode
         sortMode: root.controller.sortMode
+        openFolderShortcutText: root.configuredShortcutLabel("openFolder", Qt.platform.os === "osx" ? "⌘O" : "Ctrl+O")
+        compareShortcutText: root.configuredShortcutLabel("compare", "C")
+        settingsShortcutText: root.configuredShortcutLabel("settings", Qt.platform.os === "osx" ? "⌘," : "Ctrl+,")
+        newFolderShortcutText: root.configuredShortcutLabel("newFolder", Qt.platform.os === "osx" ? "⇧⌘N" : "Ctrl+Shift+N")
+        searchShortcutText: root.configuredShortcutLabel("find", Qt.platform.os === "osx" ? "⌘F" : "Ctrl+F")
         compareEnabled: root.workspaceController.canCompare
         activePaneAvailable: root.workspaceController.hasActivePane === undefined
                              ? true : root.workspaceController.hasActivePane
@@ -179,16 +192,27 @@ Rectangle {
         function onClicked() { root.setSmoothDisplay(toolbar.smoothDisplayControl.checked); }
     }
     Connections {
-        target: toolbar.rotateClockwiseControl
-        function onClicked() { root.controller.rotateSelectedClockwise(); }
+        target: toolbar.transformControl
+        function onClicked() { imageOperationsMenu.popup(toolbar.transformControl, 0, toolbar.transformControl.height); }
     }
-    Connections {
-        target: toolbar.rotateCounterClockwiseControl
-        function onClicked() { root.controller.rotateSelectedCounterClockwise(); }
-    }
-    Connections {
-        target: toolbar.resizeImageControl
-        function onClicked() { imageResizeDialog.openForSelection(); }
+    AppMenu {
+        id: imageOperationsMenu
+        objectName: "imageOperationsMenu"
+        AppMenuItem {
+            text: qsTr("Rotate 90° counterclockwise")
+            enabled: root.controller.canTransform
+            onTriggered: root.controller.rotateSelectedCounterClockwise()
+        }
+        AppMenuItem {
+            text: qsTr("Rotate 90° clockwise")
+            enabled: root.controller.canTransform
+            onTriggered: root.controller.rotateSelectedClockwise()
+        }
+        AppMenuItem {
+            text: qsTr("Resize image…")
+            enabled: root.controller.canTransform
+            onTriggered: imageResizeDialog.openForSelection()
+        }
     }
     Connections {
         target: toolbar.settingsControl
@@ -1142,11 +1166,11 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 4
                         radius: 6
-                        color: galleryMouse.containsMouse ? Theme.softHover : "transparent"
-                        border.color: galleryDelegate.GridView.isCurrentItem
-                                      ? Theme.primaryButton
-                                      : galleryDelegate.isSelected ? Theme.accentBorder : "transparent"
-                        border.width: galleryDelegate.GridView.isCurrentItem ? 2 : 1
+                        color: galleryDelegate.isSelected ? Theme.fileSelectionSurface : galleryMouse.containsMouse ? Theme.softHover : "transparent"
+                        border.color: galleryStrip.activeFocus && galleryDelegate.GridView.isCurrentItem
+                                      ? Theme.keyboardFocus
+                                      : galleryDelegate.isSelected ? Theme.fileSelectionBorder : "transparent"
+                        border.width: galleryStrip.activeFocus && galleryDelegate.GridView.isCurrentItem ? 2 : 1
                         ToolTip.delay: 500
                         ToolTip.timeout: 8000
                         ToolTip.visible: galleryMouse.containsMouse &&
@@ -1154,6 +1178,15 @@ Rectangle {
                                          galleryDelegate.path.length > 0
                         ToolTip.text: galleryDelegate.path
 
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 5
+                            height: 72
+                            visible: !galleryDelegate.isDirectory
+                            color: Theme.thumbnailWell
+                        }
                         Image {
                             objectName: "galleryStripPreview-" + galleryDelegate.index
                             id: galleryPreview
@@ -1168,7 +1201,8 @@ Rectangle {
                             sourceSize: Qt.size(320, 240)
                             asynchronous: true
                             cache: true
-                            fillMode: Image.PreserveAspectCrop
+                            fillMode: root.settingsController && root.settingsController.thumbnailPresentation === "fill"
+                                      ? Image.PreserveAspectCrop : Image.PreserveAspectFit
                             smooth: root.smoothDisplay
                             mipmap: root.smoothDisplay
                         }

@@ -12,6 +12,7 @@ QtObject {
     property string resolvedDisplayColorSpace: "Display P3"
     property bool honorExifOrientation: true
     property string canvasBackground: "neutral"
+    property string thumbnailPresentation: "fit"
     property bool smoothDisplay: true
     property bool colorManagementAvailable: true
     property string applicationVersion: "0.2.17"

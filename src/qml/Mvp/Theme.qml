@@ -14,7 +14,7 @@ QtObject {
     readonly property color pressedSurface: darkMode ? "#37373D" : "#E2E9ED"
     readonly property color graphiteInk: darkMode ? "#F0F0F0" : "#25303A"
     readonly property color mutedInk: darkMode ? "#C8C8C8" : "#69747D"
-    readonly property color faintInk: darkMode ? "#9D9D9D" : "#9AA5AD"
+    readonly property color faintInk: darkMode ? "#9D9D9D" : "#69747D"
     readonly property color probeBlue: darkMode ? "#78A5FF" : "#356AE6"
     readonly property color exposureAmber: darkMode ? "#E0A357" : "#B87524"
     readonly property color danger: darkMode ? "#F17A7A" : "#C94E4E"
@@ -64,7 +64,15 @@ QtObject {
     readonly property color explorerIndentGuide: darkMode ? "#404040" : "#D5D9DC"
     readonly property string iconPrefix: darkMode ? "qrc:/icons/ui-dark/" : "qrc:/icons/ui/"
     readonly property real disabledOpacity: darkMode ? 0.52 : 0.38
-    readonly property int metadataFontSize: darkMode ? 11 : 10
+    readonly property int metadataFontSize: 11
+
+    // Distinct cues for file selection, keyboard focus, and the active pane.
+    readonly property color thumbnailWell: darkMode ? "#282828" : "#E8E8E8"
+    readonly property color fileSelectionSurface: darkMode ? "#29343B" : "#E8EEF2"
+    readonly property color fileSelectionBorder: darkMode ? "#89A6BA" : "#526F82"
+    readonly property color keyboardFocus: darkMode ? "#F0C46A" : "#7A5400"
+    readonly property color activePaneHeader: darkMode ? "#343B40" : "#E9EFF2"
+    readonly property color activePaneAccent: darkMode ? "#89A6BA" : "#526F82"
 
     readonly property int unit: 4
     readonly property int toolbarHeight: 38

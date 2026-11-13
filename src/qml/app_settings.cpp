@@ -49,6 +49,7 @@ constexpr auto kPreserveHighBitDepthKey = "color/preserveHighBitDepth";
 constexpr auto kDisplayColorSpaceKey = "color/displayColorSpace";
 constexpr auto kHonorExifOrientationKey = "display/honorExifOrientation";
 constexpr auto kCanvasBackgroundKey = "display/canvasBackground";
+constexpr auto kThumbnailPresentationKey = "display/thumbnailPresentation";
 constexpr auto kSmoothDisplayKey = "display/smoothDisplay";
 constexpr auto kLastUpdateCheckKey = "updates/lastCheckUtc";
 
@@ -143,6 +144,8 @@ AppSettings::AppSettings(QGuiApplication* application, QObject* parent)
     honorExifOrientation_ = settings.value(QLatin1String(kHonorExifOrientationKey), true).toBool();
     canvasBackground_ = normalizedCanvasBackground(
         settings.value(QLatin1String(kCanvasBackgroundKey), QStringLiteral("neutral")).toString());
+    thumbnailPresentation_ = settings.value(QLatin1String(kThumbnailPresentationKey)).toString() == QStringLiteral("fill")
+                                 ? QStringLiteral("fill") : QStringLiteral("fit");
     smoothDisplay_ = settings.value(QLatin1String(kSmoothDisplayKey), true).toBool();
     EncodedColorManagement::setEnabled(applyEmbeddedColorProfiles_);
     applyDisplayColorSpace();
@@ -240,6 +243,7 @@ void AppSettings::setSurfaceColorSpace(const QColorSpace& surface) {
 }
 bool AppSettings::honorExifOrientation() const { return honorExifOrientation_; }
 QString AppSettings::canvasBackground() const { return canvasBackground_; }
+QString AppSettings::thumbnailPresentation() const { return thumbnailPresentation_; }
 bool AppSettings::smoothDisplay() const { return smoothDisplay_; }
 bool AppSettings::colorManagementAvailable() const { return EncodedColorManagement::isAvailable(); }
 
@@ -362,6 +366,14 @@ void AppSettings::setCanvasBackground(const QString& background) {
     canvasBackground_ = normalized;
     QSettings().setValue(QLatin1String(kCanvasBackgroundKey), normalized);
     emit colorDisplayChanged();
+}
+
+void AppSettings::setThumbnailPresentation(const QString& mode) {
+    const QString normalized = mode == QStringLiteral("fill") ? mode : QStringLiteral("fit");
+    if (thumbnailPresentation_ == normalized) return;
+    thumbnailPresentation_ = normalized;
+    QSettings().setValue(QLatin1String(kThumbnailPresentationKey), normalized);
+    emit thumbnailPresentationChanged();
 }
 
 void AppSettings::setSmoothDisplay(bool enabled) {
@@ -741,6 +753,7 @@ void AppSettings::restoreDefaults() {
     setDisplayColorSpace(QStringLiteral("auto"));
     setHonorExifOrientation(true);
     setCanvasBackground(QStringLiteral("neutral"));
+    setThumbnailPresentation(QStringLiteral("fit"));
     setSmoothDisplay(true);
     resetShortcuts();
 }

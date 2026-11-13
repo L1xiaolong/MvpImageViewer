@@ -4,8 +4,13 @@ import "."
 
 Button {
     id: control
+    Accessible.name: text.length > 0 ? text : toolTipText
+    Accessible.description: toolTipText
+    Accessible.onPressAction: if (enabled) animateClick()
+
     property url iconSource
     property string toolTipText: text
+    property string shortcutText: ""
     property bool compact: text.length === 0
     property int controlSize: Theme.touchTarget
     property int renderedIconSize: Theme.iconSize
@@ -49,7 +54,7 @@ Button {
         }
     }
 
-    ToolTip.visible: hovered && toolTipText.length > 0
-    ToolTip.text: toolTipText
+    ToolTip.visible: (hovered || activeFocus) && toolTipText.length > 0
+    ToolTip.text: toolTipText + (shortcutText.length > 0 ? " · " + shortcutText : "")
     ToolTip.delay: 500
 }

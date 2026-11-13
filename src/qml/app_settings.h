@@ -46,6 +46,8 @@ class AppSettings final : public QObject {
                    NOTIFY colorDisplayChanged)
     Q_PROPERTY(QString canvasBackground READ canvasBackground WRITE setCanvasBackground NOTIFY
                    colorDisplayChanged)
+    Q_PROPERTY(QString thumbnailPresentation READ thumbnailPresentation WRITE setThumbnailPresentation
+                   NOTIFY thumbnailPresentationChanged)
     Q_PROPERTY(
         bool smoothDisplay READ smoothDisplay WRITE setSmoothDisplay NOTIFY smoothDisplayChanged)
     Q_PROPERTY(bool colorManagementAvailable READ colorManagementAvailable CONSTANT)
@@ -78,6 +80,7 @@ class AppSettings final : public QObject {
     [[nodiscard]] QString resolvedDisplayColorSpace() const;
     [[nodiscard]] bool honorExifOrientation() const;
     [[nodiscard]] QString canvasBackground() const;
+    [[nodiscard]] QString thumbnailPresentation() const;
     [[nodiscard]] bool smoothDisplay() const;
     [[nodiscard]] bool colorManagementAvailable() const;
     [[nodiscard]] QString updateState() const;
@@ -111,6 +114,7 @@ class AppSettings final : public QObject {
     void setSurfaceColorSpace(const QColorSpace& surface);
     void setHonorExifOrientation(bool enabled);
     void setCanvasBackground(const QString& background);
+    void setThumbnailPresentation(const QString& mode);
     void setSmoothDisplay(bool enabled);
 
     Q_INVOKABLE QVariantMap shortcutSequenceForKey(int key, int modifiers) const;
@@ -141,6 +145,7 @@ class AppSettings final : public QObject {
     void updateStateChanged();
     void shortcutsChanged();
     void colorDisplayChanged();
+    void thumbnailPresentationChanged();
     void smoothDisplayChanged();
 
   private:
@@ -178,6 +183,7 @@ class AppSettings final : public QObject {
     QColorSpace surfaceColorSpace_;
     bool honorExifOrientation_ = true;
     QString canvasBackground_ = QStringLiteral("neutral");
+    QString thumbnailPresentation_ = QStringLiteral("fit");
     bool smoothDisplay_ = true;
     QString updateState_ = QStringLiteral("idle");
     QString latestVersion_;

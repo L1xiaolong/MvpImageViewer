@@ -336,6 +336,18 @@
         <source>Copy %1 items to “%2”?</source>
         <translation>将 %1 个项目复制到“%2”？</translation>
     </message>
+    <message>
+        <source>Rotate 90° counterclockwise</source>
+        <translation>逆时针旋转 90°</translation>
+    </message>
+    <message>
+        <source>Rotate 90° clockwise</source>
+        <translation>顺时针旋转 90°</translation>
+    </message>
+    <message>
+        <source>Resize image…</source>
+        <translation>调整图片大小…</translation>
+    </message>
 </context>
 <context>
     <name>BrowserPane</name>
@@ -484,6 +496,26 @@ Choose another folder or drop images here</source>
         <source>Network</source>
         <translation>网络</translation>
     </message>
+    <message>
+        <source>Clear search</source>
+        <translation>清除搜索</translation>
+    </message>
+    <message>
+        <source>No files match “%1”</source>
+        <translation>没有与“%1”匹配的文件</translation>
+    </message>
+    <message>
+        <source>Close browser pane</source>
+        <translation>关闭浏览窗格</translation>
+    </message>
+    <message>
+        <source>The file tree and toolbar now control this pane</source>
+        <translation>文件树和工具栏当前控制此窗格</translation>
+    </message>
+    <message>
+        <source>This pane keeps its own folder and view settings</source>
+        <translation>此窗格独立保留文件夹和视图设置</translation>
+    </message>
 </context>
 <context>
     <name>ComparePage</name>
@@ -561,6 +593,34 @@ Choose another folder or drop images here</source>
         <location filename="../Pages/ComparePage.qml" line="386"/>
         <source>Save screenshot</source>
         <translation>保存截图</translation>
+    </message>
+    <message>
+        <source>Move over an image</source>
+        <translation>将指针移到图片上</translation>
+    </message>
+    <message>
+        <source>Back to browser</source>
+        <translation>返回浏览界面</translation>
+    </message>
+    <message>
+        <source>Image rotated and saved</source>
+        <translation>图片已旋转并保存</translation>
+    </message>
+    <message>
+        <source>Screenshot saved</source>
+        <translation>截图已保存</translation>
+    </message>
+    <message>
+        <source>Unable to save screenshot</source>
+        <translation>无法保存截图</translation>
+    </message>
+    <message>
+        <source>Unable to capture comparison</source>
+        <translation>无法截取对比画面</translation>
+    </message>
+    <message>
+        <source>Loading…</source>
+        <translation>正在加载…</translation>
     </message>
 </context>
 <context>
@@ -2026,6 +2086,22 @@ Choose another folder or drop images here</source>
         <source>Logs &amp; diagnostics</source>
         <translation>日志与诊断</translation>
     </message>
+    <message>
+        <source>Thumbnail presentation</source>
+        <translation>缩略图呈现</translation>
+    </message>
+    <message>
+        <source>Show the complete image for inspection, or crop it to fill a fixed preview frame.</source>
+        <translation>完整显示图片以便检查，或裁切图片以填满固定预览框。</translation>
+    </message>
+    <message>
+        <source>Complete image</source>
+        <translation>完整图像</translation>
+    </message>
+    <message>
+        <source>Fill preview frame</source>
+        <translation>填满预览框</translation>
+    </message>
 </context>
 <context>
     <name>ThumbnailTile</name>
@@ -2222,6 +2298,54 @@ Choose another folder or drop images here</source>
         <location filename="../Mvp/TopToolbar.ui.qml" line="327"/>
         <source>Settings</source>
         <translation>设置</translation>
+    </message>
+    <message>
+        <source>Compare selected</source>
+        <translation>对比所选图片</translation>
+    </message>
+    <message>
+        <source>Compare selected images</source>
+        <translation>对比所选图片</translation>
+    </message>
+    <message>
+        <source>Select 2–4 images to compare</source>
+        <translation>选择 2～4 张图片进行对比</translation>
+    </message>
+    <message>
+        <source>Image operations</source>
+        <translation>图像操作</translation>
+    </message>
+    <message>
+        <source>Select one image to edit</source>
+        <translation>选择一张图片进行编辑</translation>
+    </message>
+    <message>
+        <source>Clear search</source>
+        <translation>清除搜索</translation>
+    </message>
+    <message>
+        <source>Add browser pane</source>
+        <translation>新增浏览窗格</translation>
+    </message>
+    <message>
+        <source>Maximum 4 browser panes</source>
+        <translation>最多支持 4 个浏览窗格</translation>
+    </message>
+    <message>
+        <source>Grid view</source>
+        <translation>网格视图</translation>
+    </message>
+    <message>
+        <source>Grid view is available with up to 2 browser panes</source>
+        <translation>最多 2 个浏览窗格时可使用网格视图</translation>
+    </message>
+    <message>
+        <source>Gallery view</source>
+        <translation>画廊视图</translation>
+    </message>
+    <message>
+        <source>Gallery view is available with 1 browser pane</source>
+        <translation>仅有 1 个浏览窗格时可使用画廊视图</translation>
     </message>
 </context>
 <context>

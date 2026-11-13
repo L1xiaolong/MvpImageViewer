@@ -10,4 +10,5 @@
 *.user
 *.qtds
 *.swp
+.impeccable
 __pycache__/

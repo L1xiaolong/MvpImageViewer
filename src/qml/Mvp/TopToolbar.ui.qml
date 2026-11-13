@@ -14,6 +14,11 @@ Rectangle {
     property string iconPrefix: Theme.iconPrefix
     property int displayMode: 0
     property int sortMode: 0
+    property string searchShortcutText: Qt.platform.os === "osx" ? "⌘F" : "Ctrl+F"
+    property string openFolderShortcutText: ""
+    property string newFolderShortcutText: ""
+    property string compareShortcutText: ""
+    property string settingsShortcutText: ""
     property bool compareEnabled: false
     property bool activePaneAvailable: true
     property bool activeDirectoryAvailable: true
@@ -32,12 +37,10 @@ Rectangle {
     property alias galleryControl: galleryModeButton
     property alias sortControl: sortButton
     property alias compareControl: compareButton
-    property alias rotateClockwiseControl: rotateClockwiseButton
-    property alias rotateCounterClockwiseControl: rotateCounterClockwiseButton
-    property alias resizeImageControl: resizeImageButton
+    property alias transformControl: transformButton
     property alias smoothDisplayControl: smoothDisplayButton
     property alias searchControl: fileSearch
-    property alias clearSearchControl: clearMouse
+    property alias clearSearchControl: clearSearch
     property alias settingsControl: settingsButton
 
     Text {
@@ -72,6 +75,7 @@ Rectangle {
         enabled: root.activePaneAvailable
         iconSource: root.iconPrefix + "folder-open.svg"
         toolTipText: qsTr("Open folder")
+        shortcutText: root.openFolderShortcutText
     }
 
     AppIconButton {
@@ -84,6 +88,7 @@ Rectangle {
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         iconSource: root.iconPrefix + "folder-plus.svg"
         toolTipText: qsTr("New folder")
+        shortcutText: root.newFolderShortcutText
     }
 
     AppIconButton {
@@ -95,7 +100,7 @@ Rectangle {
         renderedIconSize: root.toolbarIconSize
         enabled: root.canAddPane
         iconSource: root.iconPrefix + "folder-pane-plus.svg"
-        toolTipText: enabled ? qsTr("Add file manager") : qsTr("Maximum 4 file managers")
+        toolTipText: enabled ? qsTr("Add browser pane") : qsTr("Maximum 4 browser panes")
     }
 
     Rectangle {
@@ -118,7 +123,7 @@ Rectangle {
         checked: root.displayMode === 0
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable && root.gridEnabled
         iconSource: root.iconPrefix + "grid.svg"
-        toolTipText: root.gridEnabled ? "Grid view" : "Grid view is available with up to 2 file managers"
+        toolTipText: root.gridEnabled ? qsTr("Grid view") : qsTr("Grid view is available with up to 2 browser panes")
     }
 
     AppIconButton {
@@ -146,7 +151,7 @@ Rectangle {
         checked: root.displayMode === 2
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable && root.galleryEnabled
         iconSource: root.iconPrefix + "gallery.svg"
-        toolTipText: root.galleryEnabled ? "Gallery view" : "Gallery view is available with 1 file manager"
+        toolTipText: root.galleryEnabled ? qsTr("Gallery view") : qsTr("Gallery view is available with 1 browser pane")
     }
 
     Rectangle {
@@ -202,53 +207,28 @@ Rectangle {
     }
 
     AppIconButton {
-        id: rotateCounterClockwiseButton
-        objectName: "rotateCounterClockwiseButton"
+        id: transformButton
+        objectName: "imageOperationsButton"
         x: brandDivider.x + 306
         anchors.verticalCenter: parent.verticalCenter
         controlSize: root.toolbarButtonSize
         renderedIconSize: root.toolbarIconSize
         enabled: root.transformEnabled
-        iconSource: root.iconPrefix + "rotate-ccw-square.svg"
-        toolTipText: enabled ? qsTr("Rotate 90° counterclockwise")
-                             : qsTr("Select one image to rotate")
-    }
-
-    AppIconButton {
-        id: rotateClockwiseButton
-        objectName: "rotateClockwiseButton"
-        x: brandDivider.x + 336
-        anchors.verticalCenter: parent.verticalCenter
-        controlSize: root.toolbarButtonSize
-        renderedIconSize: root.toolbarIconSize
-        enabled: root.transformEnabled
-        iconSource: root.iconPrefix + "rotate-cw-square.svg"
-        toolTipText: enabled ? qsTr("Rotate 90° clockwise")
-                             : qsTr("Select one image to rotate")
-    }
-
-    AppIconButton {
-        id: resizeImageButton
-        objectName: "resizeImageButton"
-        x: brandDivider.x + 366
-        anchors.verticalCenter: parent.verticalCenter
-        controlSize: root.toolbarButtonSize
-        renderedIconSize: root.toolbarIconSize
-        enabled: root.transformEnabled
         iconSource: root.iconPrefix + "image-resize.svg"
-        toolTipText: enabled ? qsTr("Resize image…") : qsTr("Select one image to resize")
+        toolTipText: enabled ? qsTr("Image operations") : qsTr("Select one image to edit")
     }
 
     AppIconButton {
         id: compareButton
         objectName: "compareButton"
-        x: brandDivider.x + 396
+        x: brandDivider.x + 340
         anchors.verticalCenter: parent.verticalCenter
         controlSize: root.toolbarButtonSize
         renderedIconSize: root.toolbarIconSize
         enabled: root.compareEnabled
         iconSource: root.iconPrefix + "compare.svg"
-        toolTipText: enabled ? "Compare selected images" : "Select 2–4 images to compare"
+        toolTipText: enabled ? qsTr("Compare selected images") : qsTr("Select 2–4 images to compare")
+        shortcutText: root.compareShortcutText
     }
 
     TextField {
@@ -256,13 +236,14 @@ Rectangle {
         objectName: "browserSearchField"
         x: root.width - width - 18
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.max(140, Math.min(236, root.width - (brandDivider.x + 482)))
+        width: Math.max(140, Math.min(236, root.width - (brandDivider.x + 560)))
         height: root.toolbarButtonSize
+        Accessible.name: qsTr("Search files")
         placeholderText: qsTr("Search files")
         enabled: root.activePaneAvailable && root.activeDirectoryAvailable
         selectByMouse: true
         leftPadding: 34
-        rightPadding: 40
+        rightPadding: fileSearch.text.length > 0 ? 36 : searchShortcutLabel.implicitWidth + 18
         color: Theme.graphiteInk
         placeholderTextColor: Theme.faintInk
         font.family: Theme.uiFont
@@ -288,31 +269,27 @@ Rectangle {
         }
 
         Text {
+            id: searchShortcutLabel
             visible: !fileSearch.activeFocus && fileSearch.text.length === 0
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            text: qsTr("⌘F")
+            text: root.searchShortcutText
             color: Theme.faintInk
             font.family: Theme.uiFont
             font.pixelSize: 11
         }
 
-        Text {
+        AppIconButton {
             id: clearSearch
+            objectName: "clearSearchButton"
             visible: fileSearch.text.length > 0
             anchors.right: parent.right
-            anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            text: qsTr("×")
-            color: clearMouse.containsMouse ? Theme.graphiteInk : Theme.mutedInk
-            font.pixelSize: 16
-            MouseArea {
-                id: clearMouse
-                anchors.fill: parent
-                anchors.margins: -7
-                hoverEnabled: true
-            }
+            controlSize: 28
+            renderedIconSize: 14
+            iconSource: root.iconPrefix + "close.svg"
+            toolTipText: qsTr("Clear search")
         }
     }
 
@@ -325,6 +302,7 @@ Rectangle {
         renderedIconSize: root.toolbarIconSize
         iconSource: root.iconPrefix + "settings.svg"
         toolTipText: qsTr("Settings")
+        shortcutText: root.settingsShortcutText
     }
 
     Rectangle {

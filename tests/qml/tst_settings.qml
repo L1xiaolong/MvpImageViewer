@@ -129,6 +129,29 @@ Item {
             keyClick(Qt.Key_Escape)
             tryCompare(preview.card, "visible", false)
         }
+        function test_thumbnail_presentation_setting() {
+            page(1)
+            const control = findChild(preview.card, "settingsThumbnailPresentation")
+            compare(testSettings.thumbnailPresentation, "fit")
+            compare(control.currentIndex, 0)
+            const scroll = findChild(preview.card, "settingsScroll")
+            scroll.contentY = Math.max(0, control.mapToItem(scroll.contentItem, 0, 0).y - 80)
+            waitForRendering(control)
+            mouseClick(control, control.width / 2, control.height / 2)
+            keyClick(Qt.Key_End)
+            keyClick(Qt.Key_Return)
+            compare(testSettings.thumbnailPresentation, "fill")
+            compare(testCapture.storedSetting("display/thumbnailPresentation"), "fill")
+            compare(testCapture.reloadedThumbnailPresentation(), "fill")
+            page(0); page(1)
+            compare(findChild(preview.card, "settingsThumbnailPresentation").currentIndex, 1)
+            testSettings.thumbnailPresentation = "unexpected"
+            compare(testSettings.thumbnailPresentation, "fit")
+            testSettings.thumbnailPresentation = "fill"
+            testSettings.restoreDefaults()
+            compare(testSettings.thumbnailPresentation, "fit")
+            compare(testCapture.reloadedThumbnailPresentation(), "fit")
+        }
         function test_04_shortcut_capture() {
             page(2)
             const edit = testCapture.findItem(preview.card.contentItem, "editShortcut-openFolder")

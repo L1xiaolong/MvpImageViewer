@@ -389,6 +389,18 @@ Popup {
             }
             SettingsHeading { text: qsTr("Image presentation") }
             SettingsRow {
+                title: qsTr("Thumbnail presentation")
+                description: qsTr("Show the complete image for inspection, or crop it to fill a fixed preview frame.")
+                controlWidth: 210
+                SettingsComboBox {
+                    objectName: "settingsThumbnailPresentation"
+                    Accessible.name: qsTr("Thumbnail presentation")
+                    model: [qsTr("Complete image"), qsTr("Fill preview frame")]
+                    currentIndex: root.settingsController && root.settingsController.thumbnailPresentation === "fill" ? 1 : 0
+                    onActivated: if (root.settingsController) root.settingsController.thumbnailPresentation = currentIndex === 1 ? "fill" : "fit"
+                }
+            }
+            SettingsRow {
                 title: qsTr("Honor EXIF orientation")
                 description: qsTr("Automatically rotate images according to their metadata.")
                 controlWidth: 40
