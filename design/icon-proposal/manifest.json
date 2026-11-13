@@ -1,0 +1,296 @@
+{
+  "folder-open": {
+    "label": "打开文件夹",
+    "body": "<path d=\"M2.5 12V4.5h5l2 2h7v2 M2.5 16.5l2-7h14l-2 7z\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "folder-plus": {
+    "label": "新建文件夹",
+    "body": "<path d=\"M2.5 9V4.5h5l2 2h8v3 M2.5 11v5.5h8 M15 11v7 M11.5 14.5h7\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "folder-pane-plus": {
+    "label": "新增浏览窗格",
+    "body": "<rect x=\"2.5\" y=\"3.5\" width=\"15\" height=\"13\" rx=\"1\" /><path d=\"M8 3.5v13 M11 10h5 M13.5 7.5v5\" />",
+    "group": "浏览与管理",
+    "note": "窗格分隔与加号，区别于新建文件夹"
+  },
+  "grid": {
+    "label": "网格视图",
+    "body": "<rect x=\"3\" y=\"3\" width=\"5\" height=\"5\" rx=\"0.6\" /><rect x=\"12\" y=\"3\" width=\"5\" height=\"5\" rx=\"0.6\" /><rect x=\"3\" y=\"12\" width=\"5\" height=\"5\" rx=\"0.6\" /><rect x=\"12\" y=\"12\" width=\"5\" height=\"5\" rx=\"0.6\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "list": {
+    "label": "列表视图",
+    "body": "<rect x=\"3\" y=\"3\" width=\"3\" height=\"3\" rx=\"0.4\" /><path d=\"M9 3.5h8 M9 5.5h5\" /><rect x=\"3\" y=\"8.5\" width=\"3\" height=\"3\" rx=\"0.4\" /><path d=\"M9 9.0h8 M9 11.0h5\" /><rect x=\"3\" y=\"14\" width=\"3\" height=\"3\" rx=\"0.4\" /><path d=\"M9 14.5h8 M9 16.5h5\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "gallery": {
+    "label": "画廊视图",
+    "body": "<rect x=\"2.5\" y=\"3.5\" width=\"15\" height=\"9\" rx=\"1\" /><path d=\"M3 11l4-4 4 4 2-2 4 3\" /><rect x=\"2.5\" y=\"15\" width=\"3.5\" height=\"2\" rx=\"0.3\" /><rect x=\"8.25\" y=\"15\" width=\"3.5\" height=\"2\" rx=\"0.3\" /><rect x=\"14\" y=\"15\" width=\"3.5\" height=\"2\" rx=\"0.3\" />",
+    "group": "浏览与管理",
+    "note": "大图与底部缩略带"
+  },
+  "sort": {
+    "label": "排序",
+    "body": "<path d=\"M4.5 3.5v13 M2 14l2.5 2.5L7 14 M10 4.5h7 M10 9.5h5 M10 14.5h3\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "smooth-display": {
+    "label": "平滑显示",
+    "body": "<rect x=\"2.5\" y=\"3.5\" width=\"15\" height=\"13\" rx=\"1.5\" /><path d=\"M5 12.5h1c4 0 3-5 7-5h2\" />",
+    "group": "浏览与管理",
+    "note": "图像框内的连续平顺曲线"
+  },
+  "image-resize": {
+    "label": "图像操作／调整尺寸",
+    "body": "<path d=\"M10.5 3.5h-7v13h13v-7 M6 13l3-3 3 3 M12.5 7.5l5-5 M13 2.5h4.5V7\" />",
+    "group": "浏览与管理",
+    "note": "图像轮廓与向外扩展箭头"
+  },
+  "compare": {
+    "label": "比较所选图像",
+    "body": "<path d=\"M7 3.5H2.5v10H7 M13 6.5h4.5v10H13 M7 10h6 M11 8l2 2-2 2 M9 14H7v-2\" />",
+    "group": "浏览与管理",
+    "note": "错位的两幅图像与比较箭头"
+  },
+  "settings": {
+    "label": "设置",
+    "body": "<path d=\"M3 5h4 M11 5h6 M3 10h8 M15 10h2 M3 15h2 M9 15h8\" /><rect x=\"7\" y=\"3\" width=\"4\" height=\"4\" rx=\"0.7\" /><rect x=\"11\" y=\"8\" width=\"4\" height=\"4\" rx=\"0.7\" /><rect x=\"5\" y=\"13\" width=\"4\" height=\"4\" rx=\"0.7\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "search": {
+    "label": "搜索文件",
+    "body": "<circle cx=\"8.5\" cy=\"8.5\" r=\"5.5\" /><path d=\"M12.5 12.5l5 5\" />",
+    "group": "浏览与管理",
+    "note": ""
+  },
+  "side-by-side": {
+    "label": "并排比较",
+    "body": "<rect x=\"2\" y=\"4\" width=\"6\" height=\"12\" rx=\"0.7\" /><rect x=\"12\" y=\"4\" width=\"6\" height=\"12\" rx=\"0.7\" /><path d=\"M4 12l2-3 M14 12l2-3\" />",
+    "group": "图像与比较",
+    "note": "两个独立图像框"
+  },
+  "split-vertical": {
+    "label": "垂直分割",
+    "body": "<rect x=\"2.5\" y=\"4\" width=\"15\" height=\"12\" rx=\"0.8\" /><path d=\"M10 2.5v15 M4.5 12l3-4 M12.5 12l3-4\" /><rect x=\"8.5\" y=\"8.5\" width=\"3\" height=\"3\" rx=\"0.5\" fill=\"currentColor\" stroke=\"none\"/>",
+    "group": "图像与比较",
+    "note": "同一画面内的可拖动分割线"
+  },
+  "cover": {
+    "label": "按住查看候选图 B",
+    "body": "<path d=\"M3.5 3.5h11v11 M6.5 6.5h11v11h-11z M9.5 9.5h2a1.25 1.25 0 0 1 0 2.5h-2v-2.5 M9.5 12h2a1.25 1.25 0 0 1 0 2.5h-2V12\" />",
+    "group": "图像与比较",
+    "note": "前置候选图，图内 B 与快捷键一致"
+  },
+  "fit": {
+    "label": "适应窗口",
+    "body": "<path d=\"M7 3H3v4 M13 3h4v4 M3 13v4h4 M13 17h4v-4\" /><rect x=\"6.5\" y=\"7\" width=\"7\" height=\"6\" rx=\"0.6\" />",
+    "group": "图像与比较",
+    "note": "完整图像置于视口边界内"
+  },
+  "actual-size": {
+    "label": "实际像素 1:1",
+    "body": "<path d=\"M3 7l2-1v8 M13 7l2-1v8\" /><circle cx=\"9.5\" cy=\"8\" r=\"0.65\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"9.5\" cy=\"12\" r=\"0.65\" fill=\"currentColor\" stroke=\"none\"/>",
+    "group": "图像与比较",
+    "note": "直接绘制 1:1，避免眼睛图标歧义"
+  },
+  "rotate-cw-square": {
+    "label": "顺时针旋转 90°",
+    "body": "<path d=\"M4 7a6.2 6.2 0 0 1 11-2 M15 1.8v3.7h-3.7\" /><rect x=\"6\" y=\"9\" width=\"8\" height=\"8\" rx=\"0.7\" />",
+    "group": "图像与比较",
+    "note": ""
+  },
+  "rotate-ccw-square": {
+    "label": "逆时针旋转 90°",
+    "body": "<g transform=\"translate(20 0) scale(-1 1)\"><path d=\"M4 7a6.2 6.2 0 0 1 11-2 M15 1.8v3.7h-3.7\" /><rect x=\"6\" y=\"9\" width=\"8\" height=\"8\" rx=\"0.7\" /></g>",
+    "group": "图像与比较",
+    "note": ""
+  },
+  "info": {
+    "label": "图像信息",
+    "body": "<rect x=\"3\" y=\"3\" width=\"14\" height=\"14\" rx=\"2\" /><path d=\"M9 9h1.5v5 M8.5 14h4\" /><circle cx=\"10\" cy=\"6.5\" r=\"0.75\" fill=\"currentColor\" stroke=\"none\"/>",
+    "group": "图像与比较",
+    "note": "信息 i，替代警告感叹号"
+  },
+  "exif": {
+    "label": "EXIF 拍摄参数",
+    "body": "<path d=\"M2.5 6.5h3l1-2h5l1 2h3v5 M2.5 6.5v9h6 M12 13h5.5 M12 16h4\" /><circle cx=\"8\" cy=\"10.5\" r=\"2.5\" />",
+    "group": "图像与比较",
+    "note": "相机与参数行，替代拼写检查符号"
+  },
+  "histogram": {
+    "label": "亮度直方图",
+    "body": "<path d=\"M2.5 3.5v13h15 M5 14V11h2V7h2V5h2v4h2v3h2v2\" />",
+    "group": "图像与比较",
+    "note": "连续分布轮廓，区别于普通柱状统计"
+  },
+  "pixel-probe": {
+    "label": "像素取值",
+    "body": "<path d=\"M7 3H3v4 M13 3h4v4 M3 13v4h4 M13 17h4v-4\" /><rect x=\"7\" y=\"7\" width=\"6\" height=\"6\" rx=\"0\" /><rect x=\"9\" y=\"9\" width=\"2\" height=\"2\" rx=\"0\" fill=\"currentColor\" stroke=\"none\"/>",
+    "group": "图像与比较",
+    "note": "中心像素与采样范围"
+  },
+  "thumbnail-preview": {
+    "label": "导航缩略图",
+    "body": "<rect x=\"2.5\" y=\"3.5\" width=\"15\" height=\"13\" rx=\"1\" /><path d=\"M4.5 13l4-5 3 3 2-2 2 4\" /><rect x=\"10.5\" y=\"5.5\" width=\"5\" height=\"4\" rx=\"0.4\" fill=\"currentColor\" fill-opacity=\".14\"/>",
+    "group": "图像与比较",
+    "note": "整图中的小视口，替代准星"
+  },
+  "screenshot": {
+    "label": "保存比较截图",
+    "body": "<path d=\"M2.5 8V5.5h4l1.5-2h4l1.5 2h4V8 M2.5 12v4.5h15V12 M10 8v6 M7.5 11.5L10 14l2.5-2.5\" />",
+    "group": "图像与比较",
+    "note": "相机外形与保存箭头，区别于裁剪"
+  },
+  "folder": {
+    "label": "目录",
+    "body": "<path d=\"M2.5 6.5V4.5h5l2 2h8v10h-15z M2.5 8.5h15\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-home": {
+    "label": "主目录",
+    "body": "<path d=\"M2.5 9L10 3l7.5 6 M4.5 8v8.5h4V12h3v4.5h4V8\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-desktop": {
+    "label": "桌面",
+    "body": "<rect x=\"2.5\" y=\"3.5\" width=\"15\" height=\"10\" rx=\"1\" /><path d=\"M7 16.5h6 M10 13.5v3 M5 6.5h3\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-documents": {
+    "label": "文档",
+    "body": "<path d=\"M5 2.5h7l3 3v12H5z M12 2.5v4h3 M7.5 10h5 M7.5 13h4\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-downloads": {
+    "label": "下载",
+    "body": "<path d=\"M10 2.5v10 M6.5 9L10 12.5 13.5 9 M3.5 13.5v3h13v-3\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-pictures": {
+    "label": "图片",
+    "body": "<rect x=\"3\" y=\"3\" width=\"14\" height=\"14\" rx=\"1\" /><circle cx=\"7\" cy=\"7\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M3 14l4-4 3 3 3-5 4 6\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-drive": {
+    "label": "磁盘",
+    "body": "<path d=\"M4.5 4.5h11l2 8v4h-15v-4z M2.5 12.5h15 M5.5 14.5h5\" /><circle cx=\"15\" cy=\"14.5\" r=\"0.65\" fill=\"currentColor\" stroke=\"none\"/>",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "nav-network": {
+    "label": "网络位置",
+    "body": "<rect x=\"6.5\" y=\"2.5\" width=\"7\" height=\"5\" rx=\"0.6\" /><path d=\"M10 7.5v4 M4.5 14v-2.5h11V14\" /><rect x=\"2.5\" y=\"14\" width=\"4\" height=\"3.5\" rx=\"0.5\" /><rect x=\"13.5\" y=\"14\" width=\"4\" height=\"3.5\" rx=\"0.5\" />",
+    "group": "位置与目录",
+    "note": ""
+  },
+  "windows-folder": {
+    "label": "Windows 文件夹",
+    "body": "<g color=\"#A9771E\"><path d=\"M2.5 6.5V4.5h5l2 2h8v10h-15z M2.5 8.5h15\"  fill=\"currentColor\" fill-opacity=\".16\"/></g>",
+    "group": "位置与目录",
+    "note": "统一自绘轮廓；保留平台目录色"
+  },
+  "windows-folder-open": {
+    "label": "Windows 展开目录",
+    "body": "<g color=\"#A9771E\"><path d=\"M2.5 12V4.5h5l2 2h7v2 M2.5 16.5l2-7h14l-2 7z\"  fill=\"currentColor\" fill-opacity=\".16\"/></g>",
+    "group": "位置与目录",
+    "note": "统一自绘轮廓；保留平台目录色"
+  },
+  "macos-folder": {
+    "label": "macOS 文件夹",
+    "body": "<g color=\"#3D7FAD\"><path d=\"M2.5 6.5V4.5h5l2 2h8v10h-15z M2.5 8.5h15\"  fill=\"currentColor\" fill-opacity=\".16\"/></g>",
+    "group": "位置与目录",
+    "note": "统一自绘轮廓；保留平台目录色"
+  },
+  "macos-folder-open": {
+    "label": "macOS 展开目录",
+    "body": "<g color=\"#3D7FAD\"><path d=\"M2.5 12V4.5h5l2 2h7v2 M2.5 16.5l2-7h14l-2 7z\"  fill=\"currentColor\" fill-opacity=\".16\"/></g>",
+    "group": "位置与目录",
+    "note": "统一自绘轮廓；保留平台目录色"
+  },
+  "windows-drive": {
+    "label": "Windows 磁盘",
+    "body": "<path d=\"M4.5 4.5h11l2 8v4h-15v-4z M2.5 12.5h15 M5.5 14.5h5\" /><circle cx=\"15\" cy=\"14.5\" r=\"0.65\" fill=\"currentColor\" stroke=\"none\"/>",
+    "group": "位置与目录",
+    "note": "采用统一磁盘轮廓"
+  },
+  "back": {
+    "label": "后退",
+    "body": "<path d=\"M12.5 4.5L7 10l5.5 5.5\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "forward": {
+    "label": "前进",
+    "body": "<path d=\"M7.5 4.5L13 10l-5.5 5.5\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "up": {
+    "label": "上级目录",
+    "body": "<path d=\"M4.5 9L10 3.5 15.5 9 M10 3.5v13\" />",
+    "group": "窗口与辅助",
+    "note": "向上箭头，区别于目录展开符号"
+  },
+  "chevron-down": {
+    "label": "展开／下拉",
+    "body": "<path d=\"M5 7.5l5 5 5-5\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "close": {
+    "label": "关闭面板",
+    "body": "<path d=\"M5.5 5.5l9 9 M14.5 5.5l-9 9\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "caption-minimize": {
+    "label": "最小化",
+    "body": "<path d=\"M3.5 10.5h13\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "caption-maximize": {
+    "label": "最大化",
+    "body": "<rect x=\"3.5\" y=\"3.5\" width=\"13\" height=\"13\" rx=\"0.2\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "caption-restore": {
+    "label": "还原窗口",
+    "body": "<path d=\"M7 3.5h9.5V13 M3.5 7H13v9.5H3.5z\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "caption-close": {
+    "label": "关闭窗口",
+    "body": "<path d=\"M4 4l12 12 M16 4L4 16\" />",
+    "group": "窗口与辅助",
+    "note": ""
+  },
+  "caption-close-white": {
+    "label": "关闭窗口（悬停）",
+    "body": "<path d=\"M4 4l12 12 M16 4L4 16\" />",
+    "group": "窗口与辅助",
+    "note": "红色按钮背景使用纯白图形"
+  },
+  "fullscreen": {
+    "label": "全屏打开",
+    "body": "<path d=\"M11.5 3h5.5v5.5 M17 3l-6 6 M8.5 17H3v-5.5 M3 17l6-6\" />",
+    "group": "图像与比较",
+    "note": "向两角展开的双箭头，与适应窗口区别"
+  }
+}

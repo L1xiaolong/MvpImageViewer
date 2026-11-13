@@ -163,6 +163,14 @@
 <context>
     <name>BrowsePage</name>
     <message>
+        <source>Actual pixels (1:1)</source>
+        <translation>实际像素（1:1）</translation>
+    </message>
+    <message>
+        <source>Fit to window</source>
+        <translation>适应窗口</translation>
+    </message>
+    <message>
         <location filename="../Pages/BrowsePage.qml" line="28"/>
         <source>Name</source>
         <translation>名称</translation>

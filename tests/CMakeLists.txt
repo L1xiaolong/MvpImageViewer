@@ -144,7 +144,7 @@ target_compile_definitions(settings_ui_regression PRIVATE
     MVPVIEW_GITHUB_REPOSITORY="${MVPVIEW_GITHUB_REPOSITORY}")
 foreach(_variant ui ui-dark)
     set(_settings_icons)
-    foreach(_icon close caption-minimize caption-maximize caption-restore caption-close caption-close-white chevron-down folder folder-open nav-home nav-desktop nav-documents nav-downloads nav-pictures nav-drive nav-network)
+    foreach(_icon close caption-minimize caption-maximize caption-restore caption-close caption-close-white chevron-down folder folder-open nav-home nav-desktop nav-documents nav-downloads nav-pictures nav-drive nav-network actual-size fit fullscreen smooth-display)
         list(APPEND _settings_icons "${PROJECT_SOURCE_DIR}/assets/icons/${_variant}/${_icon}.svg")
     endforeach()
     qt_add_resources(settings_ui_regression "settings_test_${_variant}"

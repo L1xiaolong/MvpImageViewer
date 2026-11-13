@@ -33,6 +33,7 @@ Button {
             spacing: control.compact ? 0 : 6
             anchors.centerIn: parent
             Image {
+                objectName: "iconImage"
                 width: control.renderedIconSize
                 height: control.renderedIconSize
                 source: control.iconSource

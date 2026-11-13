@@ -133,6 +133,7 @@ set(_mvpview_qml_icons
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/side-by-side.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/split-vertical.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/fit.svg
+    ${PROJECT_SOURCE_DIR}/assets/icons/ui/fullscreen.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/exif.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/histogram.svg
     ${PROJECT_SOURCE_DIR}/assets/icons/ui/pixel-probe.svg

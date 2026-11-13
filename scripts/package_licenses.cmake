@@ -8,7 +8,9 @@ endif()
 
 get_filename_component(_source_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 file(MAKE_DIRECTORY "${NOTICE_DESTINATION}/licenses")
-foreach(_notice IN ITEMS LICENSE THIRD_PARTY_NOTICES.md licenses/Lucide-LICENSE)
+# Remove the obsolete icon notice when refreshing an existing package.
+file(REMOVE "${NOTICE_DESTINATION}/licenses/Lucide-LICENSE")
+foreach(_notice IN ITEMS LICENSE THIRD_PARTY_NOTICES.md)
     if(NOT EXISTS "${_source_root}/${_notice}")
         message(FATAL_ERROR "Missing distribution notice: ${_notice}")
     endif()

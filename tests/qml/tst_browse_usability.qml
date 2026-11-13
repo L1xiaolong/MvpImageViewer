@@ -104,6 +104,52 @@ Item {
             typeSearch("gallery")
             tryCompare(page().controller, "filterText", "gallery")
         }
+        function test_gallery_icon_controls_data() {
+            return [{tag:"light-small", w:980, dark:false}, {tag:"dark-small", w:980, dark:true},
+                    {tag:"light-wide", w:1440, dark:false}, {tag:"dark-wide", w:1440, dark:true}]
+        }
+        function test_gallery_icon_controls(data) {
+            scene.width = data.w
+            scene.Window.window.width = data.w
+            scene.Window.window.height = 640
+            page().workspaceController.paneCount = 1
+            page().workspaceController.setActiveDisplayMode(2)
+            Theme.darkMode = data.dark
+            page().iconPrefix = Qt.resolvedUrl("../../assets/icons/" + (data.dark ? "ui-dark/" : "ui/"))
+            const gallery = findChild(page(), "galleryWorkspace")
+            const actual = findChild(page(), "galleryActualPixelsButton")
+            const fit = findChild(page(), "galleryFitButton")
+            const full = findChild(page(), "galleryFullScreenButton")
+            const path = "/Images/Demo/sample_0001.jpg"
+            gallery.showPreview(path, testCapture.thumbnailFixture(false).toString() + "?fixture=gallery",
+                                "sample_0001.jpg", "240 × 60", false)
+            tryCompare(findChild(page(), "galleryImage"), "status", Image.Ready)
+            waitForRendering(gallery)
+            for (const button of [actual, fit, full]) {
+                verify(button.visible && button.enabled)
+                compare(button.text, "")
+                compare(button.width, 28)
+                compare(button.renderedIconSize, 16)
+                verify(button.Accessible.name.length > 0)
+                const image = findChild(button, "iconImage")
+                tryCompare(image, "status", Image.Ready)
+            }
+            verify(fit.checked)
+            mouseClick(actual)
+            verify(gallery.actualPixels && actual.checked && !fit.checked)
+            compare(gallery.manualZoom, 1.0)
+            mouseClick(actual)
+            verify(actual.checked, "Clicking the active zoom action keeps its selected state")
+            fit.forceActiveFocus()
+            keyClick(Qt.Key_Space)
+            verify(!gallery.actualPixels && fit.checked && !actual.checked)
+            mouseClick(full)
+            compare(page().controller.statusText, "Open sample_0001.jpg")
+            wait(80)
+            verify(testCapture.save(loader.item, testArtifactDir + "/gallery-icons-" + data.tag + ".png"))
+            gallery.resetPreview()
+            for (const button of [actual, fit, full]) verify(!button.enabled)
+        }
         function test_settings_language_switch() {
             const settings = findChild(page(), "settingsButton")
             compare(settings.text, "Settings")

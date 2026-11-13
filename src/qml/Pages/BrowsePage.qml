@@ -854,12 +854,18 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 4
 
-                    Button {
+                    AppIconButton {
                         id: actualPixelsButton
-                        width: 42
-                        height: 26
-                        text: qsTr("1:1")
-                        hoverEnabled: true
+                        objectName: "galleryActualPixelsButton"
+                        controlSize: 28
+                        renderedIconSize: 16
+                        iconSource: root.iconPrefix + "actual-size.svg"
+                        toolTipText: qsTr("Actual pixels (1:1)")
+                        enabled: galleryWorkspace.currentPreviewPath.length > 0
+                        checkable: true
+                        autoExclusive: true
+                        checked: galleryWorkspace.actualPixels &&
+                                 Math.abs(galleryWorkspace.manualZoom - 1.0) < 0.001
                         onClicked: {
                             galleryWorkspace.actualPixels = true;
                             galleryWorkspace.manualZoom = 1.0;
@@ -868,76 +874,34 @@ Rectangle {
                                 galleryFlick.contentY = Math.max(0, (galleryFlick.contentHeight - galleryFlick.height) / 2);
                             });
                         }
-                        background: Rectangle {
-                            radius: 5
-                            color: actualPixelsButton.down ? Theme.pressedSurface
-                                                           : actualPixelsButton.hovered ? Theme.softHover : "transparent"
-                            border.color: galleryWorkspace.actualPixels &&
-                                          Math.abs(galleryWorkspace.manualZoom - 1.0) < 0.001
-                                          ? Theme.primaryButton : Theme.opticalGray
-                        }
-                        contentItem: Text {
-                            text: actualPixelsButton.text
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            color: Theme.graphiteInk
-                            font.family: Theme.monoFont
-                            font.pixelSize: 10
-                        }
                     }
-                    Button {
+                    AppIconButton {
                         id: fitButton
-                        width: 42
-                        height: 26
-                        text: qsTr("Fit")
-                        hoverEnabled: true
+                        objectName: "galleryFitButton"
+                        controlSize: 28
+                        renderedIconSize: 16
+                        iconSource: root.iconPrefix + "fit.svg"
+                        toolTipText: qsTr("Fit to window")
+                        enabled: galleryWorkspace.currentPreviewPath.length > 0
+                        checkable: true
+                        autoExclusive: true
+                        checked: !galleryWorkspace.actualPixels
                         onClicked: {
                             galleryWorkspace.actualPixels = false;
                             galleryWorkspace.manualZoom = 1.0;
                             galleryFlick.contentX = 0;
                             galleryFlick.contentY = 0;
                         }
-                        background: Rectangle {
-                            radius: 5
-                            color: fitButton.down ? Theme.pressedSurface
-                                                  : fitButton.hovered ? Theme.softHover : "transparent"
-                            border.color: !galleryWorkspace.actualPixels ? Theme.primaryButton : Theme.opticalGray
-                        }
-                        contentItem: Text {
-                            text: fitButton.text
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            color: Theme.graphiteInk
-                            font.family: Theme.uiFont
-                            font.pixelSize: 10
-                        }
                     }
-                    Button {
+                    AppIconButton {
                         id: fullScreenButton
-                        width: 28
-                        height: 26
-                        text: qsTr("↗")
-                        hoverEnabled: true
-                        onClicked: {
-                            if (galleryWorkspace.currentPreviewPath.length > 0)
-                                root.controller.activatePath(galleryWorkspace.currentPreviewPath);
-                        }
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Open full screen")
-                        background: Rectangle {
-                            radius: 5
-                            color: fullScreenButton.down ? Theme.pressedSurface
-                                                         : fullScreenButton.hovered ? Theme.softHover : "transparent"
-                            border.color: Theme.opticalGray
-                        }
-                        contentItem: Text {
-                            text: fullScreenButton.text
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            color: Theme.graphiteInk
-                            font.family: Theme.uiFont
-                            font.pixelSize: 13
-                        }
+                        objectName: "galleryFullScreenButton"
+                        controlSize: 28
+                        renderedIconSize: 16
+                        iconSource: root.iconPrefix + "fullscreen.svg"
+                        toolTipText: qsTr("Open full screen")
+                        enabled: galleryWorkspace.currentPreviewPath.length > 0
+                        onClicked: root.controller.activatePath(galleryWorkspace.currentPreviewPath)
                     }
                 }
             }

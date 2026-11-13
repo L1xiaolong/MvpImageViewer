@@ -244,7 +244,7 @@ tools          Icon and translation maintenance scripts
 
 Original project code and assets are licensed under the [MIT License](LICENSE), permitting use, modification, and redistribution, including commercial use, provided the copyright and permission notices are retained.
 
-Third-party components retain their own licenses and are not covered by the project's MIT license. See [third-party notices](THIRD_PARTY_NOTICES.md) and the [complete icon license](licenses/Lucide-LICENSE) for the Lucide and Feather-derived icon attributions and file inventory. The application uses system fonts and does not bundle third-party font files.
+Third-party components retain their own licenses and are not covered by the project's MIT license. The project-authored UI SVG icons are covered by the project MIT license. See [third-party notices](THIRD_PARTY_NOTICES.md) for runtime dependency information. The application uses system fonts and does not bundle third-party font files.
 
 Packaging scripts include the project license and icon notices. These do not replace the notices and source delivery required by Qt, Exiv2, LibRaw, LittleCMS, and their transitive dependencies. Builds with Exiv2 enabled still require a combined distribution compatible with GPL-2.0-or-later.
 
